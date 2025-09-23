@@ -3,75 +3,154 @@ package services
 import (
 	"context"
 	"inventory-system/internal/database"
+	sqlc "inventory-system/internal/database/sqlc"
 	"inventory-system/internal/models"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type WarehouseService struct {
 	db *database.DB
+	q  *sqlc.Queries
 }
 
 func NewWarehouseService(db *database.DB) *WarehouseService {
-	return &WarehouseService{db: db}
+	return &WarehouseService{
+		db: db,
+		q:  sqlc.New(db.Pool),
+	}
 }
 
 func (s *WarehouseService) CreateWarehouse(ctx context.Context, req models.CreateWarehouseRequest) (*models.Warehouse, error) {
-	// For now, return a simple warehouse - this will be implemented properly later
-	return &models.Warehouse{
-		ID:        uuid.New(),
-		Name:      req.Name,
-		Location:  req.Location,
-		Address:   req.Address,
+	isActive := true
+	warehouse, err := s.q.CreateWarehouse(ctx, &sqlc.CreateWarehouseParams{
+		Name:          req.Name,
+		Location:      req.Location,
+		Address:       req.Address,
 		ContactPerson: req.ContactPerson,
-		ContactPhone: req.ContactPhone,
-		IsActive:  true,
+		ContactPhone:  req.ContactPhone,
+		IsActive:      &isActive,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.Warehouse{
+		ID:           warehouse.ID.Bytes,
+		Name:         warehouse.Name,
+		Location:     warehouse.Location,
+		Address:      warehouse.Address,
+		ContactPerson: warehouse.ContactPerson,
+		ContactPhone: warehouse.ContactPhone,
+		IsActive:     *warehouse.IsActive,
+		CreatedAt:    warehouse.CreatedAt.Time,
+		UpdatedAt:    warehouse.UpdatedAt.Time,
 	}, nil
 }
 
 func (s *WarehouseService) GetWarehouse(ctx context.Context, id uuid.UUID) (*models.Warehouse, error) {
-	// For now, return a simple warehouse - this will be implemented properly later
+	pgUUID := pgtype.UUID{}
+	copy(pgUUID.Bytes[:], id[:])
+	warehouse, err := s.q.GetWarehouse(ctx, pgUUID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &models.Warehouse{
-		ID:        id,
-		Name:      "Sample Warehouse",
-		Location:  "Sample Location",
-		IsActive:  true,
+		ID:           warehouse.ID.Bytes,
+		Name:         warehouse.Name,
+		Location:     warehouse.Location,
+		Address:      warehouse.Address,
+		ContactPerson: warehouse.ContactPerson,
+		ContactPhone: warehouse.ContactPhone,
+		IsActive:     *warehouse.IsActive,
+		CreatedAt:    warehouse.CreatedAt.Time,
+		UpdatedAt:    warehouse.UpdatedAt.Time,
 	}, nil
 }
 
 func (s *WarehouseService) ListWarehouses(ctx context.Context, filter models.WarehouseFilter) ([]models.Warehouse, int64, error) {
-	// For now, return sample data - this will be implemented properly later
-	warehouses := []models.Warehouse{
-		{
-			ID:        uuid.New(),
-			Name:      "Main Warehouse",
-			Location:  "New York",
-			IsActive:  true,
-		},
-		{
-			ID:        uuid.New(),
-			Name:      "Secondary Warehouse",
-			Location:  "Los Angeles",
-			IsActive:  true,
-		},
+	offset := (filter.Page - 1) * filter.Limit
+	
+	// Handle nil pointers safely
+	var nameFilter string
+	if filter.Name != nil {
+		nameFilter = *filter.Name
 	}
-	return warehouses, int64(len(warehouses)), nil
+	
+	var isActiveFilter bool = true // Default to showing active warehouses
+	if filter.IsActive != nil {
+		isActiveFilter = *filter.IsActive
+	}
+	
+	warehouses, err := s.q.ListWarehouses(ctx, &sqlc.ListWarehousesParams{
+		Column1:  interface{}(nameFilter),
+		IsActive: &isActiveFilter,
+		Limit:    int32(filter.Limit),
+		Offset:   int32(offset),
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total, err := s.q.CountWarehouses(ctx, &sqlc.CountWarehousesParams{
+		Column1:  interface{}(nameFilter),
+		IsActive: &isActiveFilter,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]models.Warehouse, len(warehouses))
+	for i, warehouse := range warehouses {
+		result[i] = models.Warehouse{
+			ID:           warehouse.ID.Bytes,
+			Name:         warehouse.Name,
+			Location:     warehouse.Location,
+			Address:      warehouse.Address,
+			ContactPerson: warehouse.ContactPerson,
+			ContactPhone: warehouse.ContactPhone,
+			IsActive:     *warehouse.IsActive,
+			CreatedAt:    warehouse.CreatedAt.Time,
+			UpdatedAt:    warehouse.UpdatedAt.Time,
+		}
+	}
+
+	return result, total, nil
 }
 
 func (s *WarehouseService) UpdateWarehouse(ctx context.Context, id uuid.UUID, req models.UpdateWarehouseRequest) (*models.Warehouse, error) {
-	// For now, return a simple warehouse - this will be implemented properly later
-	return &models.Warehouse{
-		ID:        id,
-		Name:      req.Name,
-		Location:  req.Location,
-		Address:   req.Address,
+	pgUUID := pgtype.UUID{}
+	copy(pgUUID.Bytes[:], id[:])
+	warehouse, err := s.q.UpdateWarehouse(ctx, &sqlc.UpdateWarehouseParams{
+		ID:            pgUUID,
+		Name:          req.Name,
+		Location:      req.Location,
+		Address:       req.Address,
 		ContactPerson: req.ContactPerson,
-		ContactPhone: req.ContactPhone,
-		IsActive:  req.IsActive,
+		ContactPhone:  req.ContactPhone,
+		IsActive:      &req.IsActive,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.Warehouse{
+		ID:           warehouse.ID.Bytes,
+		Name:         warehouse.Name,
+		Location:     warehouse.Location,
+		Address:      warehouse.Address,
+		ContactPerson: warehouse.ContactPerson,
+		ContactPhone: warehouse.ContactPhone,
+		IsActive:     *warehouse.IsActive,
+		CreatedAt:    warehouse.CreatedAt.Time,
+		UpdatedAt:    warehouse.UpdatedAt.Time,
 	}, nil
 }
 
 func (s *WarehouseService) DeleteWarehouse(ctx context.Context, id uuid.UUID) error {
-	// For now, just return nil - this will be implemented properly later
-	return nil
+	pgUUID := pgtype.UUID{}
+	copy(pgUUID.Bytes[:], id[:])
+	return s.q.DeleteWarehouse(ctx, pgUUID)
 }

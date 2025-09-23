@@ -40,14 +40,6 @@ export default function LoginPage() {
           <CardDescription className="text-center">
             Enter your email and password to access your account
           </CardDescription>
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-            <p className="text-sm text-blue-800 font-medium mb-2">Test Credentials:</p>
-            <div className="text-xs text-blue-700 space-y-1">
-              <p><strong>Admin:</strong> admin@inventory.com / password</p>
-              <p><strong>Manager:</strong> manager@inventory.com / password</p>
-              <p><strong>Staff:</strong> staff@inventory.com / password</p>
-            </div>
-          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

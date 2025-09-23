@@ -44,12 +44,26 @@ export function Navigation() {
             <Link href="/products">
               <Button variant="ghost">Products</Button>
             </Link>
+            <Link href="/categories">
+              <Button variant="ghost">Categories</Button>
+            </Link>
+            <Link href="/suppliers">
+              <Button variant="ghost">Suppliers</Button>
+            </Link>
             <Link href="/warehouses">
               <Button variant="ghost">Warehouses</Button>
             </Link>
             <Link href="/inventory/stock">
               <Button variant="ghost">Stock</Button>
             </Link>
+            <Button 
+              variant="outline" 
+              onClick={handleLogout}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

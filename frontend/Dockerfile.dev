@@ -9,6 +9,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Create .next directory to avoid ENOENT errors
+RUN mkdir -p .next
+
 EXPOSE 3000
 
 ENV PORT 3000

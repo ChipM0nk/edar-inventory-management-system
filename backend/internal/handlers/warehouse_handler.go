@@ -26,6 +26,11 @@ func (h *WarehouseHandler) ListWarehouses(c *gin.Context) {
 	search := c.Query("search")
 	isActiveStr := c.Query("is_active")
 
+	var nameFilter *string
+	if search != "" {
+		nameFilter = &search
+	}
+
 	var isActive *bool
 	if isActiveStr != "" {
 		active := isActiveStr == "true"
@@ -33,7 +38,7 @@ func (h *WarehouseHandler) ListWarehouses(c *gin.Context) {
 	}
 
 	filter := models.WarehouseFilter{
-		Name:     &search,
+		Name:     nameFilter,
 		IsActive: isActive,
 		Page:     page,
 		Limit:    limit,
