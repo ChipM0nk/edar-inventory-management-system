@@ -6,3 +6,4 @@ ALTER TABLE stock_movements
 DROP COLUMN IF EXISTS processed_date,
 DROP COLUMN IF EXISTS processed_by;
 
+

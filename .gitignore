@@ -116,4 +116,5 @@ Thumbs.db
 *.dylib
 *.test
 *.out
+*.log
 go.work

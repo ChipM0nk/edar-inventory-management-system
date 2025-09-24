@@ -13,3 +13,4 @@ CREATE INDEX idx_stock_movements_cost_price ON stock_movements(cost_price);
 -- Create index for total_amount queries
 CREATE INDEX idx_stock_movements_total_amount ON stock_movements(total_amount);
 
+

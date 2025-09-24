@@ -24,3 +24,4 @@ else
     echo "Or follow the manual setup guide: MANUAL_SETUP.md"
 fi
 
+

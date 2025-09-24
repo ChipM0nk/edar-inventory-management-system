@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"inventory-system/internal/models"
 	"inventory-system/internal/services"
@@ -18,6 +20,25 @@ func NewWarehouseHandler(warehouseService *services.WarehouseService) *Warehouse
 	return &WarehouseHandler{
 		warehouseService: warehouseService,
 	}
+}
+
+// debugLog writes debug information to a centralized log file
+func debugLog(functionName, message string, data interface{}) {
+	// Create log directory if it doesn't exist
+	if err := os.MkdirAll("log", 0755); err != nil {
+		log.Printf("Failed to create log directory: %v", err)
+		return
+	}
+	
+	logFile, err := os.OpenFile("log/service.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Printf("Failed to open log file: %v", err)
+		return
+	}
+	defer logFile.Close()
+	
+	debugLogger := log.New(logFile, "[DEBUG] ", log.LstdFlags)
+	debugLogger.Printf("[%s] %s: %+v", functionName, message, data)
 }
 
 func (h *WarehouseHandler) ListWarehouses(c *gin.Context) {
@@ -93,24 +114,58 @@ func (h *WarehouseHandler) GetWarehouse(c *gin.Context) {
 }
 
 func (h *WarehouseHandler) UpdateWarehouse(c *gin.Context) {
+	debugLog("UpdateWarehouseHandler", "Handler called", map[string]interface{}{
+		"method": c.Request.Method,
+		"url": c.Request.URL.String(),
+		"headers": c.Request.Header,
+	})
+	
 	idStr := c.Param("id")
+	debugLog("UpdateWarehouseHandler", "Extracted ID from URL", map[string]interface{}{
+		"id_string": idStr,
+	})
+	
 	id, err := uuid.Parse(idStr)
 	if err != nil {
+		debugLog("UpdateWarehouseHandler", "UUID parsing failed", map[string]interface{}{
+			"id_string": idStr,
+			"error": err.Error(),
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid warehouse ID"})
 		return
 	}
+	
+	debugLog("UpdateWarehouseHandler", "UUID parsed successfully", map[string]interface{}{
+		"id": id.String(),
+	})
 
 	var req models.UpdateWarehouseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		debugLog("UpdateWarehouseHandler", "JSON binding failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	
+	debugLog("UpdateWarehouseHandler", "JSON binding successful", map[string]interface{}{
+		"request": req,
+	})
 
 	warehouse, err := h.warehouseService.UpdateWarehouse(c.Request.Context(), id, req)
 	if err != nil {
+		debugLog("UpdateWarehouseHandler", "Service UpdateWarehouse failed", map[string]interface{}{
+			"error": err.Error(),
+			"id": id.String(),
+			"request": req,
+		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	
+	debugLog("UpdateWarehouseHandler", "Service UpdateWarehouse successful", map[string]interface{}{
+		"result": warehouse,
+	})
 
 	c.JSON(http.StatusOK, warehouse)
 }

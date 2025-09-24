@@ -33,3 +33,4 @@ INSERT INTO users (id, username, email, password_hash, role, is_active, created_
 ('990e8400-e29b-41d4-a716-446655440002', 'manager', 'manager@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager', true, NOW(), NOW()),
 ('990e8400-e29b-41d4-a716-446655440003', 'staff', 'staff@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', true, NOW(), NOW());
 
+

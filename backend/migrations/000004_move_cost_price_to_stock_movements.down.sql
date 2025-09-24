@@ -7,3 +7,4 @@ DROP INDEX IF EXISTS idx_stock_movements_cost_price;
 ALTER TABLE stock_movements DROP COLUMN IF EXISTS total_amount;
 ALTER TABLE stock_movements DROP COLUMN IF EXISTS cost_price;
 
+

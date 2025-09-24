@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Edit, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -60,6 +60,8 @@ export default function WarehousesPage() {
   
   // State management
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null)
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingData, setIsLoadingData] = useState(false)
@@ -89,10 +91,27 @@ export default function WarehousesPage() {
     }
   }, [user])
 
+  // Reload warehouses when search term changes (with debounce)
+  useEffect(() => {
+    if (user) {
+      const timeoutId = setTimeout(() => {
+        loadWarehouses()
+      }, 300) // 300ms debounce
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [searchTerm, user])
+
   const loadWarehouses = async () => {
     try {
       setIsLoadingData(true)
-      const response = await api.get('/warehouses')
+      const params = new URLSearchParams()
+      if (searchTerm.trim()) {
+        params.append('search', searchTerm.trim())
+      }
+      params.append('is_active', 'true') // Show active warehouses by default
+      
+      const response = await api.get(`/warehouses?${params.toString()}`)
       setWarehouses(response.data.warehouses || [])
     } catch (error) {
       console.error('Error loading warehouses:', error)
@@ -103,7 +122,15 @@ export default function WarehousesPage() {
 
   const handleCreate = async (data: WarehouseForm) => {
     try {
-      await api.post('/warehouses', data)
+      const createData = {
+        name: data.name,
+        location: data.location,
+        address: data.address && data.address.trim() ? data.address : null,
+        contact_person: data.contact_person && data.contact_person.trim() ? data.contact_person : null,
+        contact_phone: data.contact_phone && data.contact_phone.trim() ? data.contact_phone : null,
+      }
+      
+      await api.post('/warehouses', createData)
       setIsCreateOpen(false)
       form.reset()
       loadWarehouses() // Reload data
@@ -112,11 +139,56 @@ export default function WarehousesPage() {
     }
   }
 
-  // Filter warehouses based on search term
-  const filteredWarehouses = warehouses.filter(warehouse =>
-    warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    warehouse.location.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const handleEdit = (warehouse: Warehouse) => {
+    setEditingWarehouse(warehouse)
+    setIsEditOpen(true)
+    // Reset form with warehouse data after dialog opens
+    setTimeout(() => {
+      form.reset({
+        name: warehouse.name,
+        location: warehouse.location,
+        address: warehouse.address || '',
+        contact_person: warehouse.contact_person || '',
+        contact_phone: warehouse.contact_phone || '',
+      })
+    }, 0)
+  }
+
+  const handleUpdate = async (data: WarehouseForm) => {
+    if (!editingWarehouse) return
+    
+    try {
+      const updateData = {
+        name: data.name,
+        location: data.location,
+        address: data.address && data.address.trim() ? data.address : null,
+        contact_person: data.contact_person && data.contact_person.trim() ? data.contact_person : null,
+        contact_phone: data.contact_phone && data.contact_phone.trim() ? data.contact_phone : null,
+        is_active: editingWarehouse.is_active,
+      }
+      
+      await api.put(`/warehouses/${editingWarehouse.id}`, updateData)
+      setIsEditOpen(false)
+      setEditingWarehouse(null)
+      form.reset()
+      loadWarehouses() // Reload data
+    } catch (error) {
+      console.error('Error updating warehouse:', error)
+    }
+  }
+
+  const handleDelete = async (warehouse: Warehouse) => {
+    if (!confirm(`Are you sure you want to delete "${warehouse.name}"?`)) {
+      return
+    }
+    
+    try {
+      await api.delete(`/warehouses/${warehouse.id}`)
+      loadWarehouses() // Reload data
+    } catch (error) {
+      console.error('Error deleting warehouse:', error)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -228,6 +300,90 @@ export default function WarehousesPage() {
                   </form>
                 </DialogContent>
               </Dialog>
+
+              {/* Edit Dialog */}
+              <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Warehouse</DialogTitle>
+                    <DialogDescription>
+                      Update the warehouse information.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-name">Name *</Label>
+                        <Input
+                          id="edit-name"
+                          {...form.register('name')}
+                          placeholder="Warehouse name"
+                        />
+                        {form.formState.errors.name && (
+                          <p className="text-sm text-red-600 mt-1">
+                            {form.formState.errors.name.message}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-location">Location *</Label>
+                        <Input
+                          id="edit-location"
+                          {...form.register('location')}
+                          placeholder="City, State"
+                        />
+                        {form.formState.errors.location && (
+                          <p className="text-sm text-red-600 mt-1">
+                            {form.formState.errors.location.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-address">Address</Label>
+                      <Textarea
+                        id="edit-address"
+                        {...form.register('address')}
+                        placeholder="Full address"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-contact_person">Contact Person</Label>
+                        <Input
+                          id="edit-contact_person"
+                          {...form.register('contact_person')}
+                          placeholder="Contact person name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-contact_phone">Contact Phone</Label>
+                        <Input
+                          id="edit-contact_phone"
+                          {...form.register('contact_phone')}
+                          placeholder="Phone number"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditOpen(false)
+                          setEditingWarehouse(null)
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit">
+                        Update Warehouse
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
             
             <Card>
@@ -257,7 +413,7 @@ export default function WarehousesPage() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
                     <p className="mt-2 text-gray-600">Loading warehouses...</p>
                   </div>
-                ) : filteredWarehouses.length === 0 ? (
+                ) : warehouses.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500">
                       {searchTerm ? 'No warehouses found matching your search' : 'No warehouses found'}
@@ -276,10 +432,11 @@ export default function WarehousesPage() {
                         <TableHead>Contact</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredWarehouses.map((warehouse) => (
+                      {warehouses.map((warehouse) => (
                         <TableRow key={warehouse.id}>
                           <TableCell className="font-medium">{warehouse.name}</TableCell>
                           <TableCell>{warehouse.location}</TableCell>
@@ -306,6 +463,26 @@ export default function WarehousesPage() {
                           </TableCell>
                           <TableCell>
                             {new Date(warehouse.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEdit(warehouse)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDelete(warehouse)}
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

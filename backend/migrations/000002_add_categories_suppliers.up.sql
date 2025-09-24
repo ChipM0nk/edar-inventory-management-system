@@ -60,3 +60,4 @@ INSERT INTO suppliers (name, contact_person, email, phone, address, city, state,
 ('Home Depot Pro', 'Lisa Wilson', 'lisa@homedepot.com', '+1-555-0104', '321 Hardware Blvd', 'Atlanta', 'GA', 'USA'),
 ('Sports Central', 'Tom Brown', 'tom@sportscentral.com', '+1-555-0105', '654 Athletic Way', 'Denver', 'CO', 'USA');
 
+
