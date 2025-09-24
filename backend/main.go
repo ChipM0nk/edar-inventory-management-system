@@ -95,6 +95,7 @@ func main() {
 			products := protected.Group("/products")
 			{
 				products.GET("", productHandler.ListProducts)
+				products.GET("/with-stock", productHandler.ListProductsWithStock)
 				products.POST("", productHandler.CreateProduct)
 				products.GET("/:id", productHandler.GetProduct)
 				products.PUT("/:id", productHandler.UpdateProduct)

@@ -7,36 +7,39 @@ import (
 )
 
 type Product struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
-	SKU         string     `json:"sku" db:"sku"`
-	Name        string     `json:"name" db:"name"`
-	Description *string    `json:"description" db:"description"`
-	CategoryID  *uuid.UUID `json:"category_id" db:"category_id"`
-	SupplierID  *uuid.UUID `json:"supplier_id" db:"supplier_id"`
-	Category    *string    `json:"category,omitempty"`
-	Supplier    *string    `json:"supplier,omitempty"`
-	UnitPrice   float64    `json:"unit_price" db:"unit_price"`
-	IsActive    bool       `json:"is_active" db:"is_active"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	ID            uuid.UUID  `json:"id" db:"id"`
+	SKU           string     `json:"sku" db:"sku"`
+	Name          string     `json:"name" db:"name"`
+	Description   *string    `json:"description" db:"description"`
+	CategoryID    *uuid.UUID `json:"category_id" db:"category_id"`
+	SupplierID    *uuid.UUID `json:"supplier_id" db:"supplier_id"`
+	Category      *string    `json:"category,omitempty"`
+	Supplier      *string    `json:"supplier,omitempty"`
+	UnitPrice     float64    `json:"unit_price" db:"unit_price"`
+	MinStockLevel *int       `json:"min_stock_level" db:"min_stock_level"`
+	IsActive      bool       `json:"is_active" db:"is_active"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type CreateProductRequest struct {
-	SKU         string     `json:"sku" validate:"required"`
-	Name        string     `json:"name" validate:"required"`
-	Description *string    `json:"description"`
-	CategoryID  *uuid.UUID `json:"category_id" validate:"required"`
-	SupplierID  *uuid.UUID `json:"supplier_id" validate:"required"`
-	UnitPrice   float64    `json:"unit_price" validate:"required,min=0"`
+	SKU           string     `json:"sku" validate:"required"`
+	Name          string     `json:"name" validate:"required"`
+	Description   *string    `json:"description"`
+	CategoryID    *uuid.UUID `json:"category_id" validate:"required"`
+	SupplierID    *uuid.UUID `json:"supplier_id" validate:"required"`
+	UnitPrice     float64    `json:"unit_price" validate:"required,min=0"`
+	MinStockLevel *int       `json:"min_stock_level" validate:"omitempty,min=0"`
 }
 
 type UpdateProductRequest struct {
-	SKU         string     `json:"sku" validate:"required"`
-	Name        string     `json:"name" validate:"required"`
-	Description *string    `json:"description"`
-	CategoryID  *uuid.UUID `json:"category_id" validate:"required"`
-	SupplierID  *uuid.UUID `json:"supplier_id" validate:"required"`
-	UnitPrice   float64    `json:"unit_price" validate:"required,min=0"`
+	SKU           string     `json:"sku" validate:"required"`
+	Name          string     `json:"name" validate:"required"`
+	Description   *string    `json:"description"`
+	CategoryID    *uuid.UUID `json:"category_id" validate:"required"`
+	SupplierID    *uuid.UUID `json:"supplier_id" validate:"required"`
+	UnitPrice     float64    `json:"unit_price" validate:"required,min=0"`
+	MinStockLevel *int       `json:"min_stock_level" validate:"omitempty,min=0"`
 }
 
 type ProductFilter struct {
@@ -47,6 +50,13 @@ type ProductFilter struct {
 	Limit      int         `json:"limit" validate:"min=1,max=100"`
 	SortBy     string      `json:"sort_by"`
 	SortOrder  string      `json:"sort_order"`
+}
+
+type ProductWithStock struct {
+	Product
+	TotalStock     int64 `json:"total_stock"`
+	TotalReserved  int64 `json:"total_reserved"`
+	TotalAvailable int64 `json:"total_available"`
 }
 
 type ProductListResponse struct {

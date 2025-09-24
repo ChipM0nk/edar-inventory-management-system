@@ -123,3 +123,22 @@ type SOHReport struct {
 	MaxLevel      *int      `json:"max_stock_level"`
 	LastUpdated   time.Time `json:"last_updated"`
 }
+
+type StockInTransaction struct {
+	ReferenceID           *uuid.UUID `json:"reference_id" db:"reference_id"`
+	ProcessedDate         *time.Time `json:"processed_date" db:"processed_date"`
+	ProcessedBy           *uuid.UUID `json:"processed_by" db:"processed_by"`
+	ProcessedByFirstName  *string    `json:"processed_by_first_name" db:"processed_by_first_name"`
+	ProcessedByLastName   *string    `json:"processed_by_last_name" db:"processed_by_last_name"`
+	ItemCount             int64      `json:"item_count" db:"item_count"`
+	TotalAmount           *float64   `json:"total_amount" db:"total_amount"`
+	CreatedAt             time.Time  `json:"created_at" db:"created_at"`
+}
+
+type StockInTransactionListResponse struct {
+	Transactions []StockInTransaction `json:"transactions"`
+	Total        int64                `json:"total"`
+	Page         int                  `json:"page"`
+	Limit        int                  `json:"limit"`
+	Pages        int                  `json:"pages"`
+}

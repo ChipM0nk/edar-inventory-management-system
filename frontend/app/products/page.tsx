@@ -46,6 +46,7 @@ const productSchema = z.object({
   category_id: z.string().min(1, 'Category is required'),
   supplier_id: z.string().min(1, 'Supplier is required'),
   unit_price: z.number().min(0, 'Unit price must be greater than or equal to 0'),
+  min_stock_level: z.number().min(0, 'Minimum stock level must be greater than or equal to 0'),
 })
 
 type ProductForm = z.infer<typeof productSchema>
@@ -60,9 +61,13 @@ interface Product {
   category?: string
   supplier?: string
   unit_price: number
+  min_stock_level?: number
   is_active: boolean
   created_at: string
   updated_at: string
+  total_stock?: number
+  total_reserved?: number
+  total_available?: number
 }
 
 interface Category {
@@ -112,6 +117,7 @@ export default function ProductsPage() {
       category_id: '',
       supplier_id: '',
       unit_price: 0,
+      min_stock_level: 0,
     },
   })
 
@@ -177,7 +183,7 @@ export default function ProductsPage() {
       params.append('sort_order', sortOrder)
       params.append('limit', '50') // Load more items for better UX
       
-      const response = await api.get(`/products?${params.toString()}`)
+      const response = await api.get(`/products/with-stock?${params.toString()}`)
       setProducts(response.data.products || [])
     } catch (error) {
       console.error('Error loading products:', error)
@@ -195,6 +201,7 @@ export default function ProductsPage() {
         category_id: data.category_id,
         supplier_id: data.supplier_id,
         unit_price: data.unit_price,
+        min_stock_level: data.min_stock_level,
       }
       
       await api.post('/products', createData)
@@ -217,6 +224,7 @@ export default function ProductsPage() {
         category_id: product.category_id,
         supplier_id: product.supplier_id,
         unit_price: product.unit_price,
+        min_stock_level: product.min_stock_level || 0,
       })
     }, 0)
   }
@@ -232,6 +240,7 @@ export default function ProductsPage() {
         category_id: data.category_id,
         supplier_id: data.supplier_id,
         unit_price: data.unit_price,
+        min_stock_level: data.min_stock_level,
       }
       
       await api.put(`/products/${editingProduct.id}`, updateData)
@@ -306,6 +315,7 @@ export default function ProductsPage() {
                     category_id: '',
                     supplier_id: '',
                     unit_price: 0,
+                    min_stock_level: 0,
                   })
                 }
               }}>
@@ -415,6 +425,21 @@ export default function ProductsPage() {
                       {form.formState.errors.unit_price && (
                         <p className="text-sm text-red-600 mt-1">
                           {form.formState.errors.unit_price.message}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="min_stock_level">Minimum Stock Level *</Label>
+                      <Input
+                        id="min_stock_level"
+                        type="number"
+                        min="0"
+                        {...form.register('min_stock_level', { valueAsNumber: true })}
+                        placeholder="0"
+                      />
+                      {form.formState.errors.min_stock_level && (
+                        <p className="text-sm text-red-600 mt-1">
+                          {form.formState.errors.min_stock_level.message}
                         </p>
                       )}
                     </div>
@@ -539,6 +564,21 @@ export default function ProductsPage() {
                         </p>
                       )}
                     </div>
+                    <div>
+                      <Label htmlFor="edit-min_stock_level">Minimum Stock Level *</Label>
+                      <Input
+                        id="edit-min_stock_level"
+                        type="number"
+                        min="0"
+                        {...form.register('min_stock_level', { valueAsNumber: true })}
+                        placeholder="0"
+                      />
+                      {form.formState.errors.min_stock_level && (
+                        <p className="text-sm text-red-600 mt-1">
+                          {form.formState.errors.min_stock_level.message}
+                        </p>
+                      )}
+                    </div>
                     <DialogFooter>
                       <Button
                         type="button"
@@ -660,6 +700,7 @@ export default function ProductsPage() {
                           </Button>
                         </TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Stock</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -684,6 +725,11 @@ export default function ProductsPage() {
                             }`}>
                               {product.is_active ? 'Active' : 'Inactive'}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm font-medium">
+                              {product.total_stock || 0}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">

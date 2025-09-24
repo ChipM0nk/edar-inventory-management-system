@@ -56,6 +56,9 @@ export function Navigation() {
             <Link href="/inventory/stock">
               <Button variant="ghost">Stock</Button>
             </Link>
+            <Link href="/inventory/stock-history">
+              <Button variant="ghost">Stock History</Button>
+            </Link>
             <Button 
               variant="outline" 
               onClick={handleLogout}

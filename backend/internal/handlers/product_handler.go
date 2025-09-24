@@ -4,11 +4,13 @@ import (
 	"net/http"
 	"inventory-system/internal/models"
 	"inventory-system/internal/services"
+	"inventory-system/internal/utils"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
 
 type ProductHandler struct {
 	productService *services.ProductService
@@ -27,11 +29,26 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		return
 	}
 
+	// Debug logging
+	utils.DebugLog("CreateProduct", "Request received", map[string]interface{}{
+		"sku":            req.SKU,
+		"name":           req.Name,
+		"min_stock_level": req.MinStockLevel,
+	})
+
 	product, err := h.productService.CreateProduct(c.Request.Context(), req)
 	if err != nil {
+		utils.DebugLog("CreateProduct", "Service error", map[string]interface{}{
+			"error": err.Error(),
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	utils.DebugLog("CreateProduct", "Product created successfully", map[string]interface{}{
+		"product_id":      product.ID,
+		"min_stock_level": product.MinStockLevel,
+	})
 
 	c.JSON(http.StatusCreated, product)
 }
@@ -124,6 +141,66 @@ func (h *ProductHandler) ListProducts(c *gin.Context) {
 	})
 }
 
+func (h *ProductHandler) ListProductsWithStock(c *gin.Context) {
+	// Parse query parameters
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	name := c.Query("name")
+	categoryIDStr := c.Query("category_id")
+	supplierIDStr := c.Query("supplier_id")
+	sortBy := c.DefaultQuery("sort_by", "name")
+	sortOrder := c.DefaultQuery("sort_order", "asc")
+
+	// Validate pagination
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	filter := models.ProductFilter{
+		Page:     page,
+		Limit:    limit,
+		Name:     &name,
+		SortBy:   sortBy,
+		SortOrder: sortOrder,
+	}
+
+	// Parse UUIDs if provided
+	if categoryIDStr != "" {
+		if categoryID, err := uuid.Parse(categoryIDStr); err == nil {
+			filter.CategoryID = &categoryID
+		}
+	}
+	if supplierIDStr != "" {
+		if supplierID, err := uuid.Parse(supplierIDStr); err == nil {
+			filter.SupplierID = &supplierID
+		}
+	}
+
+	// Remove nil pointers if empty
+	if name == "" {
+		filter.Name = nil
+	}
+
+	products, total, err := h.productService.ListProductsWithStock(c.Request.Context(), filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	pages := (total + int64(limit) - 1) / int64(limit)
+
+	c.JSON(http.StatusOK, gin.H{
+		"products": products,
+		"total":    total,
+		"page":     page,
+		"limit":    limit,
+		"pages":    pages,
+	})
+}
+
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -138,11 +215,28 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
+	// Debug logging
+	utils.DebugLog("UpdateProduct", "Request received", map[string]interface{}{
+		"product_id":      id,
+		"sku":            req.SKU,
+		"name":           req.Name,
+		"min_stock_level": req.MinStockLevel,
+	})
+
 	product, err := h.productService.UpdateProduct(c.Request.Context(), id, req)
 	if err != nil {
+		utils.DebugLog("UpdateProduct", "Service error", map[string]interface{}{
+			"product_id": id,
+			"error":      err.Error(),
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	utils.DebugLog("UpdateProduct", "Product updated successfully", map[string]interface{}{
+		"product_id":      product.ID,
+		"min_stock_level": product.MinStockLevel,
+	})
 
 	c.JSON(http.StatusOK, product)
 }

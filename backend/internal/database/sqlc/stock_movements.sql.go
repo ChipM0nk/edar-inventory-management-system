@@ -111,6 +111,159 @@ func (q *Queries) CreateStockMovement(ctx context.Context, arg *CreateStockMovem
 	return &i, err
 }
 
+const GetStockInTransactionDetails = `-- name: GetStockInTransactionDetails :many
+SELECT 
+    sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount,
+    p.name as product_name,
+    p.sku,
+    w.name as warehouse_name,
+    s.name as supplier_name,
+    u.first_name,
+    u.last_name,
+    pb.first_name as processed_by_first_name,
+    pb.last_name as processed_by_last_name
+FROM stock_movements sm
+JOIN products p ON sm.product_id = p.id
+JOIN warehouses w ON sm.warehouse_id = w.id
+LEFT JOIN suppliers s ON p.supplier_id = s.id
+LEFT JOIN users u ON sm.user_id = u.id
+LEFT JOIN users pb ON sm.processed_by = pb.id
+WHERE sm.reference_id = $1
+ORDER BY sm.created_at
+`
+
+type GetStockInTransactionDetailsRow struct {
+	ID                   pgtype.UUID        `json:"id"`
+	ProductID            pgtype.UUID        `json:"product_id"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
+	MovementType         string             `json:"movement_type"`
+	Quantity             int32              `json:"quantity"`
+	ReferenceType        *string            `json:"reference_type"`
+	ReferenceID          pgtype.UUID        `json:"reference_id"`
+	Reason               *string            `json:"reason"`
+	UserID               pgtype.UUID        `json:"user_id"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	ProcessedBy          pgtype.UUID        `json:"processed_by"`
+	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
+	CostPrice            pgtype.Numeric     `json:"cost_price"`
+	TotalAmount          pgtype.Numeric     `json:"total_amount"`
+	ProductName          string             `json:"product_name"`
+	Sku                  string             `json:"sku"`
+	WarehouseName        string             `json:"warehouse_name"`
+	SupplierName         *string            `json:"supplier_name"`
+	FirstName            *string            `json:"first_name"`
+	LastName             *string            `json:"last_name"`
+	ProcessedByFirstName *string            `json:"processed_by_first_name"`
+	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+}
+
+func (q *Queries) GetStockInTransactionDetails(ctx context.Context, referenceID pgtype.UUID) ([]*GetStockInTransactionDetailsRow, error) {
+	rows, err := q.db.Query(ctx, GetStockInTransactionDetails, referenceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*GetStockInTransactionDetailsRow{}
+	for rows.Next() {
+		var i GetStockInTransactionDetailsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.WarehouseID,
+			&i.MovementType,
+			&i.Quantity,
+			&i.ReferenceType,
+			&i.ReferenceID,
+			&i.Reason,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.ProcessedBy,
+			&i.ProcessedDate,
+			&i.CostPrice,
+			&i.TotalAmount,
+			&i.ProductName,
+			&i.Sku,
+			&i.WarehouseName,
+			&i.SupplierName,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProcessedByFirstName,
+			&i.ProcessedByLastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const ListStockInTransactions = `-- name: ListStockInTransactions :many
+SELECT 
+    sm.reference_id,
+    sm.processed_date,
+    sm.processed_by,
+    pb.first_name as processed_by_first_name,
+    pb.last_name as processed_by_last_name,
+    COUNT(sm.id) as item_count,
+    SUM(sm.total_amount) as total_amount,
+    MIN(sm.created_at) as created_at
+FROM stock_movements sm
+LEFT JOIN users pb ON sm.processed_by = pb.id
+WHERE sm.movement_type = 'in' 
+  AND sm.reference_id IS NOT NULL
+GROUP BY sm.reference_id, sm.processed_date, sm.processed_by, pb.first_name, pb.last_name
+ORDER BY MIN(sm.created_at) DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListStockInTransactionsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type ListStockInTransactionsRow struct {
+	ReferenceID          pgtype.UUID        `json:"reference_id"`
+	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
+	ProcessedBy          pgtype.UUID        `json:"processed_by"`
+	ProcessedByFirstName *string            `json:"processed_by_first_name"`
+	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	ItemCount            int64              `json:"item_count"`
+	TotalAmount          int64              `json:"total_amount"`
+	CreatedAt            interface{}        `json:"created_at"`
+}
+
+func (q *Queries) ListStockInTransactions(ctx context.Context, arg *ListStockInTransactionsParams) ([]*ListStockInTransactionsRow, error) {
+	rows, err := q.db.Query(ctx, ListStockInTransactions, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*ListStockInTransactionsRow{}
+	for rows.Next() {
+		var i ListStockInTransactionsRow
+		if err := rows.Scan(
+			&i.ReferenceID,
+			&i.ProcessedDate,
+			&i.ProcessedBy,
+			&i.ProcessedByFirstName,
+			&i.ProcessedByLastName,
+			&i.ItemCount,
+			&i.TotalAmount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const ListStockMovements = `-- name: ListStockMovements :many
 SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name, 
        pb.first_name as processed_by_first_name, pb.last_name as processed_by_last_name

@@ -112,3 +112,21 @@ func OptionalStringToStringPtr(s *string) *string {
 	}
 	return s
 }
+
+// Helper function to convert optional int pointer to int32 pointer
+func OptionalIntToInt32Ptr(value *int) *int32 {
+	if value == nil {
+		return nil
+	}
+	val := int32(*value)
+	return &val
+}
+
+// Helper function to convert optional int32 pointer to int pointer
+func OptionalInt32PtrToInt(value *int32) *int {
+	if value == nil {
+		return nil
+	}
+	val := int(*value)
+	return &val
+}

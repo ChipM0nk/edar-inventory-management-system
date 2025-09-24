@@ -2,11 +2,10 @@ package services
 
 import (
 	"context"
-	"log"
-	"os"
 	"inventory-system/internal/database"
 	sqlc "inventory-system/internal/database/sqlc"
 	"inventory-system/internal/models"
+	"inventory-system/internal/utils"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -24,24 +23,6 @@ func NewWarehouseService(db *database.DB) *WarehouseService {
 	}
 }
 
-// debugLog writes debug information to a centralized log file
-func debugLog(functionName, message string, data interface{}) {
-	// Create log directory if it doesn't exist
-	if err := os.MkdirAll("log", 0755); err != nil {
-		log.Printf("Failed to create log directory: %v", err)
-		return
-	}
-	
-	logFile, err := os.OpenFile("log/service.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		log.Printf("Failed to open log file: %v", err)
-		return
-	}
-	defer logFile.Close()
-	
-	debugLogger := log.New(logFile, "[DEBUG] ", log.LstdFlags)
-	debugLogger.Printf("[%s] %s: %+v", functionName, message, data)
-}
 
 func (s *WarehouseService) CreateWarehouse(ctx context.Context, req models.CreateWarehouseRequest) (*models.Warehouse, error) {
 	isActive := true
@@ -144,21 +125,21 @@ func (s *WarehouseService) ListWarehouses(ctx context.Context, filter models.War
 }
 
 func (s *WarehouseService) UpdateWarehouse(ctx context.Context, id uuid.UUID, req models.UpdateWarehouseRequest) (*models.Warehouse, error) {
-	debugLog("UpdateWarehouse", "Function called", map[string]interface{}{
+	utils.DebugLog("UpdateWarehouse", "Function called", map[string]interface{}{
 		"id": id.String(),
 		"request": req,
 	})
 	
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
-		debugLog("UpdateWarehouse", "UUID conversion failed", map[string]interface{}{
+		utils.DebugLog("UpdateWarehouse", "UUID conversion failed", map[string]interface{}{
 			"id": id.String(),
 			"error": err.Error(),
 		})
 		return nil, err
 	}
 	
-	debugLog("UpdateWarehouse", "UUID converted successfully", map[string]interface{}{
+	utils.DebugLog("UpdateWarehouse", "UUID converted successfully", map[string]interface{}{
 		"original_id": id.String(),
 		"pg_uuid": pgUUID,
 	})
@@ -173,20 +154,20 @@ func (s *WarehouseService) UpdateWarehouse(ctx context.Context, id uuid.UUID, re
 		IsActive:      &req.IsActive,
 	}
 	
-	debugLog("UpdateWarehouse", "About to call UpdateWarehouse query", map[string]interface{}{
+	utils.DebugLog("UpdateWarehouse", "About to call UpdateWarehouse query", map[string]interface{}{
 		"params": updateParams,
 	})
 	
 	warehouse, err := s.q.UpdateWarehouse(ctx, updateParams)
 	if err != nil {
-		debugLog("UpdateWarehouse", "UpdateWarehouse query failed", map[string]interface{}{
+		utils.DebugLog("UpdateWarehouse", "UpdateWarehouse query failed", map[string]interface{}{
 			"error": err.Error(),
 			"params": updateParams,
 		})
 		return nil, err
 	}
 	
-	debugLog("UpdateWarehouse", "UpdateWarehouse query successful", map[string]interface{}{
+	utils.DebugLog("UpdateWarehouse", "UpdateWarehouse query successful", map[string]interface{}{
 		"result": warehouse,
 	})
 
@@ -202,7 +183,7 @@ func (s *WarehouseService) UpdateWarehouse(ctx context.Context, id uuid.UUID, re
 		UpdatedAt:    warehouse.UpdatedAt.Time,
 	}
 	
-	debugLog("UpdateWarehouse", "Function completed successfully", map[string]interface{}{
+	utils.DebugLog("UpdateWarehouse", "Function completed successfully", map[string]interface{}{
 		"result": result,
 	})
 	

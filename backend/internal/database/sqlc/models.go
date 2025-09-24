@@ -18,17 +18,18 @@ type Category struct {
 }
 
 type Product struct {
-	ID          pgtype.UUID        `json:"id"`
-	Sku         string             `json:"sku"`
-	Name        string             `json:"name"`
-	Description *string            `json:"description"`
-	Category    *string            `json:"category"`
-	UnitPrice   pgtype.Numeric     `json:"unit_price"`
-	IsActive    *bool              `json:"is_active"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	CategoryID  pgtype.UUID        `json:"category_id"`
-	SupplierID  pgtype.UUID        `json:"supplier_id"`
+	ID            pgtype.UUID        `json:"id"`
+	Sku           string             `json:"sku"`
+	Name          string             `json:"name"`
+	Description   *string            `json:"description"`
+	Category      *string            `json:"category"`
+	UnitPrice     pgtype.Numeric     `json:"unit_price"`
+	IsActive      *bool              `json:"is_active"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	CategoryID    pgtype.UUID        `json:"category_id"`
+	SupplierID    pgtype.UUID        `json:"supplier_id"`
+	MinStockLevel *int32             `json:"min_stock_level"`
 }
 
 type PurchaseOrder struct {

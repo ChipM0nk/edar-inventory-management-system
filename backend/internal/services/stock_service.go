@@ -362,6 +362,42 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 			return nil, err
 		}
 
+		// Update stock level
+		var newQuantity int32
+		if item.Quantity > 0 {
+			newQuantity = int32(item.Quantity)
+		}
+
+		// Get current stock level
+		currentStock, err := s.db.GetStockLevel(ctx, &sqlc.GetStockLevelParams{
+			ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID: utils.UUIDToPgxUUID(item.WarehouseID),
+		})
+		if err != nil {
+			// If stock level doesn't exist, create it
+			_, err = s.db.CreateStockLevel(ctx, &sqlc.CreateStockLevelParams{
+				ProductID:       utils.UUIDToPgxUUID(item.ProductID),
+				WarehouseID:     utils.UUIDToPgxUUID(item.WarehouseID),
+				Quantity:        int32(item.Quantity),
+				ReservedQuantity: 0,
+				MinStockLevel:   &[]int32{0}[0],
+				MaxStockLevel:   &[]int32{0}[0],
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Update existing stock level
+			_, err = s.db.UpdateStockQuantity(ctx, &sqlc.UpdateStockQuantityParams{
+				ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+				WarehouseID: utils.UUIDToPgxUUID(item.WarehouseID),
+				Quantity:    int32(currentStock.Quantity + newQuantity),
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		// Convert to model
 		stockMovements = append(stockMovements, models.StockMovement{
 			ID:            utils.PgxUUIDToUUID(stockMovement.ID),
@@ -391,6 +427,26 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 
 // GetProductsBySupplier gets all products for a specific supplier
 func (s *StockService) GetProductsBySupplier(ctx context.Context, supplierID uuid.UUID) ([]models.Product, error) {
-	// For now, return empty slice - this will be implemented later
-	return []models.Product{}, nil
+	products, err := s.db.GetProductsBySupplier(ctx, utils.UUIDToPgxUUID(supplierID))
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]models.Product, len(products))
+	for i, product := range products {
+		result[i] = models.Product{
+			ID:          utils.PgxUUIDToUUID(product.ID),
+			SKU:         product.Sku,
+			Name:        product.Name,
+			Description: product.Description,
+			UnitPrice:   utils.PgxNumericToFloat64(product.UnitPrice),
+			CategoryID:  utils.OptionalPgxUUIDToUUID(product.CategoryID),
+			SupplierID:  utils.OptionalPgxUUIDToUUID(product.SupplierID),
+			IsActive:    *product.IsActive,
+			CreatedAt:   utils.PgxTimestamptzToTime(product.CreatedAt),
+			UpdatedAt:   utils.PgxTimestamptzToTime(product.UpdatedAt),
+		}
+	}
+
+	return result, nil
 }

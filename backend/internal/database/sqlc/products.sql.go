@@ -45,18 +45,19 @@ func (q *Queries) CountProductsWithFilter(ctx context.Context, arg *CountProduct
 }
 
 const CreateProduct = `-- name: CreateProduct :one
-INSERT INTO products (sku, name, description, category_id, supplier_id, unit_price)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, sku, name, description, category, unit_price, is_active, created_at, updated_at, category_id, supplier_id
+INSERT INTO products (sku, name, description, category_id, supplier_id, unit_price, min_stock_level)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, sku, name, description, category, unit_price, is_active, created_at, updated_at, category_id, supplier_id, min_stock_level
 `
 
 type CreateProductParams struct {
-	Sku         string         `json:"sku"`
-	Name        string         `json:"name"`
-	Description *string        `json:"description"`
-	CategoryID  pgtype.UUID    `json:"category_id"`
-	SupplierID  pgtype.UUID    `json:"supplier_id"`
-	UnitPrice   pgtype.Numeric `json:"unit_price"`
+	Sku           string         `json:"sku"`
+	Name          string         `json:"name"`
+	Description   *string        `json:"description"`
+	CategoryID    pgtype.UUID    `json:"category_id"`
+	SupplierID    pgtype.UUID    `json:"supplier_id"`
+	UnitPrice     pgtype.Numeric `json:"unit_price"`
+	MinStockLevel *int32         `json:"min_stock_level"`
 }
 
 func (q *Queries) CreateProduct(ctx context.Context, arg *CreateProductParams) (*Product, error) {
@@ -67,6 +68,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg *CreateProductParams) (
 		arg.CategoryID,
 		arg.SupplierID,
 		arg.UnitPrice,
+		arg.MinStockLevel,
 	)
 	var i Product
 	err := row.Scan(
@@ -81,6 +83,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg *CreateProductParams) (
 		&i.UpdatedAt,
 		&i.CategoryID,
 		&i.SupplierID,
+		&i.MinStockLevel,
 	)
 	return &i, err
 }
@@ -97,7 +100,7 @@ func (q *Queries) DeleteProduct(ctx context.Context, id pgtype.UUID) error {
 }
 
 const GetProduct = `-- name: GetProduct :one
-SELECT id, sku, name, description, category, unit_price, is_active, created_at, updated_at, category_id, supplier_id FROM products
+SELECT id, sku, name, description, category, unit_price, is_active, created_at, updated_at, category_id, supplier_id, min_stock_level FROM products
 WHERE id = $1
 `
 
@@ -116,12 +119,13 @@ func (q *Queries) GetProduct(ctx context.Context, id pgtype.UUID) (*Product, err
 		&i.UpdatedAt,
 		&i.CategoryID,
 		&i.SupplierID,
+		&i.MinStockLevel,
 	)
 	return &i, err
 }
 
 const GetProductBySKU = `-- name: GetProductBySKU :one
-SELECT id, sku, name, description, category, unit_price, is_active, created_at, updated_at, category_id, supplier_id FROM products
+SELECT id, sku, name, description, category, unit_price, is_active, created_at, updated_at, category_id, supplier_id, min_stock_level FROM products
 WHERE sku = $1
 `
 
@@ -140,12 +144,13 @@ func (q *Queries) GetProductBySKU(ctx context.Context, sku string) (*Product, er
 		&i.UpdatedAt,
 		&i.CategoryID,
 		&i.SupplierID,
+		&i.MinStockLevel,
 	)
 	return &i, err
 }
 
 const GetProductsBySupplier = `-- name: GetProductsBySupplier :many
-SELECT p.id, p.sku, p.name, p.description, p.category, p.unit_price, p.is_active, p.created_at, p.updated_at, p.category_id, p.supplier_id, c.name as category_name, s.name as supplier_name
+SELECT p.id, p.sku, p.name, p.description, p.category, p.unit_price, p.is_active, p.created_at, p.updated_at, p.category_id, p.supplier_id, p.min_stock_level, c.name as category_name, s.name as supplier_name
 FROM products p
 LEFT JOIN categories c ON p.category_id = c.id
 LEFT JOIN suppliers s ON p.supplier_id = s.id
@@ -154,19 +159,20 @@ ORDER BY p.name
 `
 
 type GetProductsBySupplierRow struct {
-	ID           pgtype.UUID        `json:"id"`
-	Sku          string             `json:"sku"`
-	Name         string             `json:"name"`
-	Description  *string            `json:"description"`
-	Category     *string            `json:"category"`
-	UnitPrice    pgtype.Numeric     `json:"unit_price"`
-	IsActive     *bool              `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-	CategoryID   pgtype.UUID        `json:"category_id"`
-	SupplierID   pgtype.UUID        `json:"supplier_id"`
-	CategoryName *string            `json:"category_name"`
-	SupplierName *string            `json:"supplier_name"`
+	ID            pgtype.UUID        `json:"id"`
+	Sku           string             `json:"sku"`
+	Name          string             `json:"name"`
+	Description   *string            `json:"description"`
+	Category      *string            `json:"category"`
+	UnitPrice     pgtype.Numeric     `json:"unit_price"`
+	IsActive      *bool              `json:"is_active"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	CategoryID    pgtype.UUID        `json:"category_id"`
+	SupplierID    pgtype.UUID        `json:"supplier_id"`
+	MinStockLevel *int32             `json:"min_stock_level"`
+	CategoryName  *string            `json:"category_name"`
+	SupplierName  *string            `json:"supplier_name"`
 }
 
 func (q *Queries) GetProductsBySupplier(ctx context.Context, supplierID pgtype.UUID) ([]*GetProductsBySupplierRow, error) {
@@ -190,6 +196,7 @@ func (q *Queries) GetProductsBySupplier(ctx context.Context, supplierID pgtype.U
 			&i.UpdatedAt,
 			&i.CategoryID,
 			&i.SupplierID,
+			&i.MinStockLevel,
 			&i.CategoryName,
 			&i.SupplierName,
 		); err != nil {
@@ -204,7 +211,7 @@ func (q *Queries) GetProductsBySupplier(ctx context.Context, supplierID pgtype.U
 }
 
 const ListProducts = `-- name: ListProducts :many
-SELECT p.id, p.sku, p.name, p.description, p.category, p.unit_price, p.is_active, p.created_at, p.updated_at, p.category_id, p.supplier_id, c.name as category_name, s.name as supplier_name
+SELECT p.id, p.sku, p.name, p.description, p.category, p.unit_price, p.is_active, p.created_at, p.updated_at, p.category_id, p.supplier_id, p.min_stock_level, c.name as category_name, s.name as supplier_name
 FROM products p
 LEFT JOIN categories c ON p.category_id = c.id
 LEFT JOIN suppliers s ON p.supplier_id = s.id
@@ -219,19 +226,20 @@ type ListProductsParams struct {
 }
 
 type ListProductsRow struct {
-	ID           pgtype.UUID        `json:"id"`
-	Sku          string             `json:"sku"`
-	Name         string             `json:"name"`
-	Description  *string            `json:"description"`
-	Category     *string            `json:"category"`
-	UnitPrice    pgtype.Numeric     `json:"unit_price"`
-	IsActive     *bool              `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-	CategoryID   pgtype.UUID        `json:"category_id"`
-	SupplierID   pgtype.UUID        `json:"supplier_id"`
-	CategoryName *string            `json:"category_name"`
-	SupplierName *string            `json:"supplier_name"`
+	ID            pgtype.UUID        `json:"id"`
+	Sku           string             `json:"sku"`
+	Name          string             `json:"name"`
+	Description   *string            `json:"description"`
+	Category      *string            `json:"category"`
+	UnitPrice     pgtype.Numeric     `json:"unit_price"`
+	IsActive      *bool              `json:"is_active"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	CategoryID    pgtype.UUID        `json:"category_id"`
+	SupplierID    pgtype.UUID        `json:"supplier_id"`
+	MinStockLevel *int32             `json:"min_stock_level"`
+	CategoryName  *string            `json:"category_name"`
+	SupplierName  *string            `json:"supplier_name"`
 }
 
 func (q *Queries) ListProducts(ctx context.Context, arg *ListProductsParams) ([]*ListProductsRow, error) {
@@ -255,6 +263,7 @@ func (q *Queries) ListProducts(ctx context.Context, arg *ListProductsParams) ([]
 			&i.UpdatedAt,
 			&i.CategoryID,
 			&i.SupplierID,
+			&i.MinStockLevel,
 			&i.CategoryName,
 			&i.SupplierName,
 		); err != nil {
@@ -269,7 +278,7 @@ func (q *Queries) ListProducts(ctx context.Context, arg *ListProductsParams) ([]
 }
 
 const ListProductsWithFilter = `-- name: ListProductsWithFilter :many
-SELECT p.id, p.sku, p.name, p.description, p.category, p.unit_price, p.is_active, p.created_at, p.updated_at, p.category_id, p.supplier_id, c.name as category_name, s.name as supplier_name
+SELECT p.id, p.sku, p.name, p.description, p.category, p.unit_price, p.is_active, p.created_at, p.updated_at, p.category_id, p.supplier_id, p.min_stock_level, c.name as category_name, s.name as supplier_name
 FROM products p
 LEFT JOIN categories c ON p.category_id = c.id
 LEFT JOIN suppliers s ON p.supplier_id = s.id
@@ -298,19 +307,20 @@ type ListProductsWithFilterParams struct {
 }
 
 type ListProductsWithFilterRow struct {
-	ID           pgtype.UUID        `json:"id"`
-	Sku          string             `json:"sku"`
-	Name         string             `json:"name"`
-	Description  *string            `json:"description"`
-	Category     *string            `json:"category"`
-	UnitPrice    pgtype.Numeric     `json:"unit_price"`
-	IsActive     *bool              `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-	CategoryID   pgtype.UUID        `json:"category_id"`
-	SupplierID   pgtype.UUID        `json:"supplier_id"`
-	CategoryName *string            `json:"category_name"`
-	SupplierName *string            `json:"supplier_name"`
+	ID            pgtype.UUID        `json:"id"`
+	Sku           string             `json:"sku"`
+	Name          string             `json:"name"`
+	Description   *string            `json:"description"`
+	Category      *string            `json:"category"`
+	UnitPrice     pgtype.Numeric     `json:"unit_price"`
+	IsActive      *bool              `json:"is_active"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	CategoryID    pgtype.UUID        `json:"category_id"`
+	SupplierID    pgtype.UUID        `json:"supplier_id"`
+	MinStockLevel *int32             `json:"min_stock_level"`
+	CategoryName  *string            `json:"category_name"`
+	SupplierName  *string            `json:"supplier_name"`
 }
 
 func (q *Queries) ListProductsWithFilter(ctx context.Context, arg *ListProductsWithFilterParams) ([]*ListProductsWithFilterRow, error) {
@@ -342,6 +352,7 @@ func (q *Queries) ListProductsWithFilter(ctx context.Context, arg *ListProductsW
 			&i.UpdatedAt,
 			&i.CategoryID,
 			&i.SupplierID,
+			&i.MinStockLevel,
 			&i.CategoryName,
 			&i.SupplierName,
 		); err != nil {
@@ -355,21 +366,122 @@ func (q *Queries) ListProductsWithFilter(ctx context.Context, arg *ListProductsW
 	return items, nil
 }
 
+const ListProductsWithStock = `-- name: ListProductsWithStock :many
+SELECT p.id, p.sku, p.name, p.description, p.category, p.unit_price, p.is_active, p.created_at, p.updated_at, p.category_id, p.supplier_id, p.min_stock_level, c.name as category_name, s.name as supplier_name,
+       COALESCE(SUM(sl.quantity), 0) as total_stock,
+       COALESCE(SUM(sl.reserved_quantity), 0) as total_reserved,
+       COALESCE(SUM(sl.available_quantity), 0) as total_available
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN suppliers s ON p.supplier_id = s.id
+LEFT JOIN stock_levels sl ON p.id = sl.product_id
+WHERE p.is_active = true
+  AND ($1::text IS NULL OR p.name ILIKE '%' || $1 || '%')
+  AND ($2::uuid IS NULL OR p.category_id = $2)
+  AND ($3::uuid IS NULL OR p.supplier_id = $3)
+GROUP BY p.id, c.name, s.name
+ORDER BY 
+  CASE WHEN $6 = 'name' AND $7 = 'asc' THEN p.name END ASC,
+  CASE WHEN $6 = 'name' AND $7 = 'desc' THEN p.name END DESC,
+  CASE WHEN $6 = 'unit_price' AND $7 = 'asc' THEN p.unit_price END ASC,
+  CASE WHEN $6 = 'unit_price' AND $7 = 'desc' THEN p.unit_price END DESC,
+  CASE WHEN $6 = 'created_at' AND $7 = 'asc' THEN p.created_at END ASC,
+  CASE WHEN $6 = 'created_at' AND $7 = 'desc' THEN p.created_at END DESC
+LIMIT $4 OFFSET $5
+`
+
+type ListProductsWithStockParams struct {
+	Column1 string      `json:"column_1"`
+	Column2 pgtype.UUID `json:"column_2"`
+	Column3 pgtype.UUID `json:"column_3"`
+	Limit   int32       `json:"limit"`
+	Offset  int32       `json:"offset"`
+	Column6 interface{} `json:"column_6"`
+	Column7 interface{} `json:"column_7"`
+}
+
+type ListProductsWithStockRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	Sku            string             `json:"sku"`
+	Name           string             `json:"name"`
+	Description    *string            `json:"description"`
+	Category       *string            `json:"category"`
+	UnitPrice      pgtype.Numeric     `json:"unit_price"`
+	IsActive       *bool              `json:"is_active"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	CategoryID     pgtype.UUID        `json:"category_id"`
+	SupplierID     pgtype.UUID        `json:"supplier_id"`
+	MinStockLevel  *int32             `json:"min_stock_level"`
+	CategoryName   *string            `json:"category_name"`
+	SupplierName   *string            `json:"supplier_name"`
+	TotalStock     interface{}        `json:"total_stock"`
+	TotalReserved  interface{}        `json:"total_reserved"`
+	TotalAvailable interface{}        `json:"total_available"`
+}
+
+func (q *Queries) ListProductsWithStock(ctx context.Context, arg *ListProductsWithStockParams) ([]*ListProductsWithStockRow, error) {
+	rows, err := q.db.Query(ctx, ListProductsWithStock,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Limit,
+		arg.Offset,
+		arg.Column6,
+		arg.Column7,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*ListProductsWithStockRow{}
+	for rows.Next() {
+		var i ListProductsWithStockRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Sku,
+			&i.Name,
+			&i.Description,
+			&i.Category,
+			&i.UnitPrice,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.CategoryID,
+			&i.SupplierID,
+			&i.MinStockLevel,
+			&i.CategoryName,
+			&i.SupplierName,
+			&i.TotalStock,
+			&i.TotalReserved,
+			&i.TotalAvailable,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const UpdateProduct = `-- name: UpdateProduct :one
 UPDATE products
-SET sku = $2, name = $3, description = $4, category_id = $5, supplier_id = $6, unit_price = $7, updated_at = NOW()
+SET sku = $2, name = $3, description = $4, category_id = $5, supplier_id = $6, unit_price = $7, min_stock_level = $8, updated_at = NOW()
 WHERE id = $1
-RETURNING id, sku, name, description, category, unit_price, is_active, created_at, updated_at, category_id, supplier_id
+RETURNING id, sku, name, description, category, unit_price, is_active, created_at, updated_at, category_id, supplier_id, min_stock_level
 `
 
 type UpdateProductParams struct {
-	ID          pgtype.UUID    `json:"id"`
-	Sku         string         `json:"sku"`
-	Name        string         `json:"name"`
-	Description *string        `json:"description"`
-	CategoryID  pgtype.UUID    `json:"category_id"`
-	SupplierID  pgtype.UUID    `json:"supplier_id"`
-	UnitPrice   pgtype.Numeric `json:"unit_price"`
+	ID            pgtype.UUID    `json:"id"`
+	Sku           string         `json:"sku"`
+	Name          string         `json:"name"`
+	Description   *string        `json:"description"`
+	CategoryID    pgtype.UUID    `json:"category_id"`
+	SupplierID    pgtype.UUID    `json:"supplier_id"`
+	UnitPrice     pgtype.Numeric `json:"unit_price"`
+	MinStockLevel *int32         `json:"min_stock_level"`
 }
 
 func (q *Queries) UpdateProduct(ctx context.Context, arg *UpdateProductParams) (*Product, error) {
@@ -381,6 +493,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg *UpdateProductParams) (
 		arg.CategoryID,
 		arg.SupplierID,
 		arg.UnitPrice,
+		arg.MinStockLevel,
 	)
 	var i Product
 	err := row.Scan(
@@ -395,6 +508,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg *UpdateProductParams) (
 		&i.UpdatedAt,
 		&i.CategoryID,
 		&i.SupplierID,
+		&i.MinStockLevel,
 	)
 	return &i, err
 }
