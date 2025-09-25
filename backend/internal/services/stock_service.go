@@ -205,16 +205,31 @@ func (s *StockService) ListStockLevels(ctx context.Context, filter models.StockL
 
 	result := make([]models.StockLevel, len(stockLevels))
 	for i, stockLevel := range stockLevels {
-		maxStockLevel := int(*stockLevel.MaxStockLevel)
+		var maxStockLevel *int
+		if stockLevel.MaxStockLevel != nil {
+			val := int(*stockLevel.MaxStockLevel)
+			maxStockLevel = &val
+		}
+		
+		var availableQuantity int
+		if stockLevel.AvailableQuantity != nil {
+			availableQuantity = int(*stockLevel.AvailableQuantity)
+		}
+		
+		var minStockLevel int
+		if stockLevel.MinStockLevel != nil {
+			minStockLevel = int(*stockLevel.MinStockLevel)
+		}
+		
 		result[i] = models.StockLevel{
 			ID:                utils.PgxUUIDToUUID(stockLevel.ID),
 			ProductID:         utils.PgxUUIDToUUID(stockLevel.ProductID),
 			WarehouseID:       utils.PgxUUIDToUUID(stockLevel.WarehouseID),
 			Quantity:          int(stockLevel.Quantity),
 			ReservedQuantity:  int(stockLevel.ReservedQuantity),
-			AvailableQuantity: int(*stockLevel.AvailableQuantity),
-			MinStockLevel:     int(*stockLevel.MinStockLevel),
-			MaxStockLevel:     &maxStockLevel,
+			AvailableQuantity: availableQuantity,
+			MinStockLevel:     minStockLevel,
+			MaxStockLevel:     maxStockLevel,
 			LastUpdated:       utils.PgxTimestamptzToTime(stockLevel.LastUpdated),
 			CreatedAt:         utils.PgxTimestamptzToTime(stockLevel.CreatedAt),
 			UpdatedAt:         utils.PgxTimestamptzToTime(stockLevel.UpdatedAt),
