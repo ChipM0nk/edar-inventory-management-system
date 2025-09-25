@@ -15,7 +15,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Search, RefreshCw, ArrowLeft, Package } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, Package2, MapPin } from 'lucide-react'
 import api from '@/lib/api'
 
 interface StockMovement {
@@ -50,6 +57,8 @@ export default function StockHistoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filteredMovements, setFilteredMovements] = useState<StockMovement[]>([])
   const [selectedMovementType, setSelectedMovementType] = useState('all')
+  const [selectedMovement, setSelectedMovement] = useState<StockMovement | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -137,6 +146,16 @@ export default function StockHistoryPage() {
       default:
         return type
     }
+  }
+
+  const handleRowClick = (movement: StockMovement) => {
+    setSelectedMovement(movement)
+    setIsModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setSelectedMovement(null)
   }
 
   if (isLoading) {
@@ -266,11 +285,16 @@ export default function StockHistoryPage() {
                           <TableHead>Total Amount</TableHead>
                           <TableHead>Reason</TableHead>
                           <TableHead>Processed By</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredMovements.map((movement) => (
-                          <TableRow key={movement.id}>
+                          <TableRow 
+                            key={movement.id}
+                            className="cursor-pointer hover:bg-gray-50 transition-colors"
+                            onClick={() => handleRowClick(movement)}
+                          >
                             <TableCell className="text-sm text-gray-500">
                               {formatDate(movement.created_at)}
                             </TableCell>
@@ -303,6 +327,19 @@ export default function StockHistoryPage() {
                             <TableCell className="text-sm text-gray-500">
                               {movement.processed_by_name || movement.user_name || '-'}
                             </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRowClick(movement)
+                                }}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -314,6 +351,134 @@ export default function StockHistoryPage() {
           </div>
         </div>
       </div>
+
+      {/* Stock Movement Detail Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package2 className="h-5 w-5" />
+              Stock Movement Details
+            </DialogTitle>
+            <DialogDescription>
+              Complete information about this stock movement transaction
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedMovement && (
+            <div className="space-y-6">
+              {/* Movement Overview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Movement Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm font-medium">Date & Time</p>
+                        <p className="text-sm text-gray-600">{formatDate(selectedMovement.created_at)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMovementTypeColor(selectedMovement.movement_type)}`}>
+                        {getMovementTypeLabel(selectedMovement.movement_type)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Package2 className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm font-medium">Product</p>
+                        <p className="text-sm text-gray-600">{selectedMovement.product_name}</p>
+                        <p className="text-xs text-gray-500 font-mono">{selectedMovement.product_sku}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm font-medium">Warehouse</p>
+                        <p className="text-sm text-gray-600">{selectedMovement.warehouse_name}</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quantity and Financial Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Quantity & Financial Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm font-medium text-gray-600">Quantity</p>
+                      <p className={`text-2xl font-bold ${selectedMovement.movement_type === 'in' ? 'text-green-600' : selectedMovement.movement_type === 'out' ? 'text-red-600' : 'text-blue-600'}`}>
+                        {selectedMovement.movement_type === 'in' ? '+' : selectedMovement.movement_type === 'out' ? '-' : ''}{selectedMovement.quantity}
+                      </p>
+                    </div>
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm font-medium text-gray-600">Cost Price</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {selectedMovement.cost_price ? `₱${selectedMovement.cost_price.toFixed(2)}` : 'N/A'}
+                      </p>
+                    </div>
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm font-medium text-gray-600">Total Amount</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {selectedMovement.total_amount ? `₱${selectedMovement.total_amount.toFixed(2)}` : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Reference and Processing Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Reference & Processing Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Reference Type</p>
+                      <p className="text-sm text-gray-900 capitalize">{selectedMovement.reference_type || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Reference ID</p>
+                      <p className="text-sm text-gray-900 font-mono">{selectedMovement.reference_id || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Reason</p>
+                      <p className="text-sm text-gray-900">{selectedMovement.reason || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Processed By</p>
+                      <p className="text-sm text-gray-900">{selectedMovement.processed_by_name || selectedMovement.user_name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Processed Date</p>
+                      <p className="text-sm text-gray-900">{selectedMovement.processed_date ? formatDate(selectedMovement.processed_date) : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Movement ID</p>
+                      <p className="text-sm text-gray-900 font-mono">{selectedMovement.id}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={closeModal}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }
