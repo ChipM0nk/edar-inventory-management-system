@@ -29,7 +29,7 @@ type Product struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	CategoryID    pgtype.UUID        `json:"category_id"`
 	SupplierID    pgtype.UUID        `json:"supplier_id"`
-	MinStockLevel *int32             `json:"min_stock_level"`
+	MinStockLevel int32              `json:"min_stock_level"`
 }
 
 type PurchaseOrder struct {

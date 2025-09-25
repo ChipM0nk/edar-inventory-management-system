@@ -434,7 +434,8 @@ export default function ProductsPage() {
                         id="min_stock_level"
                         type="number"
                         min="0"
-                        {...form.register('min_stock_level', { valueAsNumber: true })}
+                        value={form.watch('min_stock_level') || 0}
+                        onChange={(e) => form.setValue('min_stock_level', parseInt(e.target.value) || 0)}
                         placeholder="0"
                       />
                       {form.formState.errors.min_stock_level && (
@@ -570,7 +571,8 @@ export default function ProductsPage() {
                         id="edit-min_stock_level"
                         type="number"
                         min="0"
-                        {...form.register('min_stock_level', { valueAsNumber: true })}
+                        value={form.watch('min_stock_level') || 0}
+                        onChange={(e) => form.setValue('min_stock_level', parseInt(e.target.value) || 0)}
                         placeholder="0"
                       />
                       {form.formState.errors.min_stock_level && (
@@ -699,6 +701,7 @@ export default function ProductsPage() {
                             Unit Price {getSortIcon('unit_price')}
                           </Button>
                         </TableHead>
+                        <TableHead>Min Stock</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Stock</TableHead>
                         <TableHead>Actions</TableHead>
@@ -716,6 +719,9 @@ export default function ProductsPage() {
                           <TableCell>{product.supplier || '-'}</TableCell>
                           <TableCell className="font-mono">
                             ₱{product.unit_price.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="font-mono text-center">
+                            {product.min_stock_level || 0}
                           </TableCell>
                           <TableCell>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

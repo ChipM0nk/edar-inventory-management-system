@@ -7,3 +7,4 @@ DROP COLUMN IF EXISTS processed_date,
 DROP COLUMN IF EXISTS processed_by;
 
 
+

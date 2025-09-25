@@ -34,7 +34,7 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.CreatePro
 		CategoryID:    utils.OptionalUUIDToPgxUUID(req.CategoryID),
 		SupplierID:    utils.OptionalUUIDToPgxUUID(req.SupplierID),
 		UnitPrice:     utils.Float64ToPgxNumeric(req.UnitPrice),
-		MinStockLevel: utils.OptionalIntToInt32Ptr(req.MinStockLevel),
+		MinStockLevel: utils.OptionalIntToInt32(req.MinStockLevel),
 	})
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.CreatePro
 		CategoryID:    utils.OptionalPgxUUIDToUUID(product.CategoryID),
 		SupplierID:    utils.OptionalPgxUUIDToUUID(product.SupplierID),
 		UnitPrice:     utils.PgxNumericToFloat64(product.UnitPrice),
-		MinStockLevel: utils.OptionalInt32PtrToInt(product.MinStockLevel),
+		MinStockLevel: utils.Int32ToIntPtr(product.MinStockLevel),
 		IsActive:      *product.IsActive,
 		CreatedAt:     utils.PgxTimestamptzToTime(product.CreatedAt),
 		UpdatedAt:     utils.PgxTimestamptzToTime(product.UpdatedAt),
@@ -69,7 +69,7 @@ func (s *ProductService) GetProduct(ctx context.Context, id uuid.UUID) (*models.
 		CategoryID:  utils.OptionalPgxUUIDToUUID(product.CategoryID),
 		SupplierID:  utils.OptionalPgxUUIDToUUID(product.SupplierID),
 		UnitPrice:     utils.PgxNumericToFloat64(product.UnitPrice),
-		MinStockLevel: utils.OptionalInt32PtrToInt(product.MinStockLevel),
+		MinStockLevel: utils.Int32ToIntPtr(product.MinStockLevel),
 		IsActive:      *product.IsActive,
 		CreatedAt:   utils.PgxTimestamptzToTime(product.CreatedAt),
 		UpdatedAt:   utils.PgxTimestamptzToTime(product.UpdatedAt),
@@ -88,18 +88,19 @@ func (s *ProductService) ListProducts(ctx context.Context) ([]models.Product, er
 	result := make([]models.Product, len(products))
 	for i, product := range products {
 		result[i] = models.Product{
-			ID:          utils.PgxUUIDToUUID(product.ID),
-			SKU:         product.Sku,
-			Name:        product.Name,
-			Description: product.Description,
-			CategoryID:  utils.OptionalPgxUUIDToUUID(product.CategoryID),
-			SupplierID:  utils.OptionalPgxUUIDToUUID(product.SupplierID),
-			UnitPrice:   utils.PgxNumericToFloat64(product.UnitPrice),
-			IsActive:    *product.IsActive,
-			CreatedAt:   utils.PgxTimestamptzToTime(product.CreatedAt),
-			UpdatedAt:   utils.PgxTimestamptzToTime(product.UpdatedAt),
-			Category:    product.CategoryName,
-			Supplier:    product.SupplierName,
+			ID:            utils.PgxUUIDToUUID(product.ID),
+			SKU:           product.Sku,
+			Name:          product.Name,
+			Description:   product.Description,
+			CategoryID:    utils.OptionalPgxUUIDToUUID(product.CategoryID),
+			SupplierID:    utils.OptionalPgxUUIDToUUID(product.SupplierID),
+			UnitPrice:     utils.PgxNumericToFloat64(product.UnitPrice),
+			MinStockLevel: utils.Int32ToIntPtr(product.MinStockLevel),
+			IsActive:      *product.IsActive,
+			CreatedAt:     utils.PgxTimestamptzToTime(product.CreatedAt),
+			UpdatedAt:     utils.PgxTimestamptzToTime(product.UpdatedAt),
+			Category:      product.CategoryName,
+			Supplier:      product.SupplierName,
 		}
 	}
 
@@ -147,18 +148,19 @@ func (s *ProductService) ListProductsWithFilter(ctx context.Context, filter mode
 	result := make([]models.Product, len(products))
 	for i, product := range products {
 		result[i] = models.Product{
-			ID:          utils.PgxUUIDToUUID(product.ID),
-			SKU:         product.Sku,
-			Name:        product.Name,
-			Description: product.Description,
-			CategoryID:  utils.OptionalPgxUUIDToUUID(product.CategoryID),
-			SupplierID:  utils.OptionalPgxUUIDToUUID(product.SupplierID),
-			UnitPrice:   utils.PgxNumericToFloat64(product.UnitPrice),
-			IsActive:    *product.IsActive,
-			CreatedAt:   utils.PgxTimestamptzToTime(product.CreatedAt),
-			UpdatedAt:   utils.PgxTimestamptzToTime(product.UpdatedAt),
-			Category:    product.CategoryName,
-			Supplier:    product.SupplierName,
+			ID:            utils.PgxUUIDToUUID(product.ID),
+			SKU:           product.Sku,
+			Name:          product.Name,
+			Description:   product.Description,
+			CategoryID:    utils.OptionalPgxUUIDToUUID(product.CategoryID),
+			SupplierID:    utils.OptionalPgxUUIDToUUID(product.SupplierID),
+			UnitPrice:     utils.PgxNumericToFloat64(product.UnitPrice),
+			MinStockLevel: utils.Int32ToIntPtr(product.MinStockLevel),
+			IsActive:      *product.IsActive,
+			CreatedAt:     utils.PgxTimestamptzToTime(product.CreatedAt),
+			UpdatedAt:     utils.PgxTimestamptzToTime(product.UpdatedAt),
+			Category:      product.CategoryName,
+			Supplier:      product.SupplierName,
 		}
 	}
 
@@ -207,18 +209,19 @@ func (s *ProductService) ListProductsWithStock(ctx context.Context, filter model
 	for i, product := range products {
 		result[i] = models.ProductWithStock{
 			Product: models.Product{
-				ID:          utils.PgxUUIDToUUID(product.ID),
-				SKU:         product.Sku,
-				Name:        product.Name,
-				Description: product.Description,
-				CategoryID:  utils.OptionalPgxUUIDToUUID(product.CategoryID),
-				SupplierID:  utils.OptionalPgxUUIDToUUID(product.SupplierID),
-				UnitPrice:   utils.PgxNumericToFloat64(product.UnitPrice),
-				IsActive:    *product.IsActive,
-				CreatedAt:   utils.PgxTimestamptzToTime(product.CreatedAt),
-				UpdatedAt:   utils.PgxTimestamptzToTime(product.UpdatedAt),
-				Category:    product.CategoryName,
-				Supplier:    product.SupplierName,
+				ID:            utils.PgxUUIDToUUID(product.ID),
+				SKU:           product.Sku,
+				Name:          product.Name,
+				Description:   product.Description,
+				CategoryID:    utils.OptionalPgxUUIDToUUID(product.CategoryID),
+				SupplierID:    utils.OptionalPgxUUIDToUUID(product.SupplierID),
+				UnitPrice:     utils.PgxNumericToFloat64(product.UnitPrice),
+				MinStockLevel: utils.Int32ToIntPtr(product.MinStockLevel),
+				IsActive:      *product.IsActive,
+				CreatedAt:     utils.PgxTimestamptzToTime(product.CreatedAt),
+				UpdatedAt:     utils.PgxTimestamptzToTime(product.UpdatedAt),
+				Category:      product.CategoryName,
+				Supplier:      product.SupplierName,
 			},
 			TotalStock:     product.TotalStock.(int64),
 			TotalReserved:  product.TotalReserved.(int64),
@@ -238,7 +241,7 @@ func (s *ProductService) UpdateProduct(ctx context.Context, id uuid.UUID, req mo
 		CategoryID:    utils.OptionalUUIDToPgxUUID(req.CategoryID),
 		SupplierID:    utils.OptionalUUIDToPgxUUID(req.SupplierID),
 		UnitPrice:     utils.Float64ToPgxNumeric(req.UnitPrice),
-		MinStockLevel: utils.OptionalIntToInt32Ptr(req.MinStockLevel),
+		MinStockLevel: utils.OptionalIntToInt32(req.MinStockLevel),
 	})
 	if err != nil {
 		return nil, err
@@ -252,7 +255,7 @@ func (s *ProductService) UpdateProduct(ctx context.Context, id uuid.UUID, req mo
 		CategoryID:  utils.OptionalPgxUUIDToUUID(product.CategoryID),
 		SupplierID:  utils.OptionalPgxUUIDToUUID(product.SupplierID),
 		UnitPrice:     utils.PgxNumericToFloat64(product.UnitPrice),
-		MinStockLevel: utils.OptionalInt32PtrToInt(product.MinStockLevel),
+		MinStockLevel: utils.Int32ToIntPtr(product.MinStockLevel),
 		IsActive:      *product.IsActive,
 		CreatedAt:   utils.PgxTimestamptzToTime(product.CreatedAt),
 		UpdatedAt:   utils.PgxTimestamptzToTime(product.UpdatedAt),

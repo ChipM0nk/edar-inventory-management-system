@@ -10,3 +10,4 @@ CREATE INDEX idx_stock_movements_processed_by ON stock_movements(processed_by);
 CREATE INDEX idx_stock_movements_processed_date ON stock_movements(processed_date);
 
 
+

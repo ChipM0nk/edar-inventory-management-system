@@ -122,11 +122,25 @@ func OptionalIntToInt32Ptr(value *int) *int32 {
 	return &val
 }
 
+// Helper function to convert optional int pointer to int32
+func OptionalIntToInt32(value *int) int32 {
+	if value == nil {
+		return 0
+	}
+	return int32(*value)
+}
+
 // Helper function to convert optional int32 pointer to int pointer
 func OptionalInt32PtrToInt(value *int32) *int {
 	if value == nil {
 		return nil
 	}
 	val := int(*value)
+	return &val
+}
+
+// Helper function to convert int32 to int pointer
+func Int32ToIntPtr(value int32) *int {
+	val := int(value)
 	return &val
 }

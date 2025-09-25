@@ -57,7 +57,7 @@ type CreateProductParams struct {
 	CategoryID    pgtype.UUID    `json:"category_id"`
 	SupplierID    pgtype.UUID    `json:"supplier_id"`
 	UnitPrice     pgtype.Numeric `json:"unit_price"`
-	MinStockLevel *int32         `json:"min_stock_level"`
+	MinStockLevel int32          `json:"min_stock_level"`
 }
 
 func (q *Queries) CreateProduct(ctx context.Context, arg *CreateProductParams) (*Product, error) {
@@ -170,7 +170,7 @@ type GetProductsBySupplierRow struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	CategoryID    pgtype.UUID        `json:"category_id"`
 	SupplierID    pgtype.UUID        `json:"supplier_id"`
-	MinStockLevel *int32             `json:"min_stock_level"`
+	MinStockLevel int32              `json:"min_stock_level"`
 	CategoryName  *string            `json:"category_name"`
 	SupplierName  *string            `json:"supplier_name"`
 }
@@ -237,7 +237,7 @@ type ListProductsRow struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	CategoryID    pgtype.UUID        `json:"category_id"`
 	SupplierID    pgtype.UUID        `json:"supplier_id"`
-	MinStockLevel *int32             `json:"min_stock_level"`
+	MinStockLevel int32              `json:"min_stock_level"`
 	CategoryName  *string            `json:"category_name"`
 	SupplierName  *string            `json:"supplier_name"`
 }
@@ -318,7 +318,7 @@ type ListProductsWithFilterRow struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	CategoryID    pgtype.UUID        `json:"category_id"`
 	SupplierID    pgtype.UUID        `json:"supplier_id"`
-	MinStockLevel *int32             `json:"min_stock_level"`
+	MinStockLevel int32              `json:"min_stock_level"`
 	CategoryName  *string            `json:"category_name"`
 	SupplierName  *string            `json:"supplier_name"`
 }
@@ -412,7 +412,7 @@ type ListProductsWithStockRow struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	CategoryID     pgtype.UUID        `json:"category_id"`
 	SupplierID     pgtype.UUID        `json:"supplier_id"`
-	MinStockLevel  *int32             `json:"min_stock_level"`
+	MinStockLevel  int32              `json:"min_stock_level"`
 	CategoryName   *string            `json:"category_name"`
 	SupplierName   *string            `json:"supplier_name"`
 	TotalStock     interface{}        `json:"total_stock"`
@@ -481,7 +481,7 @@ type UpdateProductParams struct {
 	CategoryID    pgtype.UUID    `json:"category_id"`
 	SupplierID    pgtype.UUID    `json:"supplier_id"`
 	UnitPrice     pgtype.Numeric `json:"unit_price"`
-	MinStockLevel *int32         `json:"min_stock_level"`
+	MinStockLevel int32          `json:"min_stock_level"`
 }
 
 func (q *Queries) UpdateProduct(ctx context.Context, arg *UpdateProductParams) (*Product, error) {

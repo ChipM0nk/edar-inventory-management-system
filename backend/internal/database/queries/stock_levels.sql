@@ -70,3 +70,4 @@ WHERE sl.available_quantity <= sl.min_stock_level
 ORDER BY sl.available_quantity ASC;
 
 
+
