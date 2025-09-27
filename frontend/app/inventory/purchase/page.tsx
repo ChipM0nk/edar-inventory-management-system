@@ -59,6 +59,12 @@ export default function PurchasePage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+  
+  // Filter states
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [selectedSupplier, setSelectedSupplier] = useState<string>('')
+  const [suppliers, setSuppliers] = useState<Array<{id: string, name: string}>>([])
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -66,14 +72,25 @@ export default function PurchasePage() {
     }
   }, [user, isLoading, router])
 
-  // Load purchase orders when user is available
+  // Load purchase orders and suppliers when user is available
   useEffect(() => {
     if (user) {
       loadPurchaseOrders()
+      loadSuppliers()
     }
   }, [user])
 
-  // Filter purchase orders based on search term
+  // Load suppliers
+  const loadSuppliers = async () => {
+    try {
+      const response = await api.get('/suppliers')
+      setSuppliers(response.data.suppliers || [])
+    } catch (error) {
+      console.error('Error loading suppliers:', error)
+    }
+  }
+
+  // Filter purchase orders based on search term, year, month, and supplier
   useEffect(() => {
     let filtered = purchaseOrders
 
@@ -84,6 +101,7 @@ export default function PurchasePage() {
           order.reference_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (order.reference_number && order.reference_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
           order.processed_by.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (order.supplier_name && order.supplier_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
           order.products.some(p => 
             p.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             p.product_sku.toLowerCase().includes(searchTerm.toLowerCase())
@@ -91,9 +109,23 @@ export default function PurchasePage() {
       )
     }
 
+    // Filter by year and month (based on Purchase Date)
+    filtered = filtered.filter(order => {
+      const orderDate = new Date(order.processed_date)
+      return orderDate.getFullYear() === selectedYear && 
+             orderDate.getMonth() + 1 === selectedMonth
+    })
+
+    // Filter by supplier
+    if (selectedSupplier) {
+      filtered = filtered.filter(order => 
+        order.supplier_name === suppliers.find(s => s.id === selectedSupplier)?.name
+      )
+    }
+
     setFilteredOrders(filtered)
     setCurrentPage(1) // Reset to first page when filtering
-  }, [searchTerm, purchaseOrders])
+  }, [purchaseOrders, searchTerm, selectedYear, selectedMonth, selectedSupplier, suppliers])
 
   // Pagination logic
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
@@ -190,31 +222,6 @@ export default function PurchasePage() {
     }).format(amount)
   }
 
-  const getTypeDisplay = (referenceType: string) => {
-    switch (referenceType) {
-      case 'purchase_order':
-        return 'Purchase Order'
-      case 'adjustment':
-        return 'Adjustment'
-      case 'transfer':
-        return 'Transfer'
-      default:
-        return referenceType.replace('_', ' ').toUpperCase()
-    }
-  }
-
-  const getTypeColor = (referenceType: string) => {
-    switch (referenceType) {
-      case 'purchase_order':
-        return 'bg-blue-100 text-blue-800'
-      case 'adjustment':
-        return 'bg-orange-100 text-orange-800'
-      case 'transfer':
-        return 'bg-purple-100 text-purple-800'
-      default:
-        return 'bg-green-100 text-green-800'
-    }
-  }
 
   const handleOrderClick = (order: PurchaseOrder) => {
     setSelectedOrder(order)
@@ -284,11 +291,71 @@ export default function PurchasePage() {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
-                      placeholder="Search by reference number, processed by, or product..."
+                      placeholder="Search by reference number, processed by, supplier, or product..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
                     />
+                  </div>
+                </div>
+
+                {/* Filter Controls */}
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Year</label>
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#52a852] focus:border-transparent"
+                    >
+                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Month</label>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#52a852] focus:border-transparent"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                        <option key={month} value={month}>
+                          {new Date(2000, month - 1).toLocaleString('default', { month: 'long' })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                    <select
+                      value={selectedSupplier}
+                      onChange={(e) => setSelectedSupplier(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#52a852] focus:border-transparent"
+                    >
+                      <option value="">All Suppliers</option>
+                      {suppliers.map(supplier => (
+                        <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button
+                      onClick={() => {
+                        setSearchTerm('')
+                        setSelectedSupplier('')
+                        setSelectedYear(new Date().getFullYear())
+                        setSelectedMonth(new Date().getMonth() + 1)
+                      }}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Clear Filters
+                    </Button>
                   </div>
                 </div>
 
@@ -319,14 +386,13 @@ export default function PurchasePage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Reference Number</TableHead>
-                          <TableHead>Type</TableHead>
+                          <TableHead>Supplier</TableHead>
                           <TableHead>Total Quantity</TableHead>
                           <TableHead>Total Amount</TableHead>
                           <TableHead>Processed By</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Created</TableHead>
+                          <TableHead>Purchase Date</TableHead>
+                          <TableHead>Created At</TableHead>
                           <TableHead>Products</TableHead>
-                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -339,10 +405,8 @@ export default function PurchasePage() {
                             <TableCell className="font-mono font-medium text-blue-600 hover:text-blue-800">
                               {order.reference_number || order.reference_id}
                             </TableCell>
-                            <TableCell>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(order.reference_type)}`}>
-                                {getTypeDisplay(order.reference_type)}
-                              </span>
+                            <TableCell className="text-sm text-gray-600">
+                              {order.supplier_name || 'Not specified'}
                             </TableCell>
                             <TableCell className="font-medium">
                               {order.total_quantity}
@@ -357,23 +421,10 @@ export default function PurchasePage() {
                               {formatDate(order.processed_date)}
                             </TableCell>
                             <TableCell className="text-sm text-gray-500">
-                              {formatDate(order.created_at)}
+                              {formatDateTime(order.created_at)}
                             </TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {order.products.length} item{order.products.length !== 1 ? 's' : ''}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleOrderClick(order)
-                                }}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -454,11 +505,6 @@ export default function PurchasePage() {
                         <p className="text-sm font-medium">Reference ID</p>
                         <p className="text-sm text-gray-600 font-mono">{selectedOrder.reference_number || selectedOrder.reference_id}</p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(selectedOrder.reference_type)}`}>
-                        {getTypeDisplay(selectedOrder.reference_type)}
-                      </span>
                     </div>
                     <div className="flex items-center gap-3">
                       <Calendar className="h-4 w-4 text-gray-500" />
