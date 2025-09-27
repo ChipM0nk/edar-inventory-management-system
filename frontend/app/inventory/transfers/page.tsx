@@ -297,9 +297,8 @@ export default function TransfersPage() {
 
   return (
     <AppLayout>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-4">
                 <Button
@@ -328,7 +327,7 @@ export default function TransfersPage() {
                   Refresh
                 </Button>
                 <Button 
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 bg-[#52a852] hover:bg-[#4a964a] text-white"
                   onClick={() => setIsCreateModalOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -443,7 +442,6 @@ export default function TransfersPage() {
             </Card>
           </div>
         </div>
-      </div>
 
       {/* Transfer Detail Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -674,7 +672,7 @@ export default function TransfersPage() {
                   />
                 </div>
                 
-                <Button onClick={handleAddItem} className="w-full">
+                <Button onClick={handleAddItem} className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white">
                   Add Item
                 </Button>
               </CardContent>
@@ -738,6 +736,7 @@ export default function TransfersPage() {
               <Button 
                 onClick={handleCreateTransfer}
                 disabled={transferItems.length === 0}
+                className="bg-[#52a852] hover:bg-[#4a964a] text-white"
               >
                 Create Transfer
               </Button>
