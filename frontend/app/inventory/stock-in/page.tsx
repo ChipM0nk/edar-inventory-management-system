@@ -107,7 +107,7 @@ export default function StockInPage() {
           if (!ordersMap.has(refId)) {
             ordersMap.set(refId, {
               reference_id: refId,
-              reference_type: movement.reference_type || 'purchase_order',
+              reference_type: movement.reference_type || 'adjustment',
               total_quantity: 0,
               total_amount: 0,
               processed_by: movement.processed_by_name || movement.user_name || 'Unknown',
@@ -154,6 +154,32 @@ export default function StockInPage() {
       style: 'currency',
       currency: 'PHP'
     }).format(amount)
+  }
+
+  const getTypeDisplay = (referenceType: string) => {
+    switch (referenceType) {
+      case 'purchase_order':
+        return 'Purchase Order'
+      case 'adjustment':
+        return 'Adjustment'
+      case 'transfer':
+        return 'Transfer'
+      default:
+        return referenceType.replace('_', ' ').toUpperCase()
+    }
+  }
+
+  const getTypeColor = (referenceType: string) => {
+    switch (referenceType) {
+      case 'purchase_order':
+        return 'bg-blue-100 text-blue-800'
+      case 'adjustment':
+        return 'bg-orange-100 text-orange-800'
+      case 'transfer':
+        return 'bg-purple-100 text-purple-800'
+      default:
+        return 'bg-green-100 text-green-800'
+    }
   }
 
   const handleOrderClick = (order: StockInOrder) => {
@@ -291,8 +317,8 @@ export default function StockInPage() {
                               {order.reference_id}
                             </TableCell>
                             <TableCell>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                {order.reference_type.replace('_', ' ').toUpperCase()}
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(order.reference_type)}`}>
+                                {getTypeDisplay(order.reference_type)}
                               </span>
                             </TableCell>
                             <TableCell className="font-medium">
@@ -365,8 +391,8 @@ export default function StockInPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {selectedOrder.reference_type.replace('_', ' ').toUpperCase()}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(selectedOrder.reference_type)}`}>
+                        {getTypeDisplay(selectedOrder.reference_type)}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">

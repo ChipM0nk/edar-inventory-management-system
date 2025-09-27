@@ -64,7 +64,7 @@ CREATE TABLE stock_movements (
     warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
     movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('in', 'out', 'transfer', 'adjustment')),
     quantity INTEGER NOT NULL,
-    reference_type VARCHAR(50), -- 'purchase_order', 'sales_order', 'transfer', 'adjustment'
+    reference_type VARCHAR(50), -- 'purchase_order', 'transfer', 'adjustment'
     reference_id UUID,
     reason TEXT,
     user_id UUID REFERENCES users(id),
