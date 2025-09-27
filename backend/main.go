@@ -43,6 +43,8 @@ func main() {
 	categoryService := services.NewCategoryService(db)
 	supplierService := services.NewSupplierService(db)
 	warehouseService := services.NewWarehouseService(db)
+	purchaseOrderService := services.NewPurchaseOrderService(db)
+	documentService := services.NewDocumentService(db)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userService, jwtService)
@@ -51,6 +53,8 @@ func main() {
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	supplierHandler := handlers.NewSupplierHandler(supplierService)
 	warehouseHandler := handlers.NewWarehouseHandler(warehouseService)
+	purchaseOrderHandler := handlers.NewPurchaseOrderHandler(purchaseOrderService)
+	documentHandler := handlers.NewDocumentHandler(documentService)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -146,6 +150,26 @@ func main() {
 				movements.GET("", stockHandler.ListStockMovements)
 				movements.POST("", stockHandler.CreateStockMovement)
 				movements.POST("/bulk", stockHandler.CreateBulkStockMovement)
+			}
+
+			// Purchase orders
+			purchaseOrders := protected.Group("/purchase-orders")
+			{
+				purchaseOrders.GET("", purchaseOrderHandler.ListPurchaseOrders)
+				purchaseOrders.POST("", purchaseOrderHandler.CreatePurchaseOrder)
+				purchaseOrders.GET("/:id", purchaseOrderHandler.GetPurchaseOrder)
+				purchaseOrders.PUT("/:id", purchaseOrderHandler.UpdatePurchaseOrder)
+			}
+
+			// Documents
+			documents := protected.Group("/documents")
+			{
+				documents.POST("/upload", documentHandler.UploadDocuments)
+				documents.GET("/purchase-order/:purchase_order_id", documentHandler.GetDocuments)
+				documents.GET("/:id/download", documentHandler.DownloadDocument)
+				documents.POST("/:id/validate", documentHandler.ValidateDocument)
+				documents.GET("/:id/validation-status", documentHandler.GetDocumentValidationStatus)
+				documents.DELETE("/:id", documentHandler.DeleteDocument)
 			}
 
 			// Products by supplier

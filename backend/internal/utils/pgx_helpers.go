@@ -165,3 +165,29 @@ func OptionalPgxTextToString(t pgtype.Text) *string {
 	}
 	return &t.String
 }
+
+// Helper function to convert time to pgtype.Date
+func TimeToPgxDate(t time.Time) pgtype.Date {
+	return pgtype.Date{Time: t, Valid: true}
+}
+
+// Helper function to convert optional time pointer to pgtype.Date
+func TimeToPgxDatePtr(t *time.Time) pgtype.Date {
+	if t == nil {
+		return pgtype.Date{Valid: false}
+	}
+	return pgtype.Date{Time: *t, Valid: true}
+}
+
+// Helper function to convert pgtype.Date to time
+func PgxDateToTime(d pgtype.Date) time.Time {
+	return d.Time
+}
+
+// Helper function to convert optional pgtype.Date to time pointer
+func PgxDateToTimePtr(d pgtype.Date) *time.Time {
+	if !d.Valid {
+		return nil
+	}
+	return &d.Time
+}

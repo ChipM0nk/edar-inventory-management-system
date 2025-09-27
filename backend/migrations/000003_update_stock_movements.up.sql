@@ -12,3 +12,5 @@ CREATE INDEX idx_stock_movements_processed_date ON stock_movements(processed_dat
 
 
 
+
+

@@ -17,6 +17,22 @@ type Category struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Document struct {
+	ID               pgtype.UUID        `json:"id"`
+	PurchaseOrderID  pgtype.UUID        `json:"purchase_order_id"`
+	FileName         string             `json:"file_name"`
+	FilePath         string             `json:"file_path"`
+	FileSize         int64              `json:"file_size"`
+	FileType         string             `json:"file_type"`
+	UploadedAt       pgtype.Timestamptz `json:"uploaded_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	HasPoReference   *bool              `json:"has_po_reference"`
+	HasMatchingDate  *bool              `json:"has_matching_date"`
+	ValidationStatus *string            `json:"validation_status"`
+	ValidationNotes  *string            `json:"validation_notes"`
+}
+
 type Product struct {
 	ID            pgtype.UUID        `json:"id"`
 	Sku           string             `json:"sku"`

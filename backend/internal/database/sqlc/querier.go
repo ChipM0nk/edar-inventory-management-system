@@ -25,6 +25,7 @@ type Querier interface {
 	CountSuppliersWithFilter(ctx context.Context, arg *CountSuppliersWithFilterParams) (int64, error)
 	CountWarehouses(ctx context.Context, arg *CountWarehousesParams) (int64, error)
 	CreateCategory(ctx context.Context, arg *CreateCategoryParams) (*Category, error)
+	CreateDocument(ctx context.Context, arg *CreateDocumentParams) (*Document, error)
 	CreateProduct(ctx context.Context, arg *CreateProductParams) (*Product, error)
 	CreatePurchaseOrder(ctx context.Context, arg *CreatePurchaseOrderParams) (*PurchaseOrder, error)
 	CreateSalesOrder(ctx context.Context, arg *CreateSalesOrderParams) (*SalesOrder, error)
@@ -34,12 +35,15 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error)
 	CreateWarehouse(ctx context.Context, arg *CreateWarehouseParams) (*Warehouse, error)
 	DeleteCategory(ctx context.Context, id pgtype.UUID) error
+	DeleteDocument(ctx context.Context, id pgtype.UUID) error
 	DeleteProduct(ctx context.Context, id pgtype.UUID) error
 	DeleteSupplier(ctx context.Context, id pgtype.UUID) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteWarehouse(ctx context.Context, id pgtype.UUID) error
 	GetCategory(ctx context.Context, id pgtype.UUID) (*Category, error)
 	GetCategoryByName(ctx context.Context, name string) (*Category, error)
+	GetDocumentByID(ctx context.Context, id pgtype.UUID) (*Document, error)
+	GetDocumentsByPurchaseOrder(ctx context.Context, purchaseOrderID pgtype.UUID) ([]*Document, error)
 	GetLowStockItems(ctx context.Context) ([]*GetLowStockItemsRow, error)
 	GetProduct(ctx context.Context, id pgtype.UUID) (*Product, error)
 	GetProductBySKU(ctx context.Context, sku string) (*Product, error)
@@ -72,6 +76,7 @@ type Querier interface {
 	ListUsers(ctx context.Context) ([]*User, error)
 	ListWarehouses(ctx context.Context, arg *ListWarehousesParams) ([]*Warehouse, error)
 	UpdateCategory(ctx context.Context, arg *UpdateCategoryParams) (*Category, error)
+	UpdateDocumentValidation(ctx context.Context, arg *UpdateDocumentValidationParams) (*Document, error)
 	UpdateProduct(ctx context.Context, arg *UpdateProductParams) (*Product, error)
 	UpdatePurchaseOrder(ctx context.Context, arg *UpdatePurchaseOrderParams) (*PurchaseOrder, error)
 	UpdatePurchaseOrderTotal(ctx context.Context, arg *UpdatePurchaseOrderTotalParams) (*PurchaseOrder, error)

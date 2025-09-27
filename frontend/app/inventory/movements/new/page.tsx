@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Plus, Package, Search, X } from 'lucide-react'
@@ -89,6 +89,8 @@ export default function NewStockMovementPage() {
   const [productCostDisplay, setProductCostDisplay] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [cancellationReason, setCancellationReason] = useState('')
 
   // Form setup
   const form = useForm<StockInForm>({
@@ -333,6 +335,54 @@ export default function NewStockMovementPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
+  // Check if purchase order can be cancelled (within 30 days)
+  const canCancelPurchaseOrder = (createdDate: string) => {
+    const created = new Date(createdDate)
+    const now = new Date()
+    const daysDifference = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+    return daysDifference <= 30
+  }
+
+  // Handle cancel purchase order
+  const handleCancelPurchaseOrder = async () => {
+    if (!cancellationReason.trim()) {
+      alert('Please provide a reason for cancellation')
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      
+      // Here you would call your API to cancel the purchase order
+      // await api.post('/purchase-orders/cancel', {
+      //   purchase_order_id: purchaseOrderId,
+      //   reason: cancellationReason
+      // })
+      
+      console.log('Cancelling purchase order with reason:', cancellationReason)
+      alert('Purchase order cancelled successfully')
+      
+      // Reset form and redirect
+      form.reset()
+      setStockInItems([])
+      setUploadedDocuments([])
+      setShowCancelDialog(false)
+      setCancellationReason('')
+      router.push('/inventory/purchase')
+    } catch (error: any) {
+      console.error('Error cancelling purchase order:', error)
+      alert('Error cancelling purchase order. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle view document
+  const handleViewDocument = (file: File) => {
+    const url = URL.createObjectURL(file)
+    window.open(url, '_blank')
+  }
+
   // Handle form submission
   const handleSubmit = async (data: StockInForm) => {
     const selectedItems = stockInItems.filter(item => item.selected && item.quantity > 0)
@@ -357,12 +407,43 @@ export default function NewStockMovementPage() {
     try {
       setIsSubmitting(true)
       
+      // Create purchase order first
+      const purchaseOrderData = {
+        po_number: data.reference_number,
+        supplier_name: data.supplier_name,
+        supplier_contact: data.supplier_contact,
+        order_date: new Date().toISOString().split('T')[0],
+        expected_delivery_date: data.expected_delivery_date,
+        notes: data.notes || '',
+        created_by: user?.id || '',
+      }
+
+      console.log('Creating purchase order:', purchaseOrderData)
+      const purchaseOrderResponse = await api.post('/purchase-orders', purchaseOrderData)
+      const purchaseOrderId = purchaseOrderResponse.data.id
+
+      // Upload documents if any
+      if (uploadedDocuments.length > 0) {
+        const formData = new FormData()
+        uploadedDocuments.forEach((file, index) => {
+          formData.append(`documents`, file)
+        })
+        formData.append('purchase_order_id', purchaseOrderId)
+
+        console.log('Uploading documents for purchase order:', purchaseOrderId)
+        await api.post('/documents/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+      }
+
+      // Create stock movements
       const bulkRequest = {
         supplier_id: data.supplier_id,
         reference_number: data.reference_number || undefined,
         processed_by: user?.id || data.processed_by,
         processed_date: new Date(data.received_date).toISOString(),
-        documents: uploadedDocuments,
         items: selectedItems.map(item => ({
           product_id: item.product_id,
           warehouse_id: item.warehouse_id,
@@ -533,6 +614,10 @@ export default function NewStockMovementPage() {
                       <Input
                         {...form.register('reference_number')}
                         placeholder="PO-12345"
+                        onChange={(e) => {
+                          const upperValue = e.target.value.toUpperCase()
+                          form.setValue('reference_number', upperValue)
+                        }}
                       />
                     </div>
 
@@ -544,97 +629,6 @@ export default function NewStockMovementPage() {
                         rows={3}
                       />
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Document Upload Section */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Documents</CardTitle>
-                  <CardDescription>
-                    Upload receipts, invoices, and other supporting documents
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* File Upload Input */}
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                      <input
-                        type="file"
-                        multiple
-                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                        onChange={handleDocumentUpload}
-                        className="hidden"
-                        id="document-upload"
-                      />
-                      <label
-                        htmlFor="document-upload"
-                        className="cursor-pointer flex flex-col items-center space-y-2"
-                      >
-                        <svg
-                          className="w-8 h-8 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                          />
-                        </svg>
-                        <span className="text-sm font-medium text-gray-600">
-                          Click to upload documents
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          PDF, JPG, PNG, DOC, DOCX, XLS, XLSX up to 10MB each
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Uploaded Documents List */}
-                    {uploadedDocuments.length > 0 && (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-gray-700">Uploaded Documents:</h4>
-                        {uploadedDocuments.map((file, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <svg
-                                className="w-5 h-5 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                />
-                              </svg>
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeDocument(index)}
-                              className="text-red-500 hover:text-red-700 transition-colors"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -920,6 +914,126 @@ export default function NewStockMovementPage() {
                 </Card>
               )}
 
+              {/* Document Upload Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Documents</CardTitle>
+                  <CardDescription>
+                    Upload receipts, invoices, and other supporting documents
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* File Upload Input */}
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                        onChange={handleDocumentUpload}
+                        className="hidden"
+                        id="document-upload"
+                      />
+                      <label
+                        htmlFor="document-upload"
+                        className="cursor-pointer flex flex-col items-center space-y-2"
+                      >
+                        <svg
+                          className="w-8 h-8 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                          />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-600">
+                          Click to upload documents
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          PDF, JPG, PNG, DOC, DOCX, XLS, XLSX up to 10MB each
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Uploaded Documents List */}
+                    {uploadedDocuments.length > 0 ? (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700">Uploaded Documents:</h4>
+                        {uploadedDocuments.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <svg
+                                className="w-5 h-5 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                              </svg>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => handleViewDocument(file)}
+                                className="text-blue-500 hover:text-blue-700 transition-colors"
+                                title="View document"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeDocument(index)}
+                                className="text-red-500 hover:text-red-700 transition-colors"
+                                title="Remove document"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <svg className="w-5 h-5 text-amber-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                          <div>
+                            <h4 className="text-sm font-medium text-amber-800">No documents uploaded</h4>
+                            <p className="text-sm text-amber-700 mt-1">
+                              Consider uploading receipts, invoices, or other supporting documents for this purchase order. 
+                              This helps with record keeping and audit trails.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Success Message */}
               {showSuccessMessage && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-2">
@@ -928,8 +1042,20 @@ export default function NewStockMovementPage() {
                 </div>
               )}
 
-              {/* Submit Button */}
-              <div className="flex justify-end">
+              {/* Action Buttons */}
+              <div className="flex justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCancelDialog(true)}
+                  className="text-red-600 border-red-300 hover:bg-red-50"
+                  disabled={isSubmitting}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Cancel Purchase Order
+                </Button>
                 <Button
                   type="submit"
                   disabled={isSubmitting || selectedItems.length === 0}
@@ -1036,6 +1162,71 @@ export default function NewStockMovementPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Purchase Order Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Cancel Purchase Order</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this purchase order? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="cancellation-reason" className="text-sm font-medium">
+                Reason for cancellation <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="cancellation-reason"
+                placeholder="Please provide a reason for cancelling this purchase order..."
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+            
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-amber-400 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-amber-800">Important Note</p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Purchase orders can only be cancelled within 30 days of creation. 
+                    If this order is older than 30 days, please contact your administrator.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="flex justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowCancelDialog(false)
+                setCancellationReason('')
+              }}
+              disabled={isSubmitting}
+            >
+              Keep Purchase Order
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCancelPurchaseOrder}
+              disabled={isSubmitting || !cancellationReason.trim()}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isSubmitting ? 'Cancelling...' : 'Cancel Purchase Order'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppLayout>

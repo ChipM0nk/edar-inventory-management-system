@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, Package2, MapPin, FileText, Hash, Building, Clock } from 'lucide-react'
+import { Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, Package2, MapPin, FileText, Hash, Building, Clock, Upload, X, Trash2, FileImage, FilePdf } from 'lucide-react'
 import api from '@/lib/api'
 
 interface PurchaseOrder {
@@ -46,6 +46,15 @@ interface PurchaseOrder {
   }[]
 }
 
+interface Document {
+  id: string
+  file_name: string
+  file_path: string
+  file_size: number
+  file_type: string
+  uploaded_at: string
+}
+
 export default function PurchasePage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
@@ -59,6 +68,18 @@ export default function PurchasePage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+  
+  // Document-related state
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
+  const [viewingDocument, setViewingDocument] = useState<string | null>(null)
+  
+  // Cancel confirmation state
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [cancellationReason, setCancellationReason] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
   
   // Filter states
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -226,11 +247,210 @@ export default function PurchasePage() {
   const handleOrderClick = (order: PurchaseOrder) => {
     setSelectedOrder(order)
     setIsModalOpen(true)
+    loadDocuments(order.reference_id)
   }
 
   const closeModal = () => {
     setIsModalOpen(false)
     setSelectedOrder(null)
+    setDocuments([])
+    setUploadedFiles([])
+    setShowDocumentUpload(false)
+    setShowCancelDialog(false)
+    setCancellationReason('')
+    setViewingDocument(null)
+  }
+
+  // Load documents for a purchase order
+  const loadDocuments = async (purchaseOrderId: string) => {
+    try {
+      const response = await api.get(`/documents/purchase-order/${purchaseOrderId}`)
+      setDocuments(response.data || [])
+    } catch (error) {
+      console.error('Error loading documents:', error)
+      setDocuments([])
+    }
+  }
+
+  // Handle file selection for upload
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    setUploadedFiles(prev => [...prev, ...files])
+  }
+
+  // Remove file from upload list
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Upload documents
+  const uploadDocuments = async () => {
+    if (!selectedOrder || uploadedFiles.length === 0) return
+
+    try {
+      setIsUploadingDocuments(true)
+      const formData = new FormData()
+      
+      uploadedFiles.forEach((file, index) => {
+        formData.append(`documents`, file)
+      })
+      formData.append('purchase_order_id', selectedOrder.reference_id)
+
+      await api.post('/documents/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      // Reload documents and clear upload files
+      await loadDocuments(selectedOrder.reference_id)
+      setUploadedFiles([])
+      setShowDocumentUpload(false)
+      
+      alert('Documents uploaded successfully!')
+    } catch (error) {
+      console.error('Error uploading documents:', error)
+      alert('Error uploading documents. Please try again.')
+    } finally {
+      setIsUploadingDocuments(false)
+    }
+  }
+
+  // Download document
+  const downloadDocument = async (document: Document) => {
+    try {
+      const response = await api.get(`/documents/${document.id}/download`, {
+        responseType: 'blob'
+      })
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', document.file_name)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error downloading document:', error)
+      alert('Error downloading document. Please try again.')
+    }
+  }
+
+  // Format file size
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  // Get file type icon
+  const getFileIcon = (fileType: string) => {
+    const type = fileType.toLowerCase()
+    if (type.includes('image')) {
+      return <FileImage className="w-5 h-5 text-green-500" />
+    } else if (type.includes('pdf')) {
+      return <FilePdf className="w-5 h-5 text-red-500" />
+    } else {
+      return <FileText className="w-5 h-5 text-gray-400" />
+    }
+  }
+
+  // Check if file is viewable
+  const isViewable = (fileType: string) => {
+    const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/html', 'text/css', 'text/javascript']
+    return viewableTypes.includes(fileType.toLowerCase())
+  }
+
+  // View document in new tab
+  const viewDocument = async (document: Document) => {
+    try {
+      setViewingDocument(document.id)
+      
+      // Check if file type is viewable in browser
+      const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/html', 'text/css', 'text/javascript']
+      if (!viewableTypes.includes(document.file_type.toLowerCase())) {
+        alert(`This file type (${document.file_type}) cannot be viewed in the browser. Please download it instead.`)
+        return
+      }
+      
+      const response = await api.get(`/documents/${document.id}/download`, {
+        responseType: 'blob'
+      })
+      
+      // Create blob URL with the correct MIME type
+      const blob = new Blob([response.data], { type: document.file_type })
+      const url = window.URL.createObjectURL(blob)
+      
+      // Open in new tab
+      const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
+      if (!newWindow) {
+        alert('Please allow popups to view documents, or try downloading the file instead.')
+        window.URL.revokeObjectURL(url)
+        return
+      }
+      
+      // Clean up the URL after a delay to free memory
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url)
+      }, 60000) // Increased to 60 seconds for better user experience
+      
+    } catch (error: any) {
+      console.error('Error viewing document:', error)
+      if (error.response?.status === 404) {
+        alert('Document not found. It may have been deleted.')
+      } else if (error.response?.status === 403) {
+        alert('You do not have permission to view this document.')
+      } else if (error.response?.status === 500) {
+        alert('Server error while retrieving document. Please try again later.')
+      } else {
+        alert('Error viewing document. Please try again or download the file instead.')
+      }
+    } finally {
+      setViewingDocument(null)
+    }
+  }
+
+  // Handle cancel purchase order
+  const handleCancelPurchaseOrder = async () => {
+    if (!selectedOrder || !cancellationReason.trim()) {
+      alert('Please provide a reason for cancellation')
+      return
+    }
+
+    try {
+      setIsCancelling(true)
+      
+      // Here you would call your API to cancel the purchase order
+      // await api.post('/purchase-orders/cancel', {
+      //   purchase_order_id: selectedOrder.reference_id,
+      //   reason: cancellationReason
+      // })
+      
+      console.log('Cancelling purchase order with reason:', cancellationReason)
+      alert('Purchase order cancelled successfully')
+      
+      // Close dialogs and refresh data
+      setShowCancelDialog(false)
+      setCancellationReason('')
+      closeModal()
+      loadPurchaseOrders()
+    } catch (error: any) {
+      console.error('Error cancelling purchase order:', error)
+      alert('Error cancelling purchase order. Please try again.')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  // Check if purchase order can be cancelled (within 30 days)
+  const canCancelPurchaseOrder = (createdDate: string) => {
+    const created = new Date(createdDate)
+    const now = new Date()
+    const daysDifference = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+    return daysDifference <= 30
   }
 
   if (isLoading) {
@@ -617,14 +837,237 @@ export default function PurchasePage() {
                 </CardContent>
               </Card>
 
+              {/* Documents Section */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Documents</CardTitle>
+                      <CardDescription>
+                        Receipts, invoices, and other supporting documents for this purchase order
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={() => setShowDocumentUpload(!showDocumentUpload)}
+                      className="flex items-center gap-2"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {showDocumentUpload ? 'Cancel Upload' : 'Add Documents'}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Document Upload Section */}
+                  {showDocumentUpload && (
+                    <div className="mb-6 p-4 border border-dashed border-gray-300 rounded-lg">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select Files to Upload
+                          </label>
+                          <input
+                            type="file"
+                            multiple
+                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                            onChange={handleFileSelect}
+                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Supported formats: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX up to 10MB each
+                          </p>
+                        </div>
+
+                        {/* Selected Files */}
+                        {uploadedFiles.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-gray-700">Selected Files:</h4>
+                            {uploadedFiles.map((file, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <FileText className="w-5 h-5 text-gray-400" />
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                                    <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFile(index)}
+                                  className="text-red-500 hover:text-red-700 transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setUploadedFiles([])
+                                  setShowDocumentUpload(false)
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={uploadDocuments}
+                                disabled={isUploadingDocuments}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                {isUploadingDocuments ? 'Uploading...' : 'Upload Documents'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing Documents */}
+                  {documents.length > 0 ? (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-gray-700">Uploaded Documents:</h4>
+                      {documents.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center space-x-3">
+                            {getFileIcon(doc.file_type)}
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{doc.file_name}</p>
+                              <p className="text-xs text-gray-500">
+                                {formatFileSize(doc.file_size)} • {formatDate(doc.uploaded_at)} • {doc.file_type}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {isViewable(doc.file_type) ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => viewDocument(doc)}
+                                disabled={viewingDocument === doc.id}
+                                className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50"
+                              >
+                                {viewingDocument === doc.id ? (
+                                  <div className="w-4 h-4 mr-1 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                                ) : (
+                                  <Eye className="w-4 h-4 mr-1" />
+                                )}
+                                {viewingDocument === doc.id ? 'Opening...' : 'View'}
+                              </Button>
+                            ) : (
+                              <div className="text-xs text-gray-500 px-2 py-1 bg-gray-200 rounded">
+                                View not available
+                              </div>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadDocument(doc)}
+                              className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
+                            >
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>No documents uploaded yet</p>
+                      <p className="text-sm">Click "Add Documents" to upload receipts, invoices, or other supporting files</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Action Buttons */}
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-between">
+                <div>
+                  {selectedOrder && canCancelPurchaseOrder(selectedOrder.created_at) && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowCancelDialog(true)}
+                      className="text-red-600 border-red-300 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Cancel Purchase Order
+                    </Button>
+                  )}
+                </div>
                 <Button variant="outline" onClick={closeModal}>
                   Close
                 </Button>
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Purchase Order Confirmation Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Cancel Purchase Order</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this purchase order? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="cancellation-reason" className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for cancellation <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="cancellation-reason"
+                placeholder="Please provide a reason for cancelling this purchase order..."
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                rows={3}
+              />
+            </div>
+            
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="flex items-start">
+                <div className="w-5 h-5 text-amber-400 mt-0.5 mr-2">⚠️</div>
+                <div>
+                  <p className="text-sm font-medium text-amber-800">Important Note</p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Purchase orders can only be cancelled within 30 days of creation. 
+                    If this order is older than 30 days, please contact your administrator.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCancelDialog(false)
+                setCancellationReason('')
+              }}
+              disabled={isCancelling}
+            >
+              Keep Purchase Order
+            </Button>
+            <Button
+              onClick={handleCancelPurchaseOrder}
+              disabled={isCancelling || !cancellationReason.trim()}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isCancelling ? 'Cancelling...' : 'Cancel Purchase Order'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </AppLayout>
