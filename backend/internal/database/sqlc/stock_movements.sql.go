@@ -56,24 +56,25 @@ func (q *Queries) CountStockMovementsWithFilter(ctx context.Context, arg *CountS
 }
 
 const CreateStockMovement = `-- name: CreateStockMovement :one
-INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, cost_price, total_amount, reference_type, reference_id, reason, user_id, processed_by, processed_date)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, product_id, warehouse_id, movement_type, quantity, reference_type, reference_id, reason, user_id, created_at, processed_by, processed_date, cost_price, total_amount
+INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, cost_price, total_amount, reference_type, reference_id, reference_number, reason, user_id, processed_by, processed_date)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, product_id, warehouse_id, movement_type, quantity, reference_type, reference_id, reason, user_id, created_at, processed_by, processed_date, cost_price, total_amount, reference_number
 `
 
 type CreateStockMovementParams struct {
-	ProductID     pgtype.UUID        `json:"product_id"`
-	WarehouseID   pgtype.UUID        `json:"warehouse_id"`
-	MovementType  string             `json:"movement_type"`
-	Quantity      int32              `json:"quantity"`
-	CostPrice     pgtype.Numeric     `json:"cost_price"`
-	TotalAmount   pgtype.Numeric     `json:"total_amount"`
-	ReferenceType *string            `json:"reference_type"`
-	ReferenceID   pgtype.UUID        `json:"reference_id"`
-	Reason        *string            `json:"reason"`
-	UserID        pgtype.UUID        `json:"user_id"`
-	ProcessedBy   pgtype.UUID        `json:"processed_by"`
-	ProcessedDate pgtype.Timestamptz `json:"processed_date"`
+	ProductID       pgtype.UUID        `json:"product_id"`
+	WarehouseID     pgtype.UUID        `json:"warehouse_id"`
+	MovementType    string             `json:"movement_type"`
+	Quantity        int32              `json:"quantity"`
+	CostPrice       pgtype.Numeric     `json:"cost_price"`
+	TotalAmount     pgtype.Numeric     `json:"total_amount"`
+	ReferenceType   *string            `json:"reference_type"`
+	ReferenceID     pgtype.UUID        `json:"reference_id"`
+	ReferenceNumber *string            `json:"reference_number"`
+	Reason          *string            `json:"reason"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	ProcessedBy     pgtype.UUID        `json:"processed_by"`
+	ProcessedDate   pgtype.Timestamptz `json:"processed_date"`
 }
 
 func (q *Queries) CreateStockMovement(ctx context.Context, arg *CreateStockMovementParams) (*StockMovement, error) {
@@ -86,6 +87,7 @@ func (q *Queries) CreateStockMovement(ctx context.Context, arg *CreateStockMovem
 		arg.TotalAmount,
 		arg.ReferenceType,
 		arg.ReferenceID,
+		arg.ReferenceNumber,
 		arg.Reason,
 		arg.UserID,
 		arg.ProcessedBy,
@@ -107,13 +109,14 @@ func (q *Queries) CreateStockMovement(ctx context.Context, arg *CreateStockMovem
 		&i.ProcessedDate,
 		&i.CostPrice,
 		&i.TotalAmount,
+		&i.ReferenceNumber,
 	)
 	return &i, err
 }
 
 const GetStockInTransactionDetails = `-- name: GetStockInTransactionDetails :many
 SELECT 
-    sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount,
+    sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number,
     p.name as product_name,
     p.sku,
     w.name as warehouse_name,
@@ -147,6 +150,7 @@ type GetStockInTransactionDetailsRow struct {
 	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
 	CostPrice            pgtype.Numeric     `json:"cost_price"`
 	TotalAmount          pgtype.Numeric     `json:"total_amount"`
+	ReferenceNumber      *string            `json:"reference_number"`
 	ProductName          string             `json:"product_name"`
 	Sku                  string             `json:"sku"`
 	WarehouseName        string             `json:"warehouse_name"`
@@ -181,6 +185,7 @@ func (q *Queries) GetStockInTransactionDetails(ctx context.Context, referenceID 
 			&i.ProcessedDate,
 			&i.CostPrice,
 			&i.TotalAmount,
+			&i.ReferenceNumber,
 			&i.ProductName,
 			&i.Sku,
 			&i.WarehouseName,
@@ -203,6 +208,7 @@ func (q *Queries) GetStockInTransactionDetails(ctx context.Context, referenceID 
 const ListStockInTransactions = `-- name: ListStockInTransactions :many
 SELECT 
     sm.reference_id,
+    sm.reference_number,
     sm.processed_date,
     sm.processed_by,
     pb.first_name as processed_by_first_name,
@@ -214,7 +220,7 @@ FROM stock_movements sm
 LEFT JOIN users pb ON sm.processed_by = pb.id
 WHERE sm.movement_type = 'in' 
   AND sm.reference_id IS NOT NULL
-GROUP BY sm.reference_id, sm.processed_date, sm.processed_by, pb.first_name, pb.last_name
+GROUP BY sm.reference_id, sm.reference_number, sm.processed_date, sm.processed_by, pb.first_name, pb.last_name
 ORDER BY MIN(sm.created_at) DESC
 LIMIT $1 OFFSET $2
 `
@@ -226,6 +232,7 @@ type ListStockInTransactionsParams struct {
 
 type ListStockInTransactionsRow struct {
 	ReferenceID          pgtype.UUID        `json:"reference_id"`
+	ReferenceNumber      *string            `json:"reference_number"`
 	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
 	ProcessedBy          pgtype.UUID        `json:"processed_by"`
 	ProcessedByFirstName *string            `json:"processed_by_first_name"`
@@ -246,6 +253,7 @@ func (q *Queries) ListStockInTransactions(ctx context.Context, arg *ListStockInT
 		var i ListStockInTransactionsRow
 		if err := rows.Scan(
 			&i.ReferenceID,
+			&i.ReferenceNumber,
 			&i.ProcessedDate,
 			&i.ProcessedBy,
 			&i.ProcessedByFirstName,
@@ -265,13 +273,15 @@ func (q *Queries) ListStockInTransactions(ctx context.Context, arg *ListStockInT
 }
 
 const ListStockMovements = `-- name: ListStockMovements :many
-SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name, 
-       pb.first_name as processed_by_first_name, pb.last_name as processed_by_last_name
+SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name, 
+       pb.first_name as processed_by_first_name, pb.last_name as processed_by_last_name,
+       po.supplier_name
 FROM stock_movements sm
 JOIN products p ON sm.product_id = p.id
 JOIN warehouses w ON sm.warehouse_id = w.id
 LEFT JOIN users u ON sm.user_id = u.id
 LEFT JOIN users pb ON sm.processed_by = pb.id
+LEFT JOIN purchase_orders po ON sm.reference_id = po.id
 ORDER BY sm.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -296,6 +306,7 @@ type ListStockMovementsRow struct {
 	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
 	CostPrice            pgtype.Numeric     `json:"cost_price"`
 	TotalAmount          pgtype.Numeric     `json:"total_amount"`
+	ReferenceNumber      *string            `json:"reference_number"`
 	ProductName          string             `json:"product_name"`
 	Sku                  string             `json:"sku"`
 	WarehouseName        string             `json:"warehouse_name"`
@@ -303,6 +314,7 @@ type ListStockMovementsRow struct {
 	LastName             *string            `json:"last_name"`
 	ProcessedByFirstName *string            `json:"processed_by_first_name"`
 	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	SupplierName         *string            `json:"supplier_name"`
 }
 
 func (q *Queries) ListStockMovements(ctx context.Context, arg *ListStockMovementsParams) ([]*ListStockMovementsRow, error) {
@@ -329,6 +341,7 @@ func (q *Queries) ListStockMovements(ctx context.Context, arg *ListStockMovement
 			&i.ProcessedDate,
 			&i.CostPrice,
 			&i.TotalAmount,
+			&i.ReferenceNumber,
 			&i.ProductName,
 			&i.Sku,
 			&i.WarehouseName,
@@ -336,6 +349,7 @@ func (q *Queries) ListStockMovements(ctx context.Context, arg *ListStockMovement
 			&i.LastName,
 			&i.ProcessedByFirstName,
 			&i.ProcessedByLastName,
+			&i.SupplierName,
 		); err != nil {
 			return nil, err
 		}
@@ -348,13 +362,15 @@ func (q *Queries) ListStockMovements(ctx context.Context, arg *ListStockMovement
 }
 
 const ListStockMovementsWithFilter = `-- name: ListStockMovementsWithFilter :many
-SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name,
-       pb.first_name as processed_by_first_name, pb.last_name as processed_by_last_name
+SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name,
+       pb.first_name as processed_by_first_name, pb.last_name as processed_by_last_name,
+       po.supplier_name
 FROM stock_movements sm
 JOIN products p ON sm.product_id = p.id
 JOIN warehouses w ON sm.warehouse_id = w.id
 LEFT JOIN users u ON sm.user_id = u.id
 LEFT JOIN users pb ON sm.processed_by = pb.id
+LEFT JOIN purchase_orders po ON sm.reference_id = po.id
 WHERE ($1::uuid IS NULL OR sm.product_id = $1)
   AND ($2::uuid IS NULL OR sm.warehouse_id = $2)
   AND ($3::text IS NULL OR sm.movement_type = $3)
@@ -389,6 +405,7 @@ type ListStockMovementsWithFilterRow struct {
 	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
 	CostPrice            pgtype.Numeric     `json:"cost_price"`
 	TotalAmount          pgtype.Numeric     `json:"total_amount"`
+	ReferenceNumber      *string            `json:"reference_number"`
 	ProductName          string             `json:"product_name"`
 	Sku                  string             `json:"sku"`
 	WarehouseName        string             `json:"warehouse_name"`
@@ -396,6 +413,7 @@ type ListStockMovementsWithFilterRow struct {
 	LastName             *string            `json:"last_name"`
 	ProcessedByFirstName *string            `json:"processed_by_first_name"`
 	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	SupplierName         *string            `json:"supplier_name"`
 }
 
 func (q *Queries) ListStockMovementsWithFilter(ctx context.Context, arg *ListStockMovementsWithFilterParams) ([]*ListStockMovementsWithFilterRow, error) {
@@ -430,6 +448,7 @@ func (q *Queries) ListStockMovementsWithFilter(ctx context.Context, arg *ListSto
 			&i.ProcessedDate,
 			&i.CostPrice,
 			&i.TotalAmount,
+			&i.ReferenceNumber,
 			&i.ProductName,
 			&i.Sku,
 			&i.WarehouseName,
@@ -437,6 +456,7 @@ func (q *Queries) ListStockMovementsWithFilter(ctx context.Context, arg *ListSto
 			&i.LastName,
 			&i.ProcessedByFirstName,
 			&i.ProcessedByLastName,
+			&i.SupplierName,
 		); err != nil {
 			return nil, err
 		}

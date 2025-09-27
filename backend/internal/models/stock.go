@@ -34,6 +34,7 @@ type StockMovement struct {
 	TotalAmount   *float64   `json:"total_amount,omitempty" db:"total_amount"`
 	ReferenceType *string    `json:"reference_type" db:"reference_type"`
 	ReferenceID   *uuid.UUID `json:"reference_id" db:"reference_id"`
+	ReferenceNumber *string  `json:"reference_number,omitempty" db:"reference_number"`
 	Reason        *string    `json:"reason" db:"reason"`
 	UserID        *uuid.UUID `json:"user_id" db:"user_id"`
 	ProcessedBy   *uuid.UUID `json:"processed_by" db:"processed_by"`
@@ -47,6 +48,7 @@ type StockMovement struct {
 	UserLastName  *string `json:"user_last_name,omitempty" db:"last_name"`
 	ProcessedByFirstName *string `json:"processed_by_first_name,omitempty" db:"processed_by_first_name"`
 	ProcessedByLastName  *string `json:"processed_by_last_name,omitempty" db:"processed_by_last_name"`
+	SupplierName  *string `json:"supplier_name,omitempty" db:"supplier_name"`
 }
 
 type CreateStockMovementRequest struct {
@@ -61,10 +63,11 @@ type CreateStockMovementRequest struct {
 }
 
 type BulkStockMovementRequest struct {
-	SupplierID    uuid.UUID                    `json:"supplier_id" validate:"required"`
-	ProcessedBy   uuid.UUID                    `json:"processed_by,omitempty"`
-	ProcessedDate time.Time                    `json:"processed_date,omitempty"`
-	Items         []BulkStockMovementItem      `json:"items" validate:"required,min=1"`
+	SupplierID      uuid.UUID                    `json:"supplier_id" validate:"required"`
+	ReferenceNumber *string                      `json:"reference_number,omitempty"`
+	ProcessedBy     uuid.UUID                    `json:"processed_by,omitempty"`
+	ProcessedDate   time.Time                    `json:"processed_date,omitempty"`
+	Items           []BulkStockMovementItem      `json:"items" validate:"required,min=1"`
 }
 
 type BulkStockMovementItem struct {

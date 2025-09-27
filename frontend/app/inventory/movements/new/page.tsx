@@ -60,6 +60,7 @@ const stockInSchema = z.object({
   received_date: z.string().min(1, 'Received date is required'),
   processed_by: z.string().min(1, 'Processed by is required'),
   reference_number: z.string().optional(),
+  documents: z.array(z.any()).optional(),
   notes: z.string().optional(),
 })
 
@@ -77,8 +78,10 @@ export default function NewStockMovementPage() {
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false)
   const [selectedSupplier, setSelectedSupplier] = useState<string>('')
-  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [uploadedDocuments, setUploadedDocuments] = useState<File[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false)
+  const [pendingFormData, setPendingFormData] = useState<StockInForm | null>(null)
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [productQuantity, setProductQuantity] = useState(0)
@@ -94,7 +97,7 @@ export default function NewStockMovementPage() {
       supplier_id: '',
       warehouse_id: '',
       received_date: new Date().toISOString().split('T')[0],
-      processed_by: user ? `${user.first_name} ${user.last_name}` : '',
+      processed_by: user ? user.id : '',
       reference_number: '',
       notes: '',
     },
@@ -111,7 +114,7 @@ export default function NewStockMovementPage() {
   // Update processed_by when user loads
   useEffect(() => {
     if (user) {
-      form.setValue('processed_by', `${user.first_name} ${user.last_name}`)
+      form.setValue('processed_by', user.id)
     }
   }, [user, form])
 
@@ -309,6 +312,27 @@ export default function NewStockMovementPage() {
     setTimeout(() => setShowSuccessMessage(false), 3000)
   }
 
+  // Document upload functions
+  const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      const newFiles = Array.from(files)
+      setUploadedDocuments(prev => [...prev, ...newFiles])
+    }
+  }
+
+  const removeDocument = (index: number) => {
+    setUploadedDocuments(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
   // Handle form submission
   const handleSubmit = async (data: StockInForm) => {
     const selectedItems = stockInItems.filter(item => item.selected && item.quantity > 0)
@@ -318,12 +342,27 @@ export default function NewStockMovementPage() {
       return
     }
 
+    // Show confirmation dialog first
+    setPendingFormData(data)
+    setShowConfirmationDialog(true)
+  }
+
+  // Handle actual submission after confirmation
+  const handleConfirmSubmit = async () => {
+    if (!pendingFormData) return
+
+    const data = pendingFormData
+    const selectedItems = stockInItems.filter(item => item.selected && item.quantity > 0)
+
     try {
       setIsSubmitting(true)
       
       const bulkRequest = {
         supplier_id: data.supplier_id,
+        reference_number: data.reference_number || undefined,
+        processed_by: user?.id || data.processed_by,
         processed_date: new Date(data.received_date).toISOString(),
+        documents: uploadedDocuments,
         items: selectedItems.map(item => ({
           product_id: item.product_id,
           warehouse_id: item.warehouse_id,
@@ -333,12 +372,16 @@ export default function NewStockMovementPage() {
         }))
       }
 
+      console.log('Sending bulk request:', bulkRequest)
       await api.post('/stock-movements/bulk', bulkRequest)
       
       // Reset form and redirect
       form.reset()
       setStockInItems([])
-      router.push('/inventory/stock-in')
+      setUploadedDocuments([])
+      setShowConfirmationDialog(false)
+      setPendingFormData(null)
+      router.push('/inventory/purchase')
     } catch (error: any) {
       console.error('Error creating stock movement:', error)
       
@@ -387,17 +430,17 @@ export default function NewStockMovementPage() {
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">New Stock Movement</h1>
-              <p className="mt-2 text-gray-600">Add new stock-in movement to your inventory</p>
+              <h1 className="text-3xl font-bold text-gray-900">New Purchase Order</h1>
+              <p className="mt-2 text-gray-600">Add new purchase order to your inventory</p>
             </div>
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
               {/* Basic Information */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Stock In Information</CardTitle>
+                  <CardTitle>Purchase Order Information</CardTitle>
                   <CardDescription>
-                    Enter the basic information for this stock movement
+                    Enter the basic information for this purchase order
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -474,6 +517,8 @@ export default function NewStockMovementPage() {
                       <Input
                         {...form.register('processed_by')}
                         placeholder="Enter processor name"
+                        value={user ? `${user.first_name} ${user.last_name}` : ''}
+                        readOnly
                         className={form.formState.errors.processed_by ? 'border-red-500' : ''}
                       />
                       {form.formState.errors.processed_by && (
@@ -484,7 +529,7 @@ export default function NewStockMovementPage() {
                     </div>
 
                     <div>
-                      <Label htmlFor="reference_number">Reference Number</Label>
+                      <Label htmlFor="reference_number">PO Reference Number</Label>
                       <Input
                         {...form.register('reference_number')}
                         placeholder="PO-12345"
@@ -499,6 +544,97 @@ export default function NewStockMovementPage() {
                         rows={3}
                       />
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Document Upload Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Documents</CardTitle>
+                  <CardDescription>
+                    Upload receipts, invoices, and other supporting documents
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* File Upload Input */}
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                        onChange={handleDocumentUpload}
+                        className="hidden"
+                        id="document-upload"
+                      />
+                      <label
+                        htmlFor="document-upload"
+                        className="cursor-pointer flex flex-col items-center space-y-2"
+                      >
+                        <svg
+                          className="w-8 h-8 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                          />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-600">
+                          Click to upload documents
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          PDF, JPG, PNG, DOC, DOCX, XLS, XLSX up to 10MB each
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Uploaded Documents List */}
+                    {uploadedDocuments.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700">Uploaded Documents:</h4>
+                        {uploadedDocuments.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <svg
+                                className="w-5 h-5 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                              </svg>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeDocument(index)}
+                              className="text-red-500 hover:text-red-700 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -654,6 +790,12 @@ export default function NewStockMovementPage() {
                                             setProductQuantity(0)
                                           }
                                         }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            handleAddProduct()
+                                          }
+                                        }}
                                       />
                                     </div>
                                     <div>
@@ -671,6 +813,12 @@ export default function NewStockMovementPage() {
                                           if (e.target.value && parseCurrency(e.target.value) === 0) {
                                             setProductCostDisplay('')
                                             setProductCost(0)
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            handleAddProduct()
                                           }
                                         }}
                                         className={
@@ -794,6 +942,102 @@ export default function NewStockMovementPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmationDialog} onOpenChange={setShowConfirmationDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Confirm Purchase Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* PO Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-gray-900 mb-3">Purchase Order Summary</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">PO Reference:</span>
+                  <p className="text-gray-600">{pendingFormData?.reference_number || 'Not specified'}</p>
+                </div>
+                <div>
+                  <span className="font-medium">Processed By:</span>
+                  <p className="text-gray-600">{user ? `${user.first_name} ${user.last_name}` : 'Unknown'}</p>
+                </div>
+                <div>
+                  <span className="font-medium">Received Date:</span>
+                  <p className="text-gray-600">{pendingFormData?.received_date}</p>
+                </div>
+                <div>
+                  <span className="font-medium">Total Products:</span>
+                  <p className="text-gray-600">{selectedItems.filter(item => item.selected && item.quantity > 0).length}</p>
+                </div>
+                <div>
+                  <span className="font-medium">Supplier:</span>
+                  <p className="text-gray-600">
+                    {pendingFormData?.supplier_id 
+                      ? suppliers.find(s => s.id === pendingFormData.supplier_id)?.name || 'Unknown Supplier'
+                      : 'Not specified'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Products List */}
+            <div>
+              <h3 className="font-medium text-gray-900 mb-3">Products to Add:</h3>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {selectedItems.filter(item => item.selected && item.quantity > 0).map((item, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 bg-white border rounded-lg">
+                    <div>
+                      <p className="font-medium">{item.product_name}</p>
+                      <p className="text-sm text-gray-500">{item.product_sku}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">Qty: {item.quantity}</p>
+                      <p className="text-sm text-gray-500">${item.cost_price.toFixed(2)} each</p>
+                      <p className="text-sm font-medium">${(item.quantity * item.cost_price).toFixed(2)} total</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Documents */}
+            {uploadedDocuments.length > 0 && (
+              <div>
+                <h3 className="font-medium text-gray-900 mb-3">Documents to Upload:</h3>
+                <div className="space-y-1">
+                  {uploadedDocuments.map((file, index) => (
+                    <p key={index} className="text-sm text-gray-600">• {file.name} ({formatFileSize(file.size)})</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowConfirmationDialog(false)
+                  setPendingFormData(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmSubmit}
+                disabled={isSubmitting}
+                className="bg-[#52a852] hover:bg-[#4a964a] text-white"
+              >
+                {isSubmitting ? 'Creating...' : 'Confirm & Create PO'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }

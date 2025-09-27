@@ -95,8 +95,8 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       title: 'Stock Movements',
       items: [
         {
-          name: 'Stock-In Orders',
-          href: '/inventory/stock-in',
+          name: 'Purchase Orders',
+          href: '/inventory/purchase',
           icon: FileText,
         },
         {

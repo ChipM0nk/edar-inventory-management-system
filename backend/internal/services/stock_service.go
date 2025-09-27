@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"inventory-system/internal/database"
 	sqlc "inventory-system/internal/database/sqlc"
 	"inventory-system/internal/models"
@@ -340,6 +341,7 @@ func (s *StockService) ListStockMovements(ctx context.Context, filter models.Sto
 			TotalAmount:   utils.OptionalPgxNumericToFloat64Ptr(movement.TotalAmount),
 			ReferenceType: movement.ReferenceType,
 			ReferenceID:   &referenceID,
+			ReferenceNumber: movement.ReferenceNumber,
 			Reason:        movement.Reason,
 			UserID:        &userID,
 			ProcessedBy:   processedBy,
@@ -352,6 +354,7 @@ func (s *StockService) ListStockMovements(ctx context.Context, filter models.Sto
 			UserLastName:  movement.LastName,
 			ProcessedByFirstName: movement.ProcessedByFirstName,
 			ProcessedByLastName:  movement.ProcessedByLastName,
+			SupplierName: movement.SupplierName,
 		}
 	}
 
@@ -405,6 +408,46 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 	defer tx.Rollback(ctx)
 
 	var stockMovements []models.StockMovement
+	var purchaseOrderID *uuid.UUID
+	var totalOrderAmount float64
+
+	// Create purchase order first if this is a purchase order type
+	referenceType := "purchase_order"
+	if req.SupplierID != uuid.Nil {
+		// Get supplier information
+		supplier, err := s.db.GetSupplier(ctx, utils.UUIDToPgxUUID(req.SupplierID))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get supplier: %w", err)
+		}
+
+		// Generate PO number
+		poNumber := fmt.Sprintf("PO-%d", time.Now().Unix())
+
+		// Create purchase order
+		notes := "Created from stock movement"
+		purchaseOrder, err := s.db.CreatePurchaseOrder(ctx, &sqlc.CreatePurchaseOrderParams{
+			PoNumber:             poNumber,
+			SupplierName:         supplier.Name,
+			SupplierContact:      supplier.ContactPerson,
+			OrderDate:            pgtype.Date{Time: req.ProcessedDate, Valid: true},
+			ExpectedDeliveryDate: pgtype.Date{Time: req.ProcessedDate, Valid: true},
+			Notes:                &notes,
+			CreatedBy:            utils.UUIDToPgxUUID(*userID),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create purchase order: %w", err)
+		}
+		purchaseOrderID = utils.OptionalPgxUUIDToUUID(purchaseOrder.ID)
+	}
+
+	// Use the purchase order ID as the reference ID for all movements in this bulk operation
+	// If no purchase order was created, generate a UUID as fallback
+	var bulkReferenceID uuid.UUID
+	if purchaseOrderID != nil {
+		bulkReferenceID = *purchaseOrderID
+	} else {
+		bulkReferenceID = uuid.New()
+	}
 
 	for _, item := range req.Items {
 		// Calculate total amount if cost price is provided
@@ -412,23 +455,24 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 		if item.CostPrice != nil {
 			amount := float64(item.Quantity) * *item.CostPrice
 			totalAmount = &amount
+			totalOrderAmount += amount
 		}
 
 		// Create stock movement with processed_by set to current user
-		supplierRef := "supplier"
 		stockMovement, err := s.db.CreateStockMovement(ctx, &sqlc.CreateStockMovementParams{
-			ProductID:     utils.UUIDToPgxUUID(item.ProductID),
-			WarehouseID:   utils.UUIDToPgxUUID(item.WarehouseID),
-			MovementType:  "in", // Bulk movements are always "in"
-			Quantity:      int32(item.Quantity),
-			CostPrice:     utils.OptionalFloat64ToPgxNumeric(item.CostPrice),
-			TotalAmount:   utils.OptionalFloat64ToPgxNumeric(totalAmount),
-			ReferenceType: utils.OptionalStringToStringPtr(&supplierRef),
-			ReferenceID:   utils.UUIDToPgxUUID(req.SupplierID),
-			Reason:        item.Reason,
-			UserID:        utils.OptionalUUIDToPgxUUID(userID),
-			ProcessedBy:   utils.UUIDToPgxUUID(req.ProcessedBy), // Use the provided processed_by
-			ProcessedDate: utils.TimeToPgxTimestamptz(req.ProcessedDate),
+			ProductID:       utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID:     utils.UUIDToPgxUUID(item.WarehouseID),
+			MovementType:    "in", // Bulk movements are always "in"
+			Quantity:        int32(item.Quantity),
+			CostPrice:       utils.OptionalFloat64ToPgxNumeric(item.CostPrice),
+			TotalAmount:     utils.OptionalFloat64ToPgxNumeric(totalAmount),
+			ReferenceType:   &referenceType,
+			ReferenceID:     utils.UUIDToPgxUUID(bulkReferenceID), // Use the same reference ID for all movements
+			ReferenceNumber: req.ReferenceNumber,
+			Reason:          item.Reason,
+			UserID:          utils.OptionalUUIDToPgxUUID(userID),
+			ProcessedBy:     utils.UUIDToPgxUUID(req.ProcessedBy), // Use the provided processed_by
+			ProcessedDate:   utils.TimeToPgxTimestamptz(req.ProcessedDate),
 		})
 		if err != nil {
 			return nil, err
@@ -472,21 +516,33 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 
 		// Convert to model
 		stockMovements = append(stockMovements, models.StockMovement{
-			ID:            utils.PgxUUIDToUUID(stockMovement.ID),
-			ProductID:     utils.PgxUUIDToUUID(stockMovement.ProductID),
-			WarehouseID:   utils.PgxUUIDToUUID(stockMovement.WarehouseID),
-			MovementType:  stockMovement.MovementType,
-			Quantity:      int(stockMovement.Quantity),
-			CostPrice:     utils.OptionalPgxNumericToFloat64Ptr(stockMovement.CostPrice),
-			TotalAmount:   utils.OptionalPgxNumericToFloat64Ptr(stockMovement.TotalAmount),
-			ReferenceType: stockMovement.ReferenceType,
-			ReferenceID:   utils.OptionalPgxUUIDToUUID(stockMovement.ReferenceID),
-			Reason:        stockMovement.Reason,
-			UserID:        utils.OptionalPgxUUIDToUUID(stockMovement.UserID),
-			ProcessedBy:   utils.OptionalPgxUUIDToUUID(stockMovement.ProcessedBy),
-			ProcessedDate: utils.OptionalPgxTimestamptzToTimePtr(stockMovement.ProcessedDate),
-			CreatedAt:     utils.PgxTimestamptzToTime(stockMovement.CreatedAt),
+			ID:              utils.PgxUUIDToUUID(stockMovement.ID),
+			ProductID:       utils.PgxUUIDToUUID(stockMovement.ProductID),
+			WarehouseID:     utils.PgxUUIDToUUID(stockMovement.WarehouseID),
+			MovementType:    stockMovement.MovementType,
+			Quantity:        int(stockMovement.Quantity),
+			CostPrice:       utils.OptionalPgxNumericToFloat64Ptr(stockMovement.CostPrice),
+			TotalAmount:     utils.OptionalPgxNumericToFloat64Ptr(stockMovement.TotalAmount),
+			ReferenceType:   stockMovement.ReferenceType,
+			ReferenceID:     utils.OptionalPgxUUIDToUUID(stockMovement.ReferenceID),
+			ReferenceNumber: stockMovement.ReferenceNumber,
+			Reason:          stockMovement.Reason,
+			UserID:          utils.OptionalPgxUUIDToUUID(stockMovement.UserID),
+			ProcessedBy:     utils.OptionalPgxUUIDToUUID(stockMovement.ProcessedBy),
+			ProcessedDate:   utils.OptionalPgxTimestamptzToTimePtr(stockMovement.ProcessedDate),
+			CreatedAt:       utils.PgxTimestamptzToTime(stockMovement.CreatedAt),
 		})
+	}
+
+	// Update purchase order total amount if we created one
+	if purchaseOrderID != nil && totalOrderAmount > 0 {
+		_, err = s.db.UpdatePurchaseOrderTotal(ctx, &sqlc.UpdatePurchaseOrderTotalParams{
+			ID:          utils.UUIDToPgxUUID(*purchaseOrderID),
+			TotalAmount: utils.Float64ToPgxNumeric(totalOrderAmount),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to update purchase order total: %w", err)
+		}
 	}
 
 	// Commit transaction

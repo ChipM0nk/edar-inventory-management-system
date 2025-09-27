@@ -105,20 +105,21 @@ type StockLevel struct {
 }
 
 type StockMovement struct {
-	ID            pgtype.UUID        `json:"id"`
-	ProductID     pgtype.UUID        `json:"product_id"`
-	WarehouseID   pgtype.UUID        `json:"warehouse_id"`
-	MovementType  string             `json:"movement_type"`
-	Quantity      int32              `json:"quantity"`
-	ReferenceType *string            `json:"reference_type"`
-	ReferenceID   pgtype.UUID        `json:"reference_id"`
-	Reason        *string            `json:"reason"`
-	UserID        pgtype.UUID        `json:"user_id"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	ProcessedBy   pgtype.UUID        `json:"processed_by"`
-	ProcessedDate pgtype.Timestamptz `json:"processed_date"`
-	CostPrice     pgtype.Numeric     `json:"cost_price"`
-	TotalAmount   pgtype.Numeric     `json:"total_amount"`
+	ID              pgtype.UUID        `json:"id"`
+	ProductID       pgtype.UUID        `json:"product_id"`
+	WarehouseID     pgtype.UUID        `json:"warehouse_id"`
+	MovementType    string             `json:"movement_type"`
+	Quantity        int32              `json:"quantity"`
+	ReferenceType   *string            `json:"reference_type"`
+	ReferenceID     pgtype.UUID        `json:"reference_id"`
+	Reason          *string            `json:"reason"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	ProcessedBy     pgtype.UUID        `json:"processed_by"`
+	ProcessedDate   pgtype.Timestamptz `json:"processed_date"`
+	CostPrice       pgtype.Numeric     `json:"cost_price"`
+	TotalAmount     pgtype.Numeric     `json:"total_amount"`
+	ReferenceNumber *string            `json:"reference_number"`
 }
 
 type Supplier struct {

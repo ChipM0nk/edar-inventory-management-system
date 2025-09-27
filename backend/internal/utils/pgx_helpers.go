@@ -152,3 +152,16 @@ func OptionalTimeToPgxTimestamp(t *time.Time) pgtype.Timestamp {
 	}
 	return pgtype.Timestamp{Time: *t, Valid: true}
 }
+
+// Helper function to convert string to pgtype.Text
+func StringToPgxText(s string) pgtype.Text {
+	return pgtype.Text{String: s, Valid: true}
+}
+
+// Helper function to convert optional pgtype.Text to string pointer
+func OptionalPgxTextToString(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	return &t.String
+}
