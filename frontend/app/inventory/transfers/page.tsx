@@ -64,6 +64,8 @@ export default function TransfersPage() {
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
   
   // Create transfer form state
   const [transferItems, setTransferItems] = useState<TransferItem[]>([])
@@ -106,7 +108,14 @@ export default function TransfersPage() {
     }
 
     setFilteredTransfers(filtered)
+    setCurrentPage(1) // Reset to first page when filtering
   }, [searchTerm, transfers])
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredTransfers.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentTransfers = filteredTransfers.slice(startIndex, endIndex)
 
   const loadTransfers = async () => {
     try {
@@ -300,20 +309,9 @@ export default function TransfersPage() {
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.back()}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Button>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Stock Transfers</h1>
-                  <p className="mt-2 text-gray-600">Manage inventory transfers between warehouses</p>
-                </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Stock Transfers</h1>
+                <p className="mt-2 text-gray-600">Manage inventory transfers between warehouses</p>
               </div>
               <div className="flex items-center gap-3">
                 <Button 
@@ -363,7 +361,7 @@ export default function TransfersPage() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
                     <p className="mt-2 text-gray-600">Loading transfers...</p>
                   </div>
-                ) : filteredTransfers.length === 0 ? (
+                ) : currentTransfers.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500">
                       {searchTerm 
@@ -393,7 +391,7 @@ export default function TransfersPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredTransfers.map((transfer) => (
+                        {currentTransfers.map((transfer) => (
                           <TableRow 
                             key={transfer.reference_id}
                             className="cursor-pointer hover:bg-gray-50 transition-colors"
@@ -440,6 +438,46 @@ export default function TransfersPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6">
+                <div className="text-sm text-gray-700">
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredTransfers.length)} of {filteredTransfers.length} results
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={currentPage === page ? "bg-[#52a852] hover:bg-[#4a964a] text-white" : ""}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

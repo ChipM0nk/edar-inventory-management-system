@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Search, RefreshCw } from 'lucide-react'
+import { Search, RefreshCw } from 'lucide-react'
 import api from '@/lib/api'
 
 interface StockLevel {
@@ -83,6 +83,7 @@ export default function StockPage() {
     }
   }
 
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -108,25 +109,16 @@ export default function StockPage() {
                 <h1 className="text-3xl font-bold text-gray-900">Stock Levels</h1>
                 <p className="mt-2 text-gray-600">Monitor current inventory levels</p>
               </div>
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={loadStockLevels}
-                  disabled={isLoadingData}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className={`h-4 w-4 ${isLoadingData ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-                <Button 
-                  className="flex items-center gap-2"
-                  onClick={() => router.push('/inventory/movements/new')}
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Stock
-                </Button>
-              </div>
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={loadStockLevels}
+                disabled={isLoadingData}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoadingData ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
             
             <Card>

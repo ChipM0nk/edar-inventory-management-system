@@ -58,6 +58,7 @@ const stockInSchema = z.object({
   supplier_id: z.string().min(1, 'Supplier is required'),
   warehouse_id: z.string().min(1, 'Warehouse is required'),
   received_date: z.string().min(1, 'Received date is required'),
+  processed_by: z.string().min(1, 'Processed by is required'),
   reference_number: z.string().optional(),
   notes: z.string().optional(),
 })
@@ -80,8 +81,9 @@ export default function NewStockMovementPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [productQuantity, setProductQuantity] = useState(1)
+  const [productQuantity, setProductQuantity] = useState(0)
   const [productCost, setProductCost] = useState(0)
+  const [productCostDisplay, setProductCostDisplay] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
 
@@ -92,6 +94,7 @@ export default function NewStockMovementPage() {
       supplier_id: '',
       warehouse_id: '',
       received_date: new Date().toISOString().split('T')[0],
+      processed_by: user ? `${user.first_name} ${user.last_name}` : '',
       reference_number: '',
       notes: '',
     },
@@ -104,6 +107,13 @@ export default function NewStockMovementPage() {
       router.push('/login')
     }
   }, [user, isLoading, router])
+
+  // Update processed_by when user loads
+  useEffect(() => {
+    if (user) {
+      form.setValue('processed_by', `${user.first_name} ${user.last_name}`)
+    }
+  }, [user, form])
 
   // Load initial data
   useEffect(() => {
@@ -186,17 +196,62 @@ export default function NewStockMovementPage() {
     }
   }
 
+  // Currency formatting functions
+  const formatCurrency = (value: string): string => {
+    // Remove all non-numeric characters except decimal point
+    const cleanValue = value.replace(/[^\d.]/g, '')
+    
+    // Handle empty input
+    if (!cleanValue) return ''
+    
+    // Handle just a decimal point
+    if (cleanValue === '.') return '0.'
+    
+    // Handle multiple decimal points - keep only the first one
+    const parts = cleanValue.split('.')
+    if (parts.length > 2) {
+      return parts[0] + '.' + parts.slice(1).join('')
+    }
+    
+    // If it has a decimal point, limit to 2 decimal places
+    if (parts.length === 2) {
+      return parts[0] + '.' + parts[1].slice(0, 2)
+    }
+    
+    // Return the clean value as is (no decimal formatting during typing)
+    return cleanValue
+  }
+
+  const parseCurrency = (value: string): number => {
+    const cleanValue = value.replace(/[^\d.]/g, '')
+    return parseFloat(cleanValue) || 0
+  }
+
   // Handle product selection
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product)
-    setProductQuantity(1)
-    setProductCost(product.unit_price)
+    setProductQuantity(0)
+    setProductCost(0)
+    setProductCostDisplay('')
+    // Focus on quantity field after product selection
+    setTimeout(() => {
+      const quantityInput = document.querySelector('input[type="number"]') as HTMLInputElement
+      if (quantityInput) {
+        quantityInput.focus()
+      }
+    }, 100)
   }
 
   // Handle add product
   const handleAddProduct = () => {
     if (!selectedProduct || productQuantity <= 0 || productCost <= 0) {
       alert('Please select a product and enter valid quantity and cost price')
+      return
+    }
+
+    // Validate cost price is lower than unit price
+    if (productCost >= selectedProduct.unit_price) {
+      alert(`Cost price ($${productCost.toFixed(2)}) must be lower than unit price ($${selectedProduct.unit_price.toFixed(2)})`)
       return
     }
 
@@ -243,8 +298,9 @@ export default function NewStockMovementPage() {
 
     // Reset form and close dialog
     setSelectedProduct(null)
-    setProductQuantity(1)
+    setProductQuantity(0)
     setProductCost(0)
+    setProductCostDisplay('')
     setSearchTerm('')
     setIsProductDialogOpen(false)
     
@@ -282,7 +338,7 @@ export default function NewStockMovementPage() {
       // Reset form and redirect
       form.reset()
       setStockInItems([])
-      router.push('/inventory/stock')
+      router.push('/inventory/stock-in')
     } catch (error: any) {
       console.error('Error creating stock movement:', error)
       
@@ -409,6 +465,20 @@ export default function NewStockMovementPage() {
                       {form.formState.errors.received_date && (
                         <p className="text-red-500 text-sm mt-1">
                           {form.formState.errors.received_date.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="processed_by">Processed By *</Label>
+                      <Input
+                        {...form.register('processed_by')}
+                        placeholder="Enter processor name"
+                        className={form.formState.errors.processed_by ? 'border-red-500' : ''}
+                      />
+                      {form.formState.errors.processed_by && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {form.formState.errors.processed_by.message}
                         </p>
                       )}
                     </div>
@@ -553,7 +623,12 @@ export default function NewStockMovementPage() {
                                       type="button"
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => setSelectedProduct(null)}
+                                      onClick={() => {
+                                        setSelectedProduct(null)
+                                        setProductQuantity(0)
+                                        setProductCost(0)
+                                        setProductCostDisplay('')
+                                      }}
                                     >
                                       <X className="h-4 w-4" />
                                     </Button>
@@ -563,26 +638,69 @@ export default function NewStockMovementPage() {
                                       <Label htmlFor="quantity">Quantity</Label>
                                       <Input
                                         type="number"
-                                        min="1"
-                                        value={productQuantity}
-                                        onChange={(e) => setProductQuantity(parseInt(e.target.value) || 1)}
+                                        min="0"
+                                        value={productQuantity || ''}
+                                        onChange={(e) => {
+                                          const value = e.target.value
+                                          if (value === '') {
+                                            setProductQuantity(0)
+                                          } else {
+                                            const numValue = parseInt(value)
+                                            setProductQuantity(isNaN(numValue) ? 0 : numValue)
+                                          }
+                                        }}
+                                        onBlur={(e) => {
+                                          if (productQuantity <= 0) {
+                                            setProductQuantity(0)
+                                          }
+                                        }}
                                       />
                                     </div>
                                     <div>
                                       <Label htmlFor="cost_price">Cost Price</Label>
                                       <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={productCost}
-                                        onChange={(e) => setProductCost(parseFloat(e.target.value) || 0)}
+                                        type="text"
+                                        placeholder="0.00"
+                                        value={productCostDisplay}
+                                        onChange={(e) => {
+                                          const formattedValue = formatCurrency(e.target.value)
+                                          setProductCostDisplay(formattedValue)
+                                          setProductCost(parseCurrency(formattedValue))
+                                        }}
+                                        onBlur={(e) => {
+                                          if (e.target.value && parseCurrency(e.target.value) === 0) {
+                                            setProductCostDisplay('')
+                                            setProductCost(0)
+                                          }
+                                        }}
+                                        className={
+                                          selectedProduct && productCost > 0 && productCost >= selectedProduct.unit_price
+                                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                                            : ''
+                                        }
                                       />
+                                      {selectedProduct && (
+                                        <div className="mt-1 text-sm text-gray-600">
+                                          Unit Price: ${selectedProduct.unit_price.toFixed(2)}
+                                        </div>
+                                      )}
+                                      {selectedProduct && productCost > 0 && productCost >= selectedProduct.unit_price && (
+                                        <div className="mt-1 text-sm text-red-600">
+                                          Cost price must be lower than unit price (${selectedProduct.unit_price.toFixed(2)})
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <Button
                                     type="button"
                                     onClick={handleAddProduct}
                                     className="w-full"
+                                    disabled={
+                                      !selectedProduct || 
+                                      productQuantity <= 0 || 
+                                      productCost <= 0 || 
+                                      (selectedProduct && productCost >= selectedProduct.unit_price)
+                                    }
                                   >
                                     Add to Stock Movement
                                   </Button>

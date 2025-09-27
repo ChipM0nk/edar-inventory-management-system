@@ -55,6 +55,8 @@ export default function StockInPage() {
   const [filteredOrders, setFilteredOrders] = useState<StockInOrder[]>([])
   const [selectedOrder, setSelectedOrder] = useState<StockInOrder | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -87,20 +89,25 @@ export default function StockInPage() {
     }
 
     setFilteredOrders(filtered)
+    setCurrentPage(1) // Reset to first page when filtering
   }, [searchTerm, stockInOrders])
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentOrders = filteredOrders.slice(startIndex, endIndex)
 
   const loadStockInOrders = async () => {
     try {
       setIsLoadingData(true)
-      const response = await api.get('/stock-movements?limit=100')
+      const response = await api.get('/stock-movements?limit=100&movement_type=in')
       const movements = response.data.stock_movements || []
       
       // Group movements by reference_id for stock-in orders
       const ordersMap = new Map<string, StockInOrder>()
       
-      movements
-        .filter((movement: any) => movement.movement_type === 'in')
-        .forEach((movement: any) => {
+      movements.forEach((movement: any) => {
           const refId = movement.reference_id
           if (!refId) return
           
@@ -212,20 +219,9 @@ export default function StockInPage() {
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.back()}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Button>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Stock-In Orders</h1>
-                  <p className="mt-2 text-gray-600">View all stock-in orders and their details</p>
-                </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Stock-In Orders</h1>
+                <p className="mt-2 text-gray-600">View all stock-in orders and their details</p>
               </div>
               <div className="flex items-center gap-3">
                 <Button 
@@ -275,7 +271,7 @@ export default function StockInPage() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
                     <p className="mt-2 text-gray-600">Loading stock-in orders...</p>
                   </div>
-                ) : filteredOrders.length === 0 ? (
+                ) : currentOrders.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500">
                       {searchTerm 
@@ -306,7 +302,7 @@ export default function StockInPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredOrders.map((order) => (
+                        {currentOrders.map((order) => (
                           <TableRow 
                             key={order.reference_id}
                             className="cursor-pointer hover:bg-gray-50 transition-colors"
@@ -356,6 +352,46 @@ export default function StockInPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6">
+                <div className="text-sm text-gray-700">
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} results
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={currentPage === page ? "bg-[#52a852] hover:bg-[#4a964a] text-white" : ""}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

@@ -106,6 +106,9 @@ export default function ProductsPage() {
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
   const [isLoadingData, setIsLoadingData] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [totalProducts, setTotalProducts] = useState(0)
 
   // Form setup
   const form = useForm<ProductForm>({
@@ -140,12 +143,23 @@ export default function ProductsPage() {
   useEffect(() => {
     if (user) {
       const timeoutId = setTimeout(() => {
+        setCurrentPage(1) // Reset to first page when filters change
         loadProducts()
       }, 300)
       
       return () => clearTimeout(timeoutId)
     }
   }, [searchTerm, selectedCategory, selectedSupplier, sortField, sortOrder, user])
+
+  // Reload products when page changes
+  useEffect(() => {
+    if (user) {
+      loadProducts()
+    }
+  }, [currentPage, user])
+
+  // Pagination logic
+  const totalPages = Math.ceil(totalProducts / itemsPerPage)
 
   const loadCategories = async () => {
     try {
@@ -181,10 +195,12 @@ export default function ProductsPage() {
       }
       params.append('sort_by', sortField)
       params.append('sort_order', sortOrder)
-      params.append('limit', '50') // Load more items for better UX
+      params.append('page', currentPage.toString())
+      params.append('limit', itemsPerPage.toString())
       
       const response = await api.get(`/products/with-stock?${params.toString()}`)
       setProducts(response.data.products || [])
+      setTotalProducts(response.data.total || 0)
     } catch (error) {
       console.error('Error loading products:', error)
     } finally {
@@ -761,6 +777,46 @@ export default function ProductsPage() {
                       ))}
                     </TableBody>
                   </Table>
+                )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-gray-700">
+                      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} results
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className={currentPage === page ? "bg-[#52a852] hover:bg-[#4a964a] text-white" : ""}
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>

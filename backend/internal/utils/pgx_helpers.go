@@ -144,3 +144,11 @@ func Int32ToIntPtr(value int32) *int {
 	val := int(value)
 	return &val
 }
+
+// Helper function to convert optional time pointer to pgtype.Timestamp
+func OptionalTimeToPgxTimestamp(t *time.Time) pgtype.Timestamp {
+	if t == nil {
+		return pgtype.Timestamp{Valid: false}
+	}
+	return pgtype.Timestamp{Time: *t, Valid: true}
+}

@@ -253,22 +253,79 @@ func (s *StockService) ListStockLevels(ctx context.Context, filter models.StockL
 func (s *StockService) ListStockMovements(ctx context.Context, filter models.StockMovementFilter) (*models.StockMovementListResponse, error) {
 	offset := (filter.Page - 1) * filter.Limit
 
-	// Use basic query for now to debug
-	stockMovements, err := s.db.ListStockMovements(ctx, &sqlc.ListStockMovementsParams{
-		Limit:  int32(filter.Limit),
-		Offset: int32(offset),
-	})
+	// Use filtered query if any filters are provided
+	var stockMovementRows []*sqlc.ListStockMovementsWithFilterRow
+	var total int64
+	var err error
+
+	if filter.ProductID != nil || filter.WarehouseID != nil || filter.MovementType != nil || filter.DateFrom != nil || filter.DateTo != nil {
+		// Use filtered query
+		stockMovementRows, err = s.db.ListStockMovementsWithFilter(ctx, &sqlc.ListStockMovementsWithFilterParams{
+			Column1:  utils.OptionalUUIDToPgxUUID(filter.ProductID),
+			Column2:  utils.OptionalUUIDToPgxUUID(filter.WarehouseID),
+			Column3:  utils.OptionalStringToString(filter.MovementType),
+			Column4:  utils.OptionalTimeToPgxTimestamp(filter.DateFrom),
+			Column5:  utils.OptionalTimeToPgxTimestamp(filter.DateTo),
+			Limit:    int32(filter.Limit),
+			Offset:   int32(offset),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		total, err = s.db.CountStockMovementsWithFilter(ctx, &sqlc.CountStockMovementsWithFilterParams{
+			Column1: utils.OptionalUUIDToPgxUUID(filter.ProductID),
+			Column2: utils.OptionalUUIDToPgxUUID(filter.WarehouseID),
+			Column3: utils.OptionalStringToString(filter.MovementType),
+			Column4: utils.OptionalTimeToPgxTimestamp(filter.DateFrom),
+			Column5: utils.OptionalTimeToPgxTimestamp(filter.DateTo),
+		})
+	} else {
+		// Use basic query when no filters
+		basicRows, err := s.db.ListStockMovements(ctx, &sqlc.ListStockMovementsParams{
+			Limit:  int32(filter.Limit),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert basic rows to filtered rows format
+		stockMovementRows = make([]*sqlc.ListStockMovementsWithFilterRow, len(basicRows))
+		for i, row := range basicRows {
+			stockMovementRows[i] = &sqlc.ListStockMovementsWithFilterRow{
+				ID:                   row.ID,
+				ProductID:            row.ProductID,
+				WarehouseID:          row.WarehouseID,
+				MovementType:         row.MovementType,
+				Quantity:             row.Quantity,
+				ReferenceType:        row.ReferenceType,
+				ReferenceID:          row.ReferenceID,
+				Reason:               row.Reason,
+				UserID:               row.UserID,
+				CreatedAt:            row.CreatedAt,
+				ProcessedBy:          row.ProcessedBy,
+				ProcessedDate:        row.ProcessedDate,
+				CostPrice:            row.CostPrice,
+				TotalAmount:          row.TotalAmount,
+				ProductName:          row.ProductName,
+				Sku:                  row.Sku,
+				WarehouseName:        row.WarehouseName,
+				FirstName:            row.FirstName,
+				LastName:             row.LastName,
+				ProcessedByFirstName: row.ProcessedByFirstName,
+				ProcessedByLastName:  row.ProcessedByLastName,
+			}
+		}
+
+		total, err = s.db.CountStockMovements(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	total, err := s.db.CountStockMovements(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]models.StockMovement, len(stockMovements))
-	for i, movement := range stockMovements {
+	result := make([]models.StockMovement, len(stockMovementRows))
+	for i, movement := range stockMovementRows {
 		referenceID := utils.PgxUUIDToUUID(movement.ReferenceID)
 		userID := utils.PgxUUIDToUUID(movement.UserID)
 		processedBy := utils.OptionalPgxUUIDToUUID(movement.ProcessedBy)
