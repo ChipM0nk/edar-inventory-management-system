@@ -6,7 +6,7 @@ export interface PurchaseOrder {
   supplier_name: string
   supplier_contact?: string
   total_amount: number
-  status: 'pending' | 'approved' | 'received' | 'cancelled'
+  status: 'received' | 'cancelled'
   order_date: string
   expected_delivery_date?: string
   received_date?: string

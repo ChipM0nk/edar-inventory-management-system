@@ -3,6 +3,7 @@
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { getStatusColor, getStatusDisplayText } from '@/lib/utils'
 import { AppLayout } from '@/components/app-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,10 +27,11 @@ import { Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign,
 import api from '@/lib/api'
 
 interface PurchaseOrder {
+  id?: string // Purchase order ID from database
   reference_id: string
   reference_number?: string
   reference_type: string
-  status?: 'pending' | 'approved' | 'received' | 'cancelled'
+  status?: 'received' | 'cancelled'
   total_quantity: number
   total_amount: number
   processed_by: string
@@ -72,10 +74,12 @@ export default function PurchasePage() {
   
   // Document-related state
   const [documents, setDocuments] = useState<Document[]>([])
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showDocumentUpload, setShowDocumentUpload] = useState(false)
   const [viewingDocument, setViewingDocument] = useState<string | null>(null)
+  const [documentViewerUrl, setDocumentViewerUrl] = useState<string | null>(null)
   
   // Cancel confirmation state
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -176,6 +180,7 @@ export default function PurchasePage() {
           
           if (!ordersMap.has(refId)) {
             ordersMap.set(refId, {
+              id: refId, // Use reference_id as the purchase order ID since it now contains the actual PO ID
               reference_id: refId,
               reference_number: movement.reference_number,
               reference_type: movement.reference_type || 'adjustment',
@@ -265,7 +270,7 @@ export default function PurchasePage() {
   const handleOrderClick = (order: PurchaseOrder) => {
     setSelectedOrder(order)
     setIsModalOpen(true)
-    loadDocuments(order.reference_id)
+    loadDocuments(order.id!)
   }
 
   const closeModal = () => {
@@ -282,11 +287,14 @@ export default function PurchasePage() {
   // Load documents for a purchase order
   const loadDocuments = async (purchaseOrderId: string) => {
     try {
+      setIsLoadingDocuments(true)
       const response = await api.get(`/documents/purchase-order/${purchaseOrderId}`)
       setDocuments(response.data || [])
     } catch (error) {
       console.error('Error loading documents:', error)
       setDocuments([])
+    } finally {
+      setIsLoadingDocuments(false)
     }
   }
 
@@ -321,7 +329,7 @@ export default function PurchasePage() {
       })
 
       // Reload documents and clear upload files
-      await loadDocuments(selectedOrder.reference_id)
+      await loadDocuments(selectedOrder.id!)
       setUploadedFiles([])
       setShowDocumentUpload(false)
       
@@ -500,7 +508,7 @@ export default function PurchasePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
@@ -511,6 +519,21 @@ export default function PurchasePage() {
 
   if (!user) {
     return null
+  }
+
+  // Show loading screen when data is being loaded
+  if (isLoadingData && purchaseOrders.length === 0) {
+    return (
+      <AppLayout>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+            <h2 className="mt-6 text-xl font-semibold text-gray-900">Loading Purchase Orders</h2>
+            <p className="mt-2 text-gray-600">Please wait while we fetch your data...</p>
+          </div>
+        </div>
+      </AppLayout>
+    )
   }
 
   return (
@@ -680,13 +703,9 @@ export default function PurchasePage() {
                                   ? 'bg-red-100 text-red-800' 
                                   : order.status === 'received'
                                   ? 'bg-green-100 text-green-800'
-                                  : order.status === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : order.status === 'approved'
-                                  ? 'bg-blue-100 text-blue-800'
                                   : 'bg-gray-100 text-gray-800'
                               }`}>
-                                {order.status || 'Unknown'}
+                                {getStatusDisplayText(order.status)}
                               </span>
                             </TableCell>
                             <TableCell className="text-sm text-gray-600">
@@ -811,17 +830,13 @@ export default function PurchasePage() {
                             ? 'bg-red-500' 
                             : selectedOrder.status === 'received'
                             ? 'bg-green-500'
-                            : selectedOrder.status === 'pending'
-                            ? 'bg-yellow-500'
-                            : selectedOrder.status === 'approved'
-                            ? 'bg-blue-500'
                             : 'bg-gray-500'
                         }`}></div>
                       </div>
                       <div>
                         <p className="text-sm font-medium">Status</p>
                         <p className="text-sm text-gray-600 capitalize">
-                          {selectedOrder.status || 'Unknown'}
+                          {getStatusDisplayText(selectedOrder.status)}
                         </p>
                       </div>
                     </div>
@@ -1100,16 +1115,6 @@ export default function PurchasePage() {
               {/* Action Buttons */}
               <div className="flex justify-between">
                 <div>
-                  {selectedOrder && canCancelPurchaseOrder(selectedOrder.created_at) && selectedOrder.status !== 'cancelled' && (
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowCancelDialog(true)}
-                      className="text-red-600 border-red-300 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Cancel Purchase Order
-                    </Button>
-                  )}
                 </div>
                 <Button variant="outline" onClick={closeModal}>
                   Close
@@ -1126,7 +1131,7 @@ export default function PurchasePage() {
     {/* Stock-In Order Detail Modal */}
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
       <DialogContent className="w-[90vw] max-w-5xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader className="sticky top-0 bg-white z-10 border-b pb-4 mb-4">
+        <DialogHeader className="sticky top-0 bg-white z-[100] border-b pb-4 mb-4 shadow-sm">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Purchase Order Details
@@ -1135,14 +1140,9 @@ export default function PurchasePage() {
                 CANCELLED
               </span>
             )}
-            {selectedOrder?.status === 'pending' && (
-              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                PENDING
-              </span>
-            )}
-            {selectedOrder?.status === 'approved' && (
-              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                APPROVED
+            {selectedOrder?.status === 'received' && (
+              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                COMPLETED
               </span>
             )}
           </DialogTitle>
@@ -1169,7 +1169,7 @@ export default function PurchasePage() {
         </DialogHeader>
         
         {selectedOrder && (
-          <div className="space-y-6">
+          <div className="space-y-6 relative z-10">
             {/* Order Overview */}
             <Card>
               <CardHeader>
@@ -1191,17 +1191,13 @@ export default function PurchasePage() {
                           ? 'bg-red-500' 
                           : selectedOrder.status === 'received'
                           ? 'bg-green-500'
-                          : selectedOrder.status === 'pending'
-                          ? 'bg-yellow-500'
-                          : selectedOrder.status === 'approved'
-                          ? 'bg-blue-500'
                           : 'bg-gray-500'
                       }`}></div>
                     </div>
                     <div>
                       <p className="text-sm font-medium">Status</p>
                       <p className="text-sm text-gray-600 capitalize">
-                        {selectedOrder.status || 'Unknown'}
+                        {getStatusDisplayText(selectedOrder.status)}
                       </p>
                     </div>
                   </div>
@@ -1389,7 +1385,12 @@ export default function PurchasePage() {
                 </div>
 
                 {/* Existing Documents */}
-                {documents.length > 0 ? (
+                {isLoadingDocuments ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading documents...</p>
+                  </div>
+                ) : documents.length > 0 ? (
                   <div className="space-y-3">
                     {documents.map((doc) => (
                       <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
@@ -1422,15 +1423,17 @@ export default function PurchasePage() {
                           >
                             Download
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => deleteDocument(doc)}
-                            className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Delete
-                          </Button>
+                          {selectedOrder?.status !== 'cancelled' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => deleteDocument(doc)}
+                              className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}

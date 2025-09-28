@@ -89,8 +89,6 @@ export default function NewStockMovementPage() {
   const [productCostDisplay, setProductCostDisplay] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
-  const [showCancelDialog, setShowCancelDialog] = useState(false)
-  const [cancellationReason, setCancellationReason] = useState('')
 
   // Form setup
   const form = useForm<StockInForm>({
@@ -343,39 +341,6 @@ export default function NewStockMovementPage() {
     return daysDifference <= 30
   }
 
-  // Handle cancel purchase order
-  const handleCancelPurchaseOrder = async () => {
-    if (!cancellationReason.trim()) {
-      alert('Please provide a reason for cancellation')
-      return
-    }
-
-    try {
-      setIsSubmitting(true)
-      
-      // Here you would call your API to cancel the purchase order
-      // await api.post('/purchase-orders/cancel', {
-      //   purchase_order_id: purchaseOrderId,
-      //   reason: cancellationReason
-      // })
-      
-      console.log('Cancelling purchase order with reason:', cancellationReason)
-      alert('Purchase order cancelled successfully')
-      
-      // Reset form and redirect
-      form.reset()
-      setStockInItems([])
-      setUploadedDocuments([])
-      setShowCancelDialog(false)
-      setCancellationReason('')
-      router.push('/inventory/purchase')
-    } catch (error: any) {
-      console.error('Error cancelling purchase order:', error)
-      alert('Error cancelling purchase order. Please try again.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   // Handle view document
   const handleViewDocument = (file: File) => {
@@ -407,13 +372,19 @@ export default function NewStockMovementPage() {
     try {
       setIsSubmitting(true)
       
+      // Get supplier details
+      const selectedSupplierData = suppliers.find(s => s.id === data.supplier_id)
+      if (!selectedSupplierData) {
+        throw new Error('Selected supplier not found')
+      }
+
       // Create purchase order first
       const purchaseOrderData = {
-        po_number: data.reference_number,
-        supplier_name: data.supplier_name,
-        supplier_contact: data.supplier_contact,
-        order_date: new Date().toISOString().split('T')[0],
-        expected_delivery_date: data.expected_delivery_date,
+        po_number: data.reference_number || `PO-${Date.now()}`,
+        supplier_name: selectedSupplierData.name,
+        supplier_contact: selectedSupplierData.email,
+        order_date: new Date().toISOString(),
+        expected_delivery_date: null, // Not available in this form
         notes: data.notes || '',
         created_by: user?.id || '',
       }
@@ -444,6 +415,7 @@ export default function NewStockMovementPage() {
         reference_number: data.reference_number || undefined,
         processed_by: user?.id || data.processed_by,
         processed_date: new Date(data.received_date).toISOString(),
+        purchase_order_id: purchaseOrderId, // Pass the purchase order ID
         items: selectedItems.map(item => ({
           product_id: item.product_id,
           warehouse_id: item.warehouse_id,
@@ -455,6 +427,22 @@ export default function NewStockMovementPage() {
 
       console.log('Sending bulk request:', bulkRequest)
       await api.post('/stock-movements/bulk', bulkRequest)
+      
+      // Update purchase order status to 'received' since stock has been processed
+      try {
+        await api.put(`/purchase-orders/${purchaseOrderId}`, {
+          supplier_name: selectedSupplierData.name,
+          supplier_contact: selectedSupplierData.email,
+          status: 'received',
+          expected_delivery_date: null,
+          received_date: new Date(data.received_date).toISOString(),
+          notes: data.notes || '',
+        })
+        console.log('Purchase order status updated to received')
+      } catch (error) {
+        console.error('Failed to update purchase order status:', error)
+        // Don't fail the entire process if status update fails
+      }
       
       // Reset form and redirect
       form.reset()
@@ -1043,19 +1031,7 @@ export default function NewStockMovementPage() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex justify-between">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowCancelDialog(true)}
-                  className="text-red-600 border-red-300 hover:bg-red-50"
-                  disabled={isSubmitting}
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Cancel Purchase Order
-                </Button>
+              <div className="flex justify-end">
                 <Button
                   type="submit"
                   disabled={isSubmitting || selectedItems.length === 0}
@@ -1165,70 +1141,6 @@ export default function NewStockMovementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Purchase Order Dialog */}
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-red-600">Cancel Purchase Order</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to cancel this purchase order? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="cancellation-reason" className="text-sm font-medium">
-                Reason for cancellation <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="cancellation-reason"
-                placeholder="Please provide a reason for cancelling this purchase order..."
-                value={cancellationReason}
-                onChange={(e) => setCancellationReason(e.target.value)}
-                className="mt-1"
-                rows={3}
-              />
-            </div>
-            
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <div className="flex items-start">
-                <svg className="w-5 h-5 text-amber-400 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-amber-800">Important Note</p>
-                  <p className="text-sm text-amber-700 mt-1">
-                    Purchase orders can only be cancelled within 30 days of creation. 
-                    If this order is older than 30 days, please contact your administrator.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowCancelDialog(false)
-                setCancellationReason('')
-              }}
-              disabled={isSubmitting}
-            >
-              Keep Purchase Order
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCancelPurchaseOrder}
-              disabled={isSubmitting || !cancellationReason.trim()}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isSubmitting ? 'Cancelling...' : 'Cancel Purchase Order'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AppLayout>
   )
 }

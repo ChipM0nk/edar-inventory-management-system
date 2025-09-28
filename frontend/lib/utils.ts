@@ -22,10 +22,6 @@ export const formatFileSize = (bytes: number) => {
 
 export const getStatusColor = (status: string) => {
   switch (status) {
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800'
-    case 'approved':
-      return 'bg-blue-100 text-blue-800'
     case 'received':
       return 'bg-green-100 text-green-800'
     case 'cancelled':
@@ -67,5 +63,16 @@ export const getValidationIcon = (status?: string) => {
       return 'XCircle'
     default:
       return null
+  }
+}
+
+export const getStatusDisplayText = (status?: string) => {
+  switch (status) {
+    case 'received':
+      return 'COMPLETED'
+    case 'cancelled':
+      return 'CANCELLED'
+    default:
+      return 'UNKNOWN'
   }
 }

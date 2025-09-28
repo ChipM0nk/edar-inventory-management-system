@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type PurchaseOrder struct {
 	ID                   string     `json:"id"`
@@ -28,6 +31,52 @@ type CreatePurchaseOrderRequest struct {
 	ExpectedDeliveryDate *time.Time `json:"expected_delivery_date"`
 	Notes                *string    `json:"notes"`
 	CreatedBy            string     `json:"created_by"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for CreatePurchaseOrderRequest
+func (r *CreatePurchaseOrderRequest) UnmarshalJSON(data []byte) error {
+	type Alias CreatePurchaseOrderRequest
+	aux := &struct {
+		OrderDate            string  `json:"order_date"`
+		ExpectedDeliveryDate *string `json:"expected_delivery_date"`
+		*Alias
+	}{
+		Alias: (*Alias)(r),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Parse order_date
+	if aux.OrderDate != "" {
+		// Try parsing as ISO 8601 first
+		if t, err := time.Parse(time.RFC3339, aux.OrderDate); err == nil {
+			r.OrderDate = t
+		} else if t, err := time.Parse("2006-01-02T15:04:05Z", aux.OrderDate); err == nil {
+			r.OrderDate = t
+		} else if t, err := time.Parse("2006-01-02", aux.OrderDate); err == nil {
+			r.OrderDate = t
+		} else {
+			return err
+		}
+	}
+
+	// Parse expected_delivery_date
+	if aux.ExpectedDeliveryDate != nil && *aux.ExpectedDeliveryDate != "" {
+		// Try parsing as ISO 8601 first
+		if t, err := time.Parse(time.RFC3339, *aux.ExpectedDeliveryDate); err == nil {
+			r.ExpectedDeliveryDate = &t
+		} else if t, err := time.Parse("2006-01-02T15:04:05Z", *aux.ExpectedDeliveryDate); err == nil {
+			r.ExpectedDeliveryDate = &t
+		} else if t, err := time.Parse("2006-01-02", *aux.ExpectedDeliveryDate); err == nil {
+			r.ExpectedDeliveryDate = &t
+		} else {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type UpdatePurchaseOrderRequest struct {

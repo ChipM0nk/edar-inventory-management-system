@@ -103,7 +103,7 @@ func (s *PurchaseOrderService) ListPurchaseOrders(limit, offset int32) ([]models
 			SupplierName:         po.SupplierName,
 			SupplierContact:      po.SupplierContact,
 			TotalAmount:          utils.PgxNumericToFloat64(po.TotalAmount),
-			Status:               "completed", // Always return completed
+			Status:               "received", // Always return received
 			OrderDate:            utils.PgxDateToTime(po.OrderDate),
 			ExpectedDeliveryDate: utils.PgxDateToTimePtr(po.ExpectedDeliveryDate),
 			ReceivedDate:         utils.PgxDateToTimePtr(po.ReceivedDate),
@@ -125,7 +125,7 @@ func (s *PurchaseOrderService) UpdatePurchaseOrder(id string, req models.UpdateP
 		ID:                   utils.UUIDToPgxUUID(uuid.MustParse(id)),
 		SupplierName:         req.SupplierName,
 		SupplierContact:      req.SupplierContact,
-		Status:               "completed", // Always set to completed
+		Status:               "received", // Always set to received
 		ExpectedDeliveryDate: utils.TimeToPgxDatePtr(req.ExpectedDeliveryDate),
 		ReceivedDate:         utils.TimeToPgxDatePtr(req.ReceivedDate),
 		Notes:                req.Notes,
@@ -140,7 +140,7 @@ func (s *PurchaseOrderService) UpdatePurchaseOrder(id string, req models.UpdateP
 		SupplierName:         po.SupplierName,
 		SupplierContact:      po.SupplierContact,
 		TotalAmount:          utils.PgxNumericToFloat64(po.TotalAmount),
-		Status:               "completed", // Always return completed
+		Status:               "received", // Always return received
 		OrderDate:            utils.PgxDateToTime(po.OrderDate),
 		ExpectedDeliveryDate: utils.PgxDateToTimePtr(po.ExpectedDeliveryDate),
 		ReceivedDate:         utils.PgxDateToTimePtr(po.ReceivedDate),

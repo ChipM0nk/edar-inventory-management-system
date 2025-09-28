@@ -411,9 +411,12 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 	var purchaseOrderID *uuid.UUID
 	var totalOrderAmount float64
 
-	// Create purchase order first if this is a purchase order type
+	// Use provided purchase order ID or create one if not provided
 	referenceType := "purchase_order"
-	if req.SupplierID != uuid.Nil {
+	if req.PurchaseOrderID != nil {
+		// Use the provided purchase order ID
+		purchaseOrderID = req.PurchaseOrderID
+	} else if req.SupplierID != uuid.Nil {
 		// Get supplier information
 		supplier, err := s.db.GetSupplier(ctx, utils.UUIDToPgxUUID(req.SupplierID))
 		if err != nil {

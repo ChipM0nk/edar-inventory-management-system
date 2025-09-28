@@ -67,6 +67,7 @@ type BulkStockMovementRequest struct {
 	ReferenceNumber *string                      `json:"reference_number,omitempty"`
 	ProcessedBy     uuid.UUID                    `json:"processed_by,omitempty"`
 	ProcessedDate   time.Time                    `json:"processed_date,omitempty"`
+	PurchaseOrderID *uuid.UUID                   `json:"purchase_order_id,omitempty"`
 	Items           []BulkStockMovementItem      `json:"items" validate:"required,min=1"`
 }
 
