@@ -54,7 +54,15 @@ func (s *DocumentValidationService) ValidateDocument(documentID string, poNumber
 		wd = filepath.Dir(wd)
 	}
 	
-	fullPath := filepath.Join(wd, "documents", document.FilePath)
+	// Check if documents directory exists in backend subdirectory first
+	backendDocsPath := filepath.Join(wd, "backend", "documents", document.FilePath)
+	var fullPath string
+	if _, err := os.Stat(backendDocsPath); err == nil {
+		fullPath = backendDocsPath
+	} else {
+		// Fallback to documents in project root
+		fullPath = filepath.Join(wd, "documents", document.FilePath)
+	}
 	
 	// Check if file exists
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {

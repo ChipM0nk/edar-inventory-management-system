@@ -6,32 +6,13 @@ import { useEffect, useState } from 'react'
 import { AppLayout } from '@/components/app-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Search, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import api from '@/lib/api'
-
-interface StockLevel {
-  id: string
-  product_id: string
-  warehouse_id: string
-  quantity: number
-  reserved_quantity: number
-  available_quantity: number
-  min_stock_level: number
-  max_stock_level?: number
-  last_updated: string
-  product_name: string
-  product_sku: string
-  warehouse_name: string
-}
+import { StockLevel } from '@/lib/types'
+import { StockTable } from '@/components/stock/stock-table'
+import { SearchBar } from '@/components/shared/search-bar'
+import { LoadingSpinner } from '@/components/shared/loading-spinner'
+import { EmptyState } from '@/components/shared/empty-state'
 
 export default function StockPage() {
   const { user, isLoading } = useAuth()
@@ -87,10 +68,7 @@ export default function StockPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+        <LoadingSpinner size="lg" text="Loading..." />
       </div>
     )
   }
@@ -131,82 +109,29 @@ export default function StockPage() {
               <CardContent>
                 {/* Search Bar */}
                 <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search by product name, SKU, or warehouse..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
+                  <SearchBar
+                    placeholder="Search by product name, SKU, or warehouse..."
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                  />
                 </div>
 
                 {/* Stock Levels Table */}
                 {isLoadingData ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                    <p className="mt-2 text-gray-600">Loading stock levels...</p>
-                  </div>
+                  <LoadingSpinner text="Loading stock levels..." />
                 ) : filteredStockLevels.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">
-                      {searchTerm ? 'No stock levels found matching your search' : 'No stock data available'}
-                    </p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      {searchTerm 
+                  <EmptyState 
+                    title={
+                      searchTerm ? 'No stock levels found matching your search' : 'No stock data available'
+                    }
+                    description={
+                      searchTerm 
                         ? 'Try adjusting your search terms' 
                         : 'Stock levels will appear here once products are added to warehouses'
-                      }
-                    </p>
-                  </div>
+                    }
+                  />
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Warehouse</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Reserved</TableHead>
-                          <TableHead>Available</TableHead>
-                          <TableHead>Min Level</TableHead>
-                          <TableHead>Last Updated</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredStockLevels.map((stock) => (
-                          <TableRow key={stock.id}>
-                            <TableCell className="font-medium">
-                              {stock.product_name}
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {stock.product_sku}
-                            </TableCell>
-                            <TableCell>
-                              {stock.warehouse_name}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {stock.quantity}
-                            </TableCell>
-                            <TableCell>
-                              {stock.reserved_quantity}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {stock.available_quantity}
-                            </TableCell>
-                            <TableCell>
-                              {stock.min_stock_level}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-500">
-                              {new Date(stock.last_updated).toLocaleDateString()}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <StockTable stockLevels={filteredStockLevels} />
                 )}
               </CardContent>
             </Card>

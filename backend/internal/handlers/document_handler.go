@@ -87,7 +87,8 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		if filepath.Base(wd) == "backend" {
 			wd = filepath.Dir(wd)
 		}
-		dirPath := filepath.Join(wd, "documents", "po", year, month)
+		// Use backend/documents directory
+		dirPath := filepath.Join(wd, "backend", "documents", "po", year, month)
 		if err := os.MkdirAll(dirPath, 0755); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create directory"})
 			return
@@ -173,13 +174,24 @@ func (h *DocumentHandler) DownloadDocument(c *gin.Context) {
 	if filepath.Base(wd) == "backend" {
 		wd = filepath.Dir(wd)
 	}
-	fullPath := filepath.Join(wd, "documents", document.FilePath)
+	// Check if documents directory exists in backend subdirectory first
+	backendDocsPath := filepath.Join(wd, "backend", "documents", document.FilePath)
+	var fullPath string
+	if _, err := os.Stat(backendDocsPath); err == nil {
+		fullPath = backendDocsPath
+	} else {
+		// Fallback to documents in project root
+		fullPath = filepath.Join(wd, "documents", document.FilePath)
+	}
 
 	// Check if file exists
+	fmt.Printf("Looking for document at path: %s\n", fullPath)
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		fmt.Printf("File not found at path: %s\n", fullPath)
 		c.JSON(http.StatusNotFound, gin.H{"error": "File not found on disk"})
 		return
 	}
+	fmt.Printf("File found at path: %s\n", fullPath)
 
 	// Set headers for file download/viewing
 	c.Header("Content-Description", "File Transfer")

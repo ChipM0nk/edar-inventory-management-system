@@ -6,53 +6,11 @@ import { useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/app-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Plus, Search, Edit, Trash2 } from 'lucide-react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
+import { Plus } from 'lucide-react'
 import api from '@/lib/api'
-
-const warehouseSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  location: z.string().min(1, 'Location is required'),
-  address: z.string().optional(),
-  contact_person: z.string().optional(),
-  contact_phone: z.string().optional(),
-})
-
-type WarehouseForm = z.infer<typeof warehouseSchema>
-
-interface Warehouse {
-  id: string
-  name: string
-  location: string
-  address?: string
-  contact_person?: string
-  contact_phone?: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
+import { Warehouse, WarehouseFormData } from '@/lib/types'
+import { WarehouseForm, WarehouseTable } from '@/components/warehouses'
+import { SearchBar, LoadingSpinner, EmptyState } from '@/components/shared'
 
 export default function WarehousesPage() {
   const { user, isLoading } = useAuth()
@@ -66,17 +24,6 @@ export default function WarehousesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingData, setIsLoadingData] = useState(false)
 
-  // Form setup
-  const form = useForm<WarehouseForm>({
-    resolver: zodResolver(warehouseSchema),
-    defaultValues: {
-      name: '',
-      location: '',
-      address: '',
-      contact_person: '',
-      contact_phone: '',
-    },
-  })
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -120,7 +67,7 @@ export default function WarehousesPage() {
     }
   }
 
-  const handleCreate = async (data: WarehouseForm) => {
+  const handleCreate = async (data: WarehouseFormData) => {
     try {
       const createData = {
         name: data.name,
@@ -132,7 +79,6 @@ export default function WarehousesPage() {
       
       await api.post('/warehouses', createData)
       setIsCreateOpen(false)
-      form.reset()
       loadWarehouses() // Reload data
     } catch (error) {
       console.error('Error creating warehouse:', error)
@@ -142,19 +88,9 @@ export default function WarehousesPage() {
   const handleEdit = (warehouse: Warehouse) => {
     setEditingWarehouse(warehouse)
     setIsEditOpen(true)
-    // Reset form with warehouse data after dialog opens
-    setTimeout(() => {
-      form.reset({
-        name: warehouse.name,
-        location: warehouse.location,
-        address: warehouse.address || '',
-        contact_person: warehouse.contact_person || '',
-        contact_phone: warehouse.contact_phone || '',
-      })
-    }, 0)
   }
 
-  const handleUpdate = async (data: WarehouseForm) => {
+  const handleUpdate = async (data: WarehouseFormData) => {
     if (!editingWarehouse) return
     
     try {
@@ -170,7 +106,6 @@ export default function WarehousesPage() {
       await api.put(`/warehouses/${editingWarehouse.id}`, updateData)
       setIsEditOpen(false)
       setEditingWarehouse(null)
-      form.reset()
       loadWarehouses() // Reload data
     } catch (error) {
       console.error('Error updating warehouse:', error)
@@ -193,10 +128,7 @@ export default function WarehousesPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+        <LoadingSpinner size="lg" text="Loading..." />
       </div>
     )
   }
@@ -215,175 +147,13 @@ export default function WarehousesPage() {
                 <h1 className="text-3xl font-bold text-gray-900">Warehouses</h1>
                 <p className="mt-2 text-gray-600">Manage your storage locations</p>
               </div>
-              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Warehouse
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create New Warehouse</DialogTitle>
-                    <DialogDescription>
-                      Add a new warehouse to your inventory system.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="name">Name *</Label>
-                        <Input
-                          id="name"
-                          {...form.register('name')}
-                          placeholder="Warehouse name"
-                        />
-                        {form.formState.errors.name && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.name.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="location">Location *</Label>
-                        <Input
-                          id="location"
-                          {...form.register('location')}
-                          placeholder="City, State"
-                        />
-                        {form.formState.errors.location && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.location.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="address">Address</Label>
-                      <Textarea
-                        id="address"
-                        {...form.register('address')}
-                        placeholder="Full address"
-                        rows={2}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="contact_person">Contact Person</Label>
-                        <Input
-                          id="contact_person"
-                          {...form.register('contact_person')}
-                          placeholder="Contact person name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="contact_phone">Contact Phone</Label>
-                        <Input
-                          id="contact_phone"
-                          {...form.register('contact_phone')}
-                          placeholder="Phone number"
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsCreateOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit">
-                        Create Warehouse
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
-              {/* Edit Dialog */}
-              <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Edit Warehouse</DialogTitle>
-                    <DialogDescription>
-                      Update the warehouse information.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="edit-name">Name *</Label>
-                        <Input
-                          id="edit-name"
-                          {...form.register('name')}
-                          placeholder="Warehouse name"
-                        />
-                        {form.formState.errors.name && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.name.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-location">Location *</Label>
-                        <Input
-                          id="edit-location"
-                          {...form.register('location')}
-                          placeholder="City, State"
-                        />
-                        {form.formState.errors.location && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.location.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-address">Address</Label>
-                      <Textarea
-                        id="edit-address"
-                        {...form.register('address')}
-                        placeholder="Full address"
-                        rows={2}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="edit-contact_person">Contact Person</Label>
-                        <Input
-                          id="edit-contact_person"
-                          {...form.register('contact_person')}
-                          placeholder="Contact person name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-contact_phone">Contact Phone</Label>
-                        <Input
-                          id="edit-contact_phone"
-                          {...form.register('contact_phone')}
-                          placeholder="Phone number"
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setIsEditOpen(false)
-                          setEditingWarehouse(null)
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit">
-                        Update Warehouse
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              <Button 
+                className="flex items-center gap-2"
+                onClick={() => setIsCreateOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add Warehouse
+              </Button>
             </div>
             
             <Card>
@@ -396,101 +166,66 @@ export default function WarehousesPage() {
               <CardContent>
                 {/* Search Bar */}
                 <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search warehouses..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
+                  <SearchBar
+                    placeholder="Search warehouses..."
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                  />
                 </div>
 
                 {/* Table */}
                 {isLoadingData ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                    <p className="mt-2 text-gray-600">Loading warehouses...</p>
-                  </div>
+                  <LoadingSpinner text="Loading warehouses..." />
                 ) : warehouses.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">
-                      {searchTerm ? 'No warehouses found matching your search' : 'No warehouses found'}
-                    </p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      {searchTerm ? 'Try adjusting your search terms' : 'Get started by adding your first warehouse'}
-                    </p>
-                  </div>
+                  <EmptyState 
+                    title={
+                      searchTerm ? 'No warehouses found matching your search' : 'No warehouses found'
+                    }
+                    description={
+                      searchTerm ? 'Try adjusting your search terms' : 'Get started by adding your first warehouse'
+                    }
+                  />
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Address</TableHead>
-                        <TableHead>Contact</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {warehouses.map((warehouse) => (
-                        <TableRow key={warehouse.id}>
-                          <TableCell className="font-medium">{warehouse.name}</TableCell>
-                          <TableCell>{warehouse.location}</TableCell>
-                          <TableCell>{warehouse.address || '-'}</TableCell>
-                          <TableCell>
-                            <div>
-                              {warehouse.contact_person && (
-                                <div className="font-medium">{warehouse.contact_person}</div>
-                              )}
-                              {warehouse.contact_phone && (
-                                <div className="text-sm text-gray-500">{warehouse.contact_phone}</div>
-                              )}
-                              {!warehouse.contact_person && !warehouse.contact_phone && '-'}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              warehouse.is_active 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {warehouse.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {new Date(warehouse.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEdit(warehouse)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDelete(warehouse)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <WarehouseTable
+                    warehouses={warehouses}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
                 )}
               </CardContent>
             </Card>
+
+            {/* Create Warehouse Form */}
+            <WarehouseForm
+              isOpen={isCreateOpen}
+              onOpenChange={setIsCreateOpen}
+              onSubmit={handleCreate}
+              onCancel={() => setIsCreateOpen(false)}
+              title="Create New Warehouse"
+              description="Add a new warehouse to your inventory system."
+              submitText="Create Warehouse"
+            />
+
+            {/* Edit Warehouse Form */}
+            <WarehouseForm
+              isOpen={isEditOpen}
+              onOpenChange={setIsEditOpen}
+              onSubmit={handleUpdate}
+              onCancel={() => {
+                setIsEditOpen(false)
+                setEditingWarehouse(null)
+              }}
+              title="Edit Warehouse"
+              description="Update the warehouse information."
+              submitText="Update Warehouse"
+              defaultValues={editingWarehouse ? {
+                name: editingWarehouse.name,
+                location: editingWarehouse.location,
+                address: editingWarehouse.address || '',
+                contact_person: editingWarehouse.contact_person || '',
+                contact_phone: editingWarehouse.contact_phone || '',
+              } : undefined}
+            />
           </div>
         </div>
       </div>

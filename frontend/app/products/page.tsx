@@ -6,88 +6,15 @@ import { useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/app-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Plus, Search, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
+import { Plus } from 'lucide-react'
 import api from '@/lib/api'
-
-const productSchema = z.object({
-  sku: z.string().min(1, 'SKU is required'),
-  name: z.string().min(1, 'Name is required'),
-  description: z.string().optional(),
-  category_id: z.string().min(1, 'Category is required'),
-  supplier_id: z.string().min(1, 'Supplier is required'),
-  unit_price: z.number().min(0, 'Unit price must be greater than or equal to 0'),
-  min_stock_level: z.number().min(0, 'Minimum stock level must be greater than or equal to 0'),
-})
-
-type ProductForm = z.infer<typeof productSchema>
-
-interface Product {
-  id: string
-  sku: string
-  name: string
-  description?: string
-  category_id: string
-  supplier_id: string
-  category?: string
-  supplier?: string
-  unit_price: number
-  min_stock_level?: number
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  total_stock?: number
-  total_reserved?: number
-  total_available?: number
-}
-
-interface Category {
-  id: string
-  name: string
-  description: string
-  is_active: boolean
-}
-
-interface Supplier {
-  id: string
-  name: string
-  contact_person: string
-  email: string
-  phone: string
-  is_active: boolean
-}
-
-type SortField = 'name' | 'unit_price' | 'created_at'
-type SortOrder = 'asc' | 'desc'
+import { Product, Category, Supplier, SortField, SortOrder, ProductFormData } from '@/lib/types'
+import { ProductForm } from '@/components/products/product-form'
+import { ProductTable } from '@/components/products/product-table'
+import { ProductFilters } from '@/components/products/product-filters'
+import { Pagination } from '@/components/products/pagination'
+import { LoadingSpinner } from '@/components/shared/loading-spinner'
+import { EmptyState } from '@/components/shared/empty-state'
 
 export default function ProductsPage() {
   const { user, isLoading } = useAuth()
@@ -110,19 +37,6 @@ export default function ProductsPage() {
   const [itemsPerPage] = useState(10)
   const [totalProducts, setTotalProducts] = useState(0)
 
-  // Form setup
-  const form = useForm<ProductForm>({
-    resolver: zodResolver(productSchema),
-    defaultValues: {
-      sku: '',
-      name: '',
-      description: '',
-      category_id: '',
-      supplier_id: '',
-      unit_price: 0,
-      min_stock_level: 0,
-    },
-  })
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -208,7 +122,7 @@ export default function ProductsPage() {
     }
   }
 
-  const handleCreate = async (data: ProductForm) => {
+  const handleCreate = async (data: ProductFormData) => {
     try {
       const createData = {
         sku: data.sku,
@@ -222,7 +136,6 @@ export default function ProductsPage() {
       
       await api.post('/products', createData)
       setIsCreateOpen(false)
-      form.reset()
       loadProducts()
     } catch (error) {
       console.error('Error creating product:', error)
@@ -232,20 +145,9 @@ export default function ProductsPage() {
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
     setIsEditOpen(true)
-    setTimeout(() => {
-      form.reset({
-        sku: product.sku,
-        name: product.name,
-        description: product.description || '',
-        category_id: product.category_id,
-        supplier_id: product.supplier_id,
-        unit_price: product.unit_price,
-        min_stock_level: product.min_stock_level || 0,
-      })
-    }, 0)
   }
 
-  const handleUpdate = async (data: ProductForm) => {
+  const handleUpdate = async (data: ProductFormData) => {
     if (!editingProduct) return
     
     try {
@@ -262,7 +164,6 @@ export default function ProductsPage() {
       await api.put(`/products/${editingProduct.id}`, updateData)
       setIsEditOpen(false)
       setEditingProduct(null)
-      form.reset()
       loadProducts()
     } catch (error) {
       console.error('Error updating product:', error)
@@ -291,18 +192,11 @@ export default function ProductsPage() {
     }
   }
 
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="h-4 w-4" />
-    return sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-  }
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+        <LoadingSpinner size="lg" text="Loading..." />
       </div>
     )
   }
@@ -321,300 +215,13 @@ export default function ProductsPage() {
                 <h1 className="text-3xl font-bold text-gray-900">Products</h1>
                 <p className="mt-2 text-gray-600">Manage your inventory products</p>
               </div>
-              <Dialog open={isCreateOpen} onOpenChange={(open) => {
-                setIsCreateOpen(open)
-                if (open) {
-                  form.reset({
-                    sku: '',
-                    name: '',
-                    description: '',
-                    category_id: '',
-                    supplier_id: '',
-                    unit_price: 0,
-                    min_stock_level: 0,
-                  })
-                }
-              }}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Product
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Create New Product</DialogTitle>
-                    <DialogDescription>
-                      Add a new product to your inventory system.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="sku">SKU *</Label>
-                        <Input
-                          id="sku"
-                          {...form.register('sku')}
-                          placeholder="Product SKU"
-                        />
-                        {form.formState.errors.sku && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.sku.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="name">Name *</Label>
-                        <Input
-                          id="name"
-                          {...form.register('name')}
-                          placeholder="Product name"
-                        />
-                        {form.formState.errors.name && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.name.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        {...form.register('description')}
-                        placeholder="Product description"
-                        rows={2}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="category_id">Category *</Label>
-                        <Select onValueChange={(value) => form.setValue('category_id', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category.id} value={category.id}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {form.formState.errors.category_id && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.category_id.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="supplier_id">Supplier *</Label>
-                        <Select onValueChange={(value) => form.setValue('supplier_id', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select supplier" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map((supplier) => (
-                              <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {form.formState.errors.supplier_id && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.supplier_id.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="unit_price">Unit Price (₱) *</Label>
-                      <Input
-                        id="unit_price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        {...form.register('unit_price', { valueAsNumber: true })}
-                        placeholder="0.00"
-                      />
-                      {form.formState.errors.unit_price && (
-                        <p className="text-sm text-red-600 mt-1">
-                          {form.formState.errors.unit_price.message}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <Label htmlFor="min_stock_level">Minimum Stock Level *</Label>
-                      <Input
-                        id="min_stock_level"
-                        type="number"
-                        min="0"
-                        value={form.watch('min_stock_level') || 0}
-                        onChange={(e) => form.setValue('min_stock_level', parseInt(e.target.value) || 0)}
-                        placeholder="0"
-                      />
-                      {form.formState.errors.min_stock_level && (
-                        <p className="text-sm text-red-600 mt-1">
-                          {form.formState.errors.min_stock_level.message}
-                        </p>
-                      )}
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsCreateOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit">
-                        Create Product
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
-              {/* Edit Dialog */}
-              <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Edit Product</DialogTitle>
-                    <DialogDescription>
-                      Update the product information.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="edit-sku">SKU *</Label>
-                        <Input
-                          id="edit-sku"
-                          {...form.register('sku')}
-                          placeholder="Product SKU"
-                        />
-                        {form.formState.errors.sku && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.sku.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-name">Name *</Label>
-                        <Input
-                          id="edit-name"
-                          {...form.register('name')}
-                          placeholder="Product name"
-                        />
-                        {form.formState.errors.name && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.name.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-description">Description</Label>
-                      <Textarea
-                        id="edit-description"
-                        {...form.register('description')}
-                        placeholder="Product description"
-                        rows={2}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="edit-category_id">Category *</Label>
-                        <Select onValueChange={(value) => form.setValue('category_id', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category.id} value={category.id}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {form.formState.errors.category_id && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.category_id.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-supplier_id">Supplier *</Label>
-                        <Select onValueChange={(value) => form.setValue('supplier_id', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select supplier" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map((supplier) => (
-                              <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {form.formState.errors.supplier_id && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {form.formState.errors.supplier_id.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-unit_price">Unit Price (₱) *</Label>
-                      <Input
-                        id="edit-unit_price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        {...form.register('unit_price', { valueAsNumber: true })}
-                        placeholder="0.00"
-                      />
-                      {form.formState.errors.unit_price && (
-                        <p className="text-sm text-red-600 mt-1">
-                          {form.formState.errors.unit_price.message}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-min_stock_level">Minimum Stock Level *</Label>
-                      <Input
-                        id="edit-min_stock_level"
-                        type="number"
-                        min="0"
-                        value={form.watch('min_stock_level') || 0}
-                        onChange={(e) => form.setValue('min_stock_level', parseInt(e.target.value) || 0)}
-                        placeholder="0"
-                      />
-                      {form.formState.errors.min_stock_level && (
-                        <p className="text-sm text-red-600 mt-1">
-                          {form.formState.errors.min_stock_level.message}
-                        </p>
-                      )}
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setIsEditOpen(false)
-                          setEditingProduct(null)
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit">
-                        Update Product
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              <Button 
+                className="flex items-center gap-2"
+                onClick={() => setIsCreateOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add Product
+              </Button>
             </div>
             
             <Card>
@@ -626,200 +233,94 @@ export default function ProductsPage() {
               </CardHeader>
               <CardContent>
                 {/* Filters */}
-                <div className="mb-6 space-y-4">
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex-1 min-w-[200px]">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
-                          placeholder="Search products..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                    <div className="min-w-[150px]">
-                      <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="All Categories" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Categories</SelectItem>
-                          {categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="min-w-[150px]">
-                      <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="All Suppliers" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Suppliers</SelectItem>
-                          {suppliers.map((supplier) => (
-                            <SelectItem key={supplier.id} value={supplier.id}>
-                              {supplier.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
+                <ProductFilters
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  selectedCategory={selectedCategory}
+                  onCategoryChange={setSelectedCategory}
+                  selectedSupplier={selectedSupplier}
+                  onSupplierChange={setSelectedSupplier}
+                  categories={categories}
+                  suppliers={suppliers}
+                />
 
                 {/* Table */}
                 {isLoadingData ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                    <p className="mt-2 text-gray-600">Loading products...</p>
-                  </div>
+                  <LoadingSpinner text="Loading products..." />
                 ) : products.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">
-                      {searchTerm || (selectedCategory && selectedCategory !== 'all') || (selectedSupplier && selectedSupplier !== 'all')
+                  <EmptyState 
+                    title={
+                      searchTerm || (selectedCategory && selectedCategory !== 'all') || (selectedSupplier && selectedSupplier !== 'all')
                         ? 'No products found matching your filters' 
-                        : 'No products found'}
-                    </p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      {searchTerm || (selectedCategory && selectedCategory !== 'all') || (selectedSupplier && selectedSupplier !== 'all')
+                        : 'No products found'
+                    }
+                    description={
+                      searchTerm || (selectedCategory && selectedCategory !== 'all') || (selectedSupplier && selectedSupplier !== 'all')
                         ? 'Try adjusting your search terms or filters' 
-                        : 'Get started by adding your first product'}
-                    </p>
-                  </div>
+                        : 'Get started by adding your first product'
+                    }
+                  />
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            onClick={() => handleSort('name')}
-                            className="flex items-center gap-2 p-0 h-auto font-semibold"
-                          >
-                            Name {getSortIcon('name')}
-                          </Button>
-                        </TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            onClick={() => handleSort('unit_price')}
-                            className="flex items-center gap-2 p-0 h-auto font-semibold"
-                          >
-                            Unit Price {getSortIcon('unit_price')}
-                          </Button>
-                        </TableHead>
-                        <TableHead>Min Stock</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Stock</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {products.map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                          <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell className="max-w-[200px] truncate">
-                            {product.description || '-'}
-                          </TableCell>
-                          <TableCell>{product.category || '-'}</TableCell>
-                          <TableCell>{product.supplier || '-'}</TableCell>
-                          <TableCell className="font-mono">
-                            ₱{product.unit_price.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="font-mono text-center">
-                            {product.min_stock_level || 0}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              product.is_active 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {product.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm font-medium">
-                              {product.total_stock || 0}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEdit(product)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDelete(product)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-6">
-                    <div className="text-sm text-gray-700">
-                      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} results
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                      >
-                        Previous
-                      </Button>
-                      <div className="flex items-center space-x-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                          <Button
-                            key={page}
-                            variant={currentPage === page ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setCurrentPage(page)}
-                            className={currentPage === page ? "bg-[#52a852] hover:bg-[#4a964a] text-white" : ""}
-                          >
-                            {page}
-                          </Button>
-                        ))}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
+                  <>
+                    <ProductTable
+                      products={products}
+                      sortField={sortField}
+                      sortOrder={sortOrder}
+                      onSort={handleSort}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={totalProducts}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={setCurrentPage}
+                    />
+                  </>
                 )}
               </CardContent>
             </Card>
+
+            {/* Create Product Form */}
+            <ProductForm
+              key="create"
+              isOpen={isCreateOpen}
+              onOpenChange={setIsCreateOpen}
+              onSubmit={handleCreate}
+              onCancel={() => setIsCreateOpen(false)}
+              categories={categories}
+              suppliers={suppliers}
+              title="Create New Product"
+              description="Add a new product to your inventory system."
+              submitText="Create Product"
+            />
+
+            {/* Edit Product Form */}
+            <ProductForm
+              key={editingProduct?.id || 'create'}
+              isOpen={isEditOpen}
+              onOpenChange={setIsEditOpen}
+              onSubmit={handleUpdate}
+              onCancel={() => {
+                setIsEditOpen(false)
+                setEditingProduct(null)
+              }}
+              categories={categories}
+              suppliers={suppliers}
+              title="Edit Product"
+              description="Update the product information."
+              submitText="Update Product"
+              defaultValues={editingProduct ? {
+                sku: editingProduct.sku,
+                name: editingProduct.name,
+                description: editingProduct.description || '',
+                category_id: editingProduct.category_id,
+                supplier_id: editingProduct.supplier_id,
+                unit_price: editingProduct.unit_price,
+                min_stock_level: editingProduct.min_stock_level || 0,
+              } : undefined}
+            />
           </div>
         </div>
       </div>

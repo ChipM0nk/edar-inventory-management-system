@@ -337,6 +337,26 @@ export default function PurchasePage() {
     }
   }
 
+  // Delete document
+  const deleteDocument = async (document: Document) => {
+    if (!confirm(`Are you sure you want to delete "${document.file_name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/documents/${document.id}`)
+      
+      // Remove the document from the current documents list
+      setDocuments(prev => prev.filter(doc => doc.id !== document.id))
+      
+      // Show success message
+      alert('Document deleted successfully')
+    } catch (error) {
+      console.error('Error deleting document:', error)
+      alert('Failed to delete document. Please try again.')
+    }
+  }
+
   // Format file size
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -972,6 +992,15 @@ export default function PurchasePage() {
                               className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
                             >
                               Download
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => deleteDocument(doc)}
+                              className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
                             </Button>
                           </div>
                         </div>

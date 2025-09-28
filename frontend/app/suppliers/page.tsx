@@ -5,64 +5,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Plus, Edit, Trash2, Search, Filter, ChevronUp, ChevronDown } from 'lucide-react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
+import { Plus } from 'lucide-react'
 import api from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 import { AppLayout } from '@/components/app-layout'
-
-const supplierSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  contact_person: z.string().optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  country: z.string().optional(),
-  postal_code: z.string().optional(),
-})
-
-type SupplierForm = z.infer<typeof supplierSchema>
-
-interface Supplier {
-  id: string
-  name: string
-  contact_person?: string
-  email?: string
-  phone?: string
-  address?: string
-  city?: string
-  state?: string
-  country?: string
-  postal_code?: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
+import { Supplier, SupplierFormData } from '@/lib/types'
+import { SupplierForm, SupplierTable, SupplierFilters, SupplierPagination } from '@/components/suppliers'
+import { LoadingSpinner, EmptyState } from '@/components/shared'
 
 export default function SuppliersPage() {
   const { user, isLoading: authLoading } = useAuth()
@@ -77,10 +26,7 @@ export default function SuppliersPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+        <LoadingSpinner size="lg" text="Loading..." />
       </div>
     )
   }
@@ -214,7 +160,7 @@ export default function SuppliersPage() {
   }, [showInactive])
 
   const createMutation = useMutation({
-    mutationFn: async (data: SupplierForm) => {
+    mutationFn: async (data: SupplierFormData) => {
       const response = await api.post('/suppliers', data)
       return response.data
     },
@@ -225,7 +171,7 @@ export default function SuppliersPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: SupplierForm & { is_active?: boolean } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: SupplierFormData }) => {
       const response = await api.put(`/suppliers/${id}`, data)
       return response.data
     },
@@ -245,59 +191,17 @@ export default function SuppliersPage() {
     },
   })
 
-  const createForm = useForm<SupplierForm>({
-    resolver: zodResolver(supplierSchema),
-    defaultValues: {
-      name: '',
-      contact_person: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      country: '',
-      postal_code: '',
-    },
-  })
 
-  const editForm = useForm<SupplierForm & { is_active: boolean }>({
-    resolver: zodResolver(supplierSchema.extend({ is_active: z.boolean() })),
-    defaultValues: {
-      name: '',
-      contact_person: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      country: '',
-      postal_code: '',
-      is_active: true,
-    },
-  })
-
-  const handleCreate = (data: SupplierForm) => {
+  const handleCreate = (data: SupplierFormData) => {
     createMutation.mutate(data)
   }
 
   const handleEdit = (supplier: Supplier) => {
     setEditingSupplier(supplier)
-    editForm.reset({
-      name: supplier.name,
-      contact_person: supplier.contact_person || '',
-      email: supplier.email || '',
-      phone: supplier.phone || '',
-      address: supplier.address || '',
-      city: supplier.city || '',
-      state: supplier.state || '',
-      country: supplier.country || '',
-      postal_code: supplier.postal_code || '',
-      is_active: supplier.is_active,
-    })
     setIsEditOpen(true)
   }
 
-  const handleUpdate = (data: SupplierForm & { is_active: boolean }) => {
+  const handleUpdate = (data: SupplierFormData) => {
     if (editingSupplier) {
       updateMutation.mutate({ id: editingSupplier.id, data })
     }
@@ -349,168 +253,26 @@ export default function SuppliersPage() {
                   Create, edit, and manage product suppliers
                 </CardDescription>
               </div>
-              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
+              <Button 
+                onClick={() => setIsCreateOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
                     Add Supplier
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Create New Supplier</DialogTitle>
-                    <DialogDescription>
-                      Add a new supplier to your inventory system.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={createForm.handleSubmit(handleCreate)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="name">Name *</Label>
-                        <Input
-                          id="name"
-                          {...createForm.register('name')}
-                          placeholder="Supplier name"
-                        />
-                        {createForm.formState.errors.name && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {createForm.formState.errors.name.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="contact_person">Contact Person</Label>
-                        <Input
-                          id="contact_person"
-                          {...createForm.register('contact_person')}
-                          placeholder="Contact person name"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          {...createForm.register('email')}
-                          placeholder="supplier@example.com"
-                        />
-                        {createForm.formState.errors.email && (
-                          <p className="text-sm text-red-600 mt-1">
-                            {createForm.formState.errors.email.message}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="phone">Phone</Label>
-                        <Input
-                          id="phone"
-                          {...createForm.register('phone')}
-                          placeholder="Phone number"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="address">Address</Label>
-                      <Textarea
-                        id="address"
-                        {...createForm.register('address')}
-                        placeholder="Full address"
-                        rows={2}
-                      />
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor="city">City</Label>
-                        <Input
-                          id="city"
-                          {...createForm.register('city')}
-                          placeholder="City"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="state">State</Label>
-                        <Input
-                          id="state"
-                          {...createForm.register('state')}
-                          placeholder="State"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="country">Country</Label>
-                        <Input
-                          id="country"
-                          {...createForm.register('country')}
-                          placeholder="Country"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="postal_code">Postal Code</Label>
-                      <Input
-                        id="postal_code"
-                        {...createForm.register('postal_code')}
-                        placeholder="Postal code"
-                      />
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsCreateOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={createMutation.isPending}>
-                        {createMutation.isPending ? 'Creating...' : 'Create Supplier'}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 mb-6">
-              <div className="flex-1">
-                <div 
-                  className="relative cursor-text"
-                  onClick={() => focusSearchInput()}
-                >
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      ref={searchInputRef}
-                      placeholder="Search suppliers..."
-                      value={searchInput}
-                      onChange={handleSearchChange}
-                      className="pl-10 pr-10"
-                      disabled={tableData.isFetching}
-                    />
-                  {tableData.isFetching && searchInput ? (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                    </div>
-                  ) : searchInput ? (
-                    <button
-                      type="button"
-                      onClick={() => setSearchInput('')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      ✕
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleShowInactiveToggle}
-                className="flex items-center"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                {showInactive ? 'Hide Inactive' : 'Show Inactive'}
-              </Button>
-            </div>
+            <SupplierFilters
+              searchInput={searchInput}
+              onSearchChange={handleSearchChange}
+              showInactive={showInactive}
+              onToggleInactive={handleShowInactiveToggle}
+              isFetching={tableData.isFetching}
+              onClearSearch={() => setSearchInput('')}
+              searchInputRef={searchInputRef}
+              onFocusSearch={focusSearchInput}
+            />
 
             {error && (
               <div className="text-red-500 p-4">
@@ -524,246 +286,74 @@ export default function SuppliersPage() {
               </div>
             )}
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <button
-                      onClick={() => handleSort('name')}
-                      className="flex items-center space-x-1 hover:text-gray-600"
-                    >
-                      <span>Name</span>
-                      {sortField === 'name' && (
-                        sortOrder === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                      )}
-                    </button>
-                  </TableHead>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tableData.suppliers?.map((supplier: Supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell className="font-medium">{supplier.name}</TableCell>
-                    <TableCell>{supplier.contact_person || '-'}</TableCell>
-                    <TableCell>{supplier.email || '-'}</TableCell>
-                    <TableCell>{supplier.phone || '-'}</TableCell>
-                    <TableCell>
-                      {supplier.city && supplier.state 
-                        ? `${supplier.city}, ${supplier.state}` 
-                        : supplier.city || supplier.state || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={supplier.is_active ? 'default' : 'secondary'}>
-                        {supplier.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(supplier)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleActive(supplier)}
-                        >
-                          {supplier.is_active ? 'Deactivate' : 'Activate'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(supplier.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {tableData.suppliers?.length === 0 ? (
+              <EmptyState 
+                title="No suppliers found"
+                description="Get started by adding your first supplier"
+              />
+            ) : (
+              <SupplierTable
+                suppliers={tableData.suppliers}
+                sortField={sortField}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onToggleActive={handleToggleActive}
+              />
+            )}
           </CardContent>
           
           {/* Pagination */}
-          <div className="flex items-center justify-between px-6 py-4 border-t">
-            <div className="text-sm text-gray-500">
-              {searchTerm ? (
-                <>Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, tableData.total)} of {tableData.total} results for "{searchTerm}"</>
-              ) : (
-                <>Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, tableData.total)} of {tableData.total} suppliers</>
-              )}
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: Math.min(5, tableData.totalPages) }, (_, i) => {
-                  const page = i + 1
-                  return (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </Button>
-                  )
-                })}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, tableData.totalPages))}
-                disabled={currentPage === tableData.totalPages}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <SupplierPagination
+            currentPage={currentPage}
+            totalPages={tableData.totalPages}
+            totalItems={tableData.total}
+            pageSize={pageSize}
+            searchTerm={searchTerm}
+            onPageChange={setCurrentPage}
+          />
         </Card>
 
-        {/* Edit Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit Supplier</DialogTitle>
-              <DialogDescription>
-                Update the supplier information.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={editForm.handleSubmit(handleUpdate)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-name">Name *</Label>
-                  <Input
-                    id="edit-name"
-                    {...editForm.register('name')}
-                    placeholder="Supplier name"
-                  />
-                  {editForm.formState.errors.name && (
-                    <p className="text-sm text-red-600 mt-1">
-                      {editForm.formState.errors.name.message}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="edit-contact_person">Contact Person</Label>
-                  <Input
-                    id="edit-contact_person"
-                    {...editForm.register('contact_person')}
-                    placeholder="Contact person name"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-email">Email</Label>
-                  <Input
-                    id="edit-email"
-                    type="email"
-                    {...editForm.register('email')}
-                    placeholder="supplier@example.com"
-                  />
-                  {editForm.formState.errors.email && (
-                    <p className="text-sm text-red-600 mt-1">
-                      {editForm.formState.errors.email.message}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="edit-phone">Phone</Label>
-                  <Input
-                    id="edit-phone"
-                    {...editForm.register('phone')}
-                    placeholder="Phone number"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="edit-address">Address</Label>
-                <Textarea
-                  id="edit-address"
-                  {...editForm.register('address')}
-                  placeholder="Full address"
-                  rows={2}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="edit-city">City</Label>
-                  <Input
-                    id="edit-city"
-                    {...editForm.register('city')}
-                    placeholder="City"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-state">State</Label>
-                  <Input
-                    id="edit-state"
-                    {...editForm.register('state')}
-                    placeholder="State"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-country">Country</Label>
-                  <Input
-                    id="edit-country"
-                    {...editForm.register('country')}
-                    placeholder="Country"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="edit-postal_code">Postal Code</Label>
-                <Input
-                  id="edit-postal_code"
-                  {...editForm.register('postal_code')}
-                  placeholder="Postal code"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="edit-active"
-                  {...editForm.register('is_active')}
-                  className="rounded"
-                />
-                <Label htmlFor="edit-active">Active</Label>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? 'Updating...' : 'Update Supplier'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {/* Create Supplier Form */}
+        <SupplierForm
+          isOpen={isCreateOpen}
+          onOpenChange={setIsCreateOpen}
+          onSubmit={handleCreate}
+          onCancel={() => setIsCreateOpen(false)}
+          title="Create New Supplier"
+          description="Add a new supplier to your inventory system."
+          submitText="Create Supplier"
+          isSubmitting={createMutation.isPending}
+        />
+
+        {/* Edit Supplier Form */}
+        <SupplierForm
+          isOpen={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          onSubmit={handleUpdate}
+          onCancel={() => {
+            setIsEditOpen(false)
+            setEditingSupplier(null)
+          }}
+          title="Edit Supplier"
+          description="Update the supplier information."
+          submitText="Update Supplier"
+          isSubmitting={updateMutation.isPending}
+          showActiveToggle={true}
+          defaultValues={editingSupplier ? {
+            name: editingSupplier.name,
+            contact_person: editingSupplier.contact_person || '',
+            email: editingSupplier.email || '',
+            phone: editingSupplier.phone || '',
+            address: editingSupplier.address || '',
+            city: editingSupplier.city || '',
+            state: editingSupplier.state || '',
+            country: editingSupplier.country || '',
+            postal_code: editingSupplier.postal_code || '',
+            is_active: editingSupplier.is_active,
+          } : undefined}
+        />
       </div>
     </div>
     </AppLayout>
