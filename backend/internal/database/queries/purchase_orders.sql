@@ -50,6 +50,25 @@ WHERE ($1::text IS NULL OR po.status = $1)
   AND ($3::date IS NULL OR po.order_date >= $3)
   AND ($4::date IS NULL OR po.order_date <= $4);
 
+-- name: CancelPurchaseOrder :one
+UPDATE purchase_orders
+SET status = 'cancelled', updated_at = NOW()
+WHERE id = $1 AND status != 'cancelled'
+RETURNING *;
+
+-- name: GetPurchaseOrderItems :many
+SELECT poi.*, p.name as product_name, p.sku
+FROM purchase_order_items poi
+JOIN products p ON poi.product_id = p.id
+WHERE poi.purchase_order_id = $1;
+
+-- name: GetPurchaseOrderStockMovements :many
+SELECT sm.*, p.name as product_name, p.sku, w.name as warehouse_name
+FROM stock_movements sm
+JOIN products p ON sm.product_id = p.id
+JOIN warehouses w ON sm.warehouse_id = w.id
+WHERE sm.reference_type = 'purchase_order' AND sm.reference_id = $1;
+
 
 
 

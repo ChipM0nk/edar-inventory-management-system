@@ -155,10 +155,11 @@ func main() {
 			// Purchase orders
 			purchaseOrders := protected.Group("/purchase-orders")
 			{
-				purchaseOrders.GET("", purchaseOrderHandler.ListPurchaseOrders)
-				purchaseOrders.POST("", purchaseOrderHandler.CreatePurchaseOrder)
-				purchaseOrders.GET("/:id", purchaseOrderHandler.GetPurchaseOrder)
-				purchaseOrders.PUT("/:id", purchaseOrderHandler.UpdatePurchaseOrder)
+			purchaseOrders.GET("", purchaseOrderHandler.ListPurchaseOrders)
+			purchaseOrders.POST("", purchaseOrderHandler.CreatePurchaseOrder)
+			purchaseOrders.GET("/:id", purchaseOrderHandler.GetPurchaseOrder)
+			purchaseOrders.PUT("/:id", purchaseOrderHandler.UpdatePurchaseOrder)
+			purchaseOrders.POST("/:id/cancel", purchaseOrderHandler.CancelPurchaseOrder)
 			}
 
 			// Documents

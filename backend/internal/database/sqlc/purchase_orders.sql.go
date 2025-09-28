@@ -11,6 +11,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const CancelPurchaseOrder = `-- name: CancelPurchaseOrder :one
+UPDATE purchase_orders
+SET status = 'cancelled', updated_at = NOW()
+WHERE id = $1 AND status != 'cancelled'
+RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at
+`
+
+func (q *Queries) CancelPurchaseOrder(ctx context.Context, id pgtype.UUID) (*PurchaseOrder, error) {
+	row := q.db.QueryRow(ctx, CancelPurchaseOrder, id)
+	var i PurchaseOrder
+	err := row.Scan(
+		&i.ID,
+		&i.PoNumber,
+		&i.SupplierName,
+		&i.SupplierContact,
+		&i.TotalAmount,
+		&i.Status,
+		&i.OrderDate,
+		&i.ExpectedDeliveryDate,
+		&i.ReceivedDate,
+		&i.Notes,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const CountPurchaseOrders = `-- name: CountPurchaseOrders :one
 SELECT COUNT(*) FROM purchase_orders
 `
@@ -141,6 +169,127 @@ func (q *Queries) GetPurchaseOrder(ctx context.Context, id pgtype.UUID) (*GetPur
 		&i.LastName,
 	)
 	return &i, err
+}
+
+const GetPurchaseOrderItems = `-- name: GetPurchaseOrderItems :many
+SELECT poi.id, poi.purchase_order_id, poi.product_id, poi.quantity, poi.unit_price, poi.total_price, poi.received_quantity, poi.created_at, poi.updated_at, p.name as product_name, p.sku
+FROM purchase_order_items poi
+JOIN products p ON poi.product_id = p.id
+WHERE poi.purchase_order_id = $1
+`
+
+type GetPurchaseOrderItemsRow struct {
+	ID               pgtype.UUID        `json:"id"`
+	PurchaseOrderID  pgtype.UUID        `json:"purchase_order_id"`
+	ProductID        pgtype.UUID        `json:"product_id"`
+	Quantity         int32              `json:"quantity"`
+	UnitPrice        pgtype.Numeric     `json:"unit_price"`
+	TotalPrice       pgtype.Numeric     `json:"total_price"`
+	ReceivedQuantity *int32             `json:"received_quantity"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ProductName      string             `json:"product_name"`
+	Sku              string             `json:"sku"`
+}
+
+func (q *Queries) GetPurchaseOrderItems(ctx context.Context, purchaseOrderID pgtype.UUID) ([]*GetPurchaseOrderItemsRow, error) {
+	rows, err := q.db.Query(ctx, GetPurchaseOrderItems, purchaseOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*GetPurchaseOrderItemsRow{}
+	for rows.Next() {
+		var i GetPurchaseOrderItemsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PurchaseOrderID,
+			&i.ProductID,
+			&i.Quantity,
+			&i.UnitPrice,
+			&i.TotalPrice,
+			&i.ReceivedQuantity,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ProductName,
+			&i.Sku,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetPurchaseOrderStockMovements = `-- name: GetPurchaseOrderStockMovements :many
+SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name
+FROM stock_movements sm
+JOIN products p ON sm.product_id = p.id
+JOIN warehouses w ON sm.warehouse_id = w.id
+WHERE sm.reference_type = 'purchase_order' AND sm.reference_id = $1
+`
+
+type GetPurchaseOrderStockMovementsRow struct {
+	ID              pgtype.UUID        `json:"id"`
+	ProductID       pgtype.UUID        `json:"product_id"`
+	WarehouseID     pgtype.UUID        `json:"warehouse_id"`
+	MovementType    string             `json:"movement_type"`
+	Quantity        int32              `json:"quantity"`
+	ReferenceType   *string            `json:"reference_type"`
+	ReferenceID     pgtype.UUID        `json:"reference_id"`
+	Reason          *string            `json:"reason"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	ProcessedBy     pgtype.UUID        `json:"processed_by"`
+	ProcessedDate   pgtype.Timestamptz `json:"processed_date"`
+	CostPrice       pgtype.Numeric     `json:"cost_price"`
+	TotalAmount     pgtype.Numeric     `json:"total_amount"`
+	ReferenceNumber *string            `json:"reference_number"`
+	ProductName     string             `json:"product_name"`
+	Sku             string             `json:"sku"`
+	WarehouseName   string             `json:"warehouse_name"`
+}
+
+func (q *Queries) GetPurchaseOrderStockMovements(ctx context.Context, referenceID pgtype.UUID) ([]*GetPurchaseOrderStockMovementsRow, error) {
+	rows, err := q.db.Query(ctx, GetPurchaseOrderStockMovements, referenceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*GetPurchaseOrderStockMovementsRow{}
+	for rows.Next() {
+		var i GetPurchaseOrderStockMovementsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.WarehouseID,
+			&i.MovementType,
+			&i.Quantity,
+			&i.ReferenceType,
+			&i.ReferenceID,
+			&i.Reason,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.ProcessedBy,
+			&i.ProcessedDate,
+			&i.CostPrice,
+			&i.TotalAmount,
+			&i.ReferenceNumber,
+			&i.ProductName,
+			&i.Sku,
+			&i.WarehouseName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const ListPurchaseOrders = `-- name: ListPurchaseOrders :many

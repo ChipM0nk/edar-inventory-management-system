@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type PurchaseOrderHandler struct {
@@ -103,3 +104,35 @@ func (h *PurchaseOrderHandler) UpdatePurchaseOrder(c *gin.Context) {
 }
 
 
+
+
+// CancelPurchaseOrder cancels a purchase order
+func (h *PurchaseOrderHandler) CancelPurchaseOrder(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Purchase order ID is required"})
+		return
+	}
+
+	// Validate that the ID is a valid UUID
+	if _, err := uuid.Parse(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid purchase order ID format"})
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		return
+	}
+
+	purchaseOrder, err := h.purchaseOrderService.CancelPurchaseOrder(id, req.Reason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, purchaseOrder)
+}

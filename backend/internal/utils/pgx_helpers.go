@@ -113,6 +113,20 @@ func OptionalStringToStringPtr(s *string) *string {
 	return s
 }
 
+// Helper function to convert string to string pointer
+func StringPtr(s string) *string {
+	return &s
+}
+
+// Helper function to convert pgx numeric to float64 pointer
+func PgxNumericToFloat64Ptr(numeric pgtype.Numeric) *float64 {
+	if !numeric.Valid {
+		return nil
+	}
+	value := float64(numeric.Int.Int64()) / math.Pow(10, float64(-numeric.Exp))
+	return &value
+}
+
 // Helper function to convert optional int pointer to int32 pointer
 func OptionalIntToInt32Ptr(value *int) *int32 {
 	if value == nil {

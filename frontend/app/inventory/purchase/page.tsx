@@ -22,13 +22,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, Package2, MapPin, FileText, Hash, Building, Clock, Upload, X, Trash2, FileImage, FilePdf } from 'lucide-react'
+import { Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, Package2, MapPin, FileText, Hash, Building, Clock, Upload, X, Trash2, FileImage, File } from 'lucide-react'
 import api from '@/lib/api'
 
 interface PurchaseOrder {
   reference_id: string
   reference_number?: string
   reference_type: string
+  status?: 'pending' | 'approved' | 'received' | 'cancelled'
   total_quantity: number
   total_amount: number
   processed_by: string
@@ -178,6 +179,7 @@ export default function PurchasePage() {
               reference_id: refId,
               reference_number: movement.reference_number,
               reference_type: movement.reference_type || 'adjustment',
+              status: 'received', // Default status for stock movements (they represent received items)
               total_quantity: 0,
               total_amount: 0,
               processed_by: movement.processed_by_first_name && movement.processed_by_last_name 
@@ -210,7 +212,23 @@ export default function PurchasePage() {
           })
         })
       
-      setPurchaseOrders(Array.from(ordersMap.values()))
+      const orders = Array.from(ordersMap.values())
+      
+      // Check the actual status of each purchase order
+      for (const order of orders) {
+        try {
+          const response = await api.get(`/purchase-orders/${order.reference_id}`)
+          console.log(`Status for PO ${order.reference_id}:`, response.data?.status)
+          if (response.data && response.data.status) {
+            order.status = response.data.status
+          }
+        } catch (error) {
+          // If we can't get the purchase order, keep the default status
+          console.warn(`Could not get status for purchase order ${order.reference_id}:`, error)
+        }
+      }
+      
+      setPurchaseOrders(orders)
     } catch (error) {
       console.error('Error loading purchase orders:', error)
     } finally {
@@ -324,10 +342,10 @@ export default function PurchasePage() {
       })
       
       const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
+      const link = window.document.createElement('a')
       link.href = url
       link.setAttribute('download', document.file_name)
-      document.body.appendChild(link)
+      window.document.body.appendChild(link)
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
@@ -372,7 +390,7 @@ export default function PurchasePage() {
     if (type.includes('image')) {
       return <FileImage className="w-5 h-5 text-green-500" />
     } else if (type.includes('pdf')) {
-      return <FilePdf className="w-5 h-5 text-red-500" />
+      return <File className="w-5 h-5 text-red-500" />
     } else {
       return <FileText className="w-5 h-5 text-gray-400" />
     }
@@ -443,23 +461,30 @@ export default function PurchasePage() {
     try {
       setIsCancelling(true)
       
-      // Here you would call your API to cancel the purchase order
-      // await api.post('/purchase-orders/cancel', {
-      //   purchase_order_id: selectedOrder.reference_id,
-      //   reason: cancellationReason
-      // })
+      // Debug: Log the data being sent
+      console.log('Cancelling purchase order with ID:', selectedOrder.reference_id)
+      console.log('Reason:', cancellationReason)
+      console.log('Full selectedOrder:', selectedOrder)
       
-      console.log('Cancelling purchase order with reason:', cancellationReason)
+      // Call the API to cancel the purchase order
+      // Use the reference_id as it should be the purchase order ID
+      await api.post(`/purchase-orders/${selectedOrder.reference_id}/cancel`, {
+        reason: cancellationReason
+      })
+      
       alert('Purchase order cancelled successfully')
       
       // Close dialogs and refresh data
       setShowCancelDialog(false)
       setCancellationReason('')
       closeModal()
-      loadPurchaseOrders()
+      
+      // Refresh purchase orders to update status
+      await loadPurchaseOrders()
     } catch (error: any) {
       console.error('Error cancelling purchase order:', error)
-      alert('Error cancelling purchase order. Please try again.')
+      const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
+      alert(`Error cancelling purchase order: ${errorMessage}`)
     } finally {
       setIsCancelling(false)
     }
@@ -489,6 +514,7 @@ export default function PurchasePage() {
   }
 
   return (
+    <>
     <AppLayout>
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
@@ -626,6 +652,7 @@ export default function PurchasePage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Reference Number</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead>Supplier</TableHead>
                           <TableHead>Total Quantity</TableHead>
                           <TableHead>Total Amount</TableHead>
@@ -639,11 +666,28 @@ export default function PurchasePage() {
                         {currentOrders.map((order) => (
                           <TableRow 
                             key={order.reference_id}
-                            className="cursor-pointer hover:bg-gray-50 transition-colors"
+                            className={`cursor-pointer hover:bg-gray-50 transition-colors ${
+                              order.status === 'cancelled' ? 'bg-red-50 hover:bg-red-100' : ''
+                            }`}
                             onClick={() => handleOrderClick(order)}
                           >
                             <TableCell className="font-mono font-medium text-blue-600 hover:text-blue-800">
                               {order.reference_number || order.reference_id}
+                            </TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                order.status === 'cancelled' 
+                                  ? 'bg-red-100 text-red-800' 
+                                  : order.status === 'received'
+                                  ? 'bg-green-100 text-green-800'
+                                  : order.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : order.status === 'approved'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {order.status || 'Unknown'}
+                              </span>
                             </TableCell>
                             <TableCell className="text-sm text-gray-600">
                               {order.supplier_name || 'Not specified'}
@@ -719,11 +763,25 @@ export default function PurchasePage() {
 
       {/* Stock-In Order Detail Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[85vw] max-w-4xl max-h-[60vh] overflow-y-auto relative">
+          {/* Cancelled Watermark */}
+          {selectedOrder?.status === 'cancelled' && (
+            <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+              <div className="text-6xl font-bold text-red-200 opacity-30 transform -rotate-12 select-none">
+                CANCELLED
+              </div>
+            </div>
+          )}
+          
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Purchase Order Details
+              {selectedOrder?.status === 'cancelled' && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  CANCELLED
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription>
               Complete information about this purchase order and its products
@@ -744,6 +802,27 @@ export default function PurchasePage() {
                       <div>
                         <p className="text-sm font-medium">Reference ID</p>
                         <p className="text-sm text-gray-600 font-mono">{selectedOrder.reference_number || selectedOrder.reference_id}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-4 w-4 flex items-center justify-center">
+                        <div className={`w-3 h-3 rounded-full ${
+                          selectedOrder.status === 'cancelled' 
+                            ? 'bg-red-500' 
+                            : selectedOrder.status === 'received'
+                            ? 'bg-green-500'
+                            : selectedOrder.status === 'pending'
+                            ? 'bg-yellow-500'
+                            : selectedOrder.status === 'approved'
+                            ? 'bg-blue-500'
+                            : 'bg-gray-500'
+                        }`}></div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Status</p>
+                        <p className="text-sm text-gray-600 capitalize">
+                          {selectedOrder.status || 'Unknown'}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -993,15 +1072,17 @@ export default function PurchasePage() {
                             >
                               Download
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteDocument(doc)}
-                              className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4 mr-1" />
-                              Delete
-                            </Button>
+                            {selectedOrder?.status !== 'cancelled' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deleteDocument(doc)}
+                                className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Delete
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1019,7 +1100,359 @@ export default function PurchasePage() {
               {/* Action Buttons */}
               <div className="flex justify-between">
                 <div>
-                  {selectedOrder && canCancelPurchaseOrder(selectedOrder.created_at) && (
+                  {selectedOrder && canCancelPurchaseOrder(selectedOrder.created_at) && selectedOrder.status !== 'cancelled' && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowCancelDialog(true)}
+                      className="text-red-600 border-red-300 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Cancel Purchase Order
+                    </Button>
+                  )}
+                </div>
+                <Button variant="outline" onClick={closeModal}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+    </AppLayout>
+
+    {/* Dialogs rendered outside AppLayout for proper positioning */}
+    {/* Stock-In Order Detail Modal */}
+    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <DialogContent className="w-[90vw] max-w-5xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader className="sticky top-0 bg-white z-10 border-b pb-4 mb-4">
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Purchase Order Details
+            {selectedOrder?.status === 'cancelled' && (
+              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                CANCELLED
+              </span>
+            )}
+            {selectedOrder?.status === 'pending' && (
+              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                PENDING
+              </span>
+            )}
+            {selectedOrder?.status === 'approved' && (
+              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                APPROVED
+              </span>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            Complete information about this purchase order and its products
+          </DialogDescription>
+          
+          {/* Status Warning - Moved into header */}
+          {selectedOrder?.status === 'cancelled' && (
+            <div className="mt-3 bg-red-50 border-l-4 border-red-400 p-3 rounded-r">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700 font-medium">This purchase order has been cancelled</p>
+                  <p className="text-xs text-red-600 mt-1">No further actions can be taken on this order</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogHeader>
+        
+        {selectedOrder && (
+          <div className="space-y-6">
+            {/* Order Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Order Overview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <Hash className="h-4 w-4 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium">Reference ID</p>
+                      <p className="text-sm text-gray-600 font-mono">{selectedOrder.reference_number || selectedOrder.reference_id}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 flex items-center justify-center">
+                      <div className={`w-3 h-3 rounded-full ${
+                        selectedOrder.status === 'cancelled' 
+                          ? 'bg-red-500' 
+                          : selectedOrder.status === 'received'
+                          ? 'bg-green-500'
+                          : selectedOrder.status === 'pending'
+                          ? 'bg-yellow-500'
+                          : selectedOrder.status === 'approved'
+                          ? 'bg-blue-500'
+                          : 'bg-gray-500'
+                      }`}></div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Status</p>
+                      <p className="text-sm text-gray-600 capitalize">
+                        {selectedOrder.status || 'Unknown'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium">Purchase Date</p>
+                      <p className="text-sm text-gray-600">{formatDate(selectedOrder.processed_date)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <User className="h-4 w-4 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium">Processed By</p>
+                      <p className="text-sm text-gray-600">{selectedOrder.processed_by}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium">Created At</p>
+                      <p className="text-sm text-gray-600">{formatDateTime(selectedOrder.created_at)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Building className="h-4 w-4 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium">Supplier</p>
+                      <p className="text-sm text-gray-600">{selectedOrder.supplier_name || 'Not specified'}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Order Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Package className="h-5 w-5 text-blue-500" />
+                      <p className="text-sm font-medium text-gray-600">Total Quantity</p>
+                    </div>
+                    <p className="text-2xl font-bold text-green-600">{selectedOrder.total_quantity}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <DollarSign className="h-5 w-5 text-green-500" />
+                      <p className="text-sm font-medium text-gray-600">Total Amount</p>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(selectedOrder.total_amount)}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Package2 className="h-5 w-5 text-purple-500" />
+                      <p className="text-sm font-medium text-gray-600">Products</p>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600">{selectedOrder.products.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Products Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Products</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead>Warehouse</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Unit Price</TableHead>
+                        <TableHead>Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedOrder.products.map((product, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{product.product_name}</TableCell>
+                          <TableCell className="font-mono text-sm">{product.product_sku}</TableCell>
+                          <TableCell className="text-sm">{product.warehouse_name}</TableCell>
+                          <TableCell className="font-medium">{product.quantity}</TableCell>
+                          <TableCell className="font-mono text-sm">{formatCurrency(product.cost_price)}</TableCell>
+                          <TableCell className="font-mono text-sm font-medium">{formatCurrency(product.total_amount)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Documents Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Documents
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Upload Documents */}
+                <div className="mb-4">
+                  {selectedOrder?.status !== 'cancelled' && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <Button
+                        onClick={() => setShowDocumentUpload(!showDocumentUpload)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Add Documents
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {showDocumentUpload && selectedOrder?.status !== 'cancelled' && (
+                    <div className="border rounded-lg p-4 bg-gray-50">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select documents to upload
+                          </label>
+                          <input
+                            type="file"
+                            multiple
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            onChange={handleFileSelect}
+                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                          />
+                        </div>
+                        
+                        {uploadedFiles.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium text-gray-700 mb-2">Selected files:</p>
+                            <ul className="space-y-1">
+                              {uploadedFiles.map((file, index) => (
+                                <li key={index} className="flex items-center justify-between text-sm text-gray-600 bg-white p-2 rounded">
+                                  <span>{file.name} ({formatFileSize(file.size)})</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeFile(index)}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={uploadDocuments}
+                            disabled={uploadedFiles.length === 0 || isUploadingDocuments}
+                            size="sm"
+                          >
+                            {isUploadingDocuments ? 'Uploading...' : 'Upload'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowDocumentUpload(false)
+                              setUploadedFiles([])
+                            }}
+                            size="sm"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Existing Documents */}
+                {documents.length > 0 ? (
+                  <div className="space-y-3">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                        <div className="flex items-center gap-3">
+                          {getFileIcon(doc.file_type)}
+                          <div>
+                            <p className="font-medium text-sm">{doc.file_name}</p>
+                            <p className="text-xs text-gray-500">
+                              {formatFileSize(doc.file_size)} • Uploaded {formatDateTime(doc.uploaded_at)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isViewable(doc.file_type) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => viewDocument(doc)}
+                              className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadDocument(doc)}
+                            className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
+                          >
+                            Download
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteDocument(doc)}
+                            className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p>No documents uploaded yet</p>
+                    {selectedOrder?.status === 'cancelled' ? (
+                      <p className="text-sm">Documents cannot be added to cancelled purchase orders</p>
+                    ) : (
+                      <p className="text-sm">Click "Add Documents" to upload receipts, invoices, or other supporting files</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex justify-between">
+              <div>
+                {selectedOrder && canCancelPurchaseOrder(selectedOrder.created_at) && selectedOrder.status !== 'cancelled' && (
                     <Button
                       variant="outline"
                       onClick={() => setShowCancelDialog(true)}
@@ -1099,6 +1532,6 @@ export default function PurchasePage() {
           </div>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   )
 }

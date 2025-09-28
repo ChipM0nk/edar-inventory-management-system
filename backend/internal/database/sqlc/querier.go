@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CancelPurchaseOrder(ctx context.Context, id pgtype.UUID) (*PurchaseOrder, error)
 	CountCategoriesWithFilter(ctx context.Context, arg *CountCategoriesWithFilterParams) (int64, error)
 	CountProducts(ctx context.Context) (int64, error)
 	CountProductsWithFilter(ctx context.Context, arg *CountProductsWithFilterParams) (int64, error)
@@ -49,6 +50,8 @@ type Querier interface {
 	GetProductBySKU(ctx context.Context, sku string) (*Product, error)
 	GetProductsBySupplier(ctx context.Context, supplierID pgtype.UUID) ([]*GetProductsBySupplierRow, error)
 	GetPurchaseOrder(ctx context.Context, id pgtype.UUID) (*GetPurchaseOrderRow, error)
+	GetPurchaseOrderItems(ctx context.Context, purchaseOrderID pgtype.UUID) ([]*GetPurchaseOrderItemsRow, error)
+	GetPurchaseOrderStockMovements(ctx context.Context, referenceID pgtype.UUID) ([]*GetPurchaseOrderStockMovementsRow, error)
 	GetSalesOrder(ctx context.Context, id pgtype.UUID) (*GetSalesOrderRow, error)
 	GetStockInTransactionDetails(ctx context.Context, referenceID pgtype.UUID) ([]*GetStockInTransactionDetailsRow, error)
 	GetStockLevel(ctx context.Context, arg *GetStockLevelParams) (*GetStockLevelRow, error)
