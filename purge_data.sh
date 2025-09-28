@@ -9,6 +9,10 @@ echo "   - stock_movements"
 echo "   - purchase_orders"
 echo "   - sales_orders (if any)"
 echo "   - stock_levels"
+echo "   - adjustments"
+echo "   - adjustment_items"
+echo "   - transfers"
+echo "   - transfer_items"
 echo ""
 
 read -p "Are you sure you want to continue? (yes/no): " confirm
@@ -46,7 +50,7 @@ echo "🗑️  Purging stock movements data..."
 # Run the purge script
 if $DB_CMD -f purge_stock_movements.sql; then
 echo ""
-echo "✅ All stock movements, purchase orders, and stock levels purged successfully!"
+echo "✅ All stock movements, purchase orders, stock levels, adjustments, and transfers purged successfully!"
     echo "📊 Current table counts:"
     $DB_CMD -c "
         SELECT 'Stock Movements' as table_name, COUNT(*) as count FROM stock_movements
@@ -55,7 +59,15 @@ echo "✅ All stock movements, purchase orders, and stock levels purged successf
         UNION ALL
         SELECT 'Sales Orders', COUNT(*) FROM sales_orders
         UNION ALL
-        SELECT 'Stock Levels', COUNT(*) FROM stock_levels;
+        SELECT 'Stock Levels', COUNT(*) FROM stock_levels
+        UNION ALL
+        SELECT 'Adjustments', COUNT(*) FROM adjustments
+        UNION ALL
+        SELECT 'Adjustment Items', COUNT(*) FROM adjustment_items
+        UNION ALL
+        SELECT 'Transfers', COUNT(*) FROM transfers
+        UNION ALL
+        SELECT 'Transfer Items', COUNT(*) FROM transfer_items;
     "
 else
     echo "❌ Failed to purge data. Please check the database connection and permissions."

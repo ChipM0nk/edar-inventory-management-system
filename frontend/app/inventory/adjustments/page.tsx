@@ -28,6 +28,21 @@ interface Warehouse {
   location: string
 }
 
+interface StockLevel {
+  id: string
+  product_id: string
+  warehouse_id: string
+  quantity: number
+  reserved_quantity: number
+  available_quantity: number
+  min_stock_level: number
+  max_stock_level?: number
+  last_updated: string
+  product_name: string
+  product_sku: string
+  warehouse_name: string
+}
+
 interface AdjustmentItem {
   product_id: string
   product_name: string
@@ -69,9 +84,12 @@ export default function AdjustmentsPage() {
   const [adjustmentItems, setAdjustmentItems] = useState<AdjustmentItem[]>([])
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null)
-  const [adjustmentQuantity, setAdjustmentQuantity] = useState(1)
+  const [adjustmentQuantity, setAdjustmentQuantity] = useState('')
+  const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract'>('add')
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [adjustmentDate, setAdjustmentDate] = useState(new Date().toISOString().split('T')[0])
+  const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null)
+  const [isCheckingStock, setIsCheckingStock] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -87,6 +105,28 @@ export default function AdjustmentsPage() {
       loadWarehouses()
     }
   }, [user])
+
+  // Check stock level when product, warehouse, or quantity changes for subtraction
+  useEffect(() => {
+    const quantity = parseInt(adjustmentQuantity)
+    if (adjustmentType === 'subtract' && selectedProduct && selectedWarehouse && adjustmentQuantity.trim() && quantity > 0) {
+      const checkStock = async () => {
+        setIsCheckingStock(true)
+        try {
+          const currentStock = await checkStockLevel(selectedProduct.id, selectedWarehouse.id)
+          setCurrentStockLevel(currentStock)
+        } catch (error) {
+          console.error('Error checking stock:', error)
+          setCurrentStockLevel(null)
+        } finally {
+          setIsCheckingStock(false)
+        }
+      }
+      checkStock()
+    } else {
+      setCurrentStockLevel(null)
+    }
+  }, [adjustmentType, selectedProduct, selectedWarehouse, adjustmentQuantity])
 
   // Filter adjustments based on search term
   useEffect(() => {
@@ -120,21 +160,29 @@ export default function AdjustmentsPage() {
       const response = await api.get('/stock-movements?limit=100')
       const movements = response.data.stock_movements || []
       
+      console.log('All movements:', movements)
+      
       // Filter and group movements by reference_id for adjustments
       const adjustmentsMap = new Map<string, Adjustment>()
       
-      movements
-        .filter((movement: any) => movement.reference_type === 'adjustment')
-        .forEach((movement: any) => {
-          const refId = movement.reference_id
-          if (!refId) return
+      const adjustmentMovements = movements.filter((movement: any) => movement.reference_type === 'adjustment')
+      console.log('Adjustment movements:', adjustmentMovements)
+      
+      adjustmentMovements.forEach((movement: any) => {
+          // For adjustments, group by date and user since they don't have reference_id
+          // This creates logical batches of adjustments made at the same time
+          const refId = movement.reference_id || `${movement.processed_date || movement.created_at}-${movement.user_id || 'unknown'}`
           
           if (!adjustmentsMap.has(refId)) {
             adjustmentsMap.set(refId, {
               id: movement.id,
               reference_id: refId,
               total_quantity: 0,
-              processed_by: movement.processed_by_name || movement.user_name || 'Unknown',
+              processed_by: movement.processed_by_first_name && movement.processed_by_last_name 
+                ? `${movement.processed_by_first_name} ${movement.processed_by_last_name}`
+                : movement.user_first_name && movement.user_last_name
+                ? `${movement.user_first_name} ${movement.user_last_name}`
+                : 'Unknown',
               processed_date: movement.processed_date || movement.created_at,
               created_at: movement.created_at,
               items: []
@@ -154,7 +202,9 @@ export default function AdjustmentsPage() {
           })
         })
       
-      setAdjustments(Array.from(adjustmentsMap.values()))
+      const adjustmentsArray = Array.from(adjustmentsMap.values())
+      console.log('Final adjustments:', adjustmentsArray)
+      setAdjustments(adjustmentsArray)
     } catch (error) {
       console.error('Error loading adjustments:', error)
     } finally {
@@ -200,11 +250,45 @@ export default function AdjustmentsPage() {
     setSelectedAdjustment(null)
   }
 
-  const handleAddItem = () => {
-    if (!selectedProduct || !selectedWarehouse || adjustmentQuantity === 0 || !adjustmentReason.trim()) {
-      alert('Please fill in all required fields')
+  const checkStockLevel = async (productId: string, warehouseId: string): Promise<number> => {
+    try {
+      const response = await api.get(`/stock-levels/${productId}/${warehouseId}`)
+      return response.data.quantity || 0
+    } catch (error) {
+      console.error('Error checking stock level:', error)
+      return 0
+    }
+  }
+
+  const handleAddItem = async () => {
+    const quantity = parseInt(adjustmentQuantity)
+    if (!selectedProduct || !selectedWarehouse || !adjustmentQuantity.trim() || quantity <= 0 || !adjustmentReason.trim()) {
+      alert('Please fill in all required fields with valid values')
       return
     }
+
+    // Check stock level for subtraction adjustments
+    if (adjustmentType === 'subtract') {
+      setIsCheckingStock(true)
+      try {
+        const currentStock = await checkStockLevel(selectedProduct.id, selectedWarehouse.id)
+        setCurrentStockLevel(currentStock)
+        
+        if (currentStock < quantity) {
+          alert(`Insufficient stock! Current stock: ${currentStock}, trying to subtract: ${quantity}`)
+          setIsCheckingStock(false)
+          return
+        }
+      } catch (error) {
+        console.error('Error checking stock:', error)
+        alert('Error checking stock level. Please try again.')
+        setIsCheckingStock(false)
+        return
+      }
+      setIsCheckingStock(false)
+    }
+
+    const finalQuantity = adjustmentType === 'add' ? quantity : -quantity
 
     const newItem: AdjustmentItem = {
       product_id: selectedProduct.id,
@@ -212,7 +296,7 @@ export default function AdjustmentsPage() {
       product_sku: selectedProduct.sku,
       warehouse_id: selectedWarehouse.id,
       warehouse_name: selectedWarehouse.name,
-      quantity: adjustmentQuantity,
+      quantity: finalQuantity,
       reason: adjustmentReason
     }
 
@@ -221,8 +305,10 @@ export default function AdjustmentsPage() {
     // Reset form
     setSelectedProduct(null)
     setSelectedWarehouse(null)
-    setAdjustmentQuantity(1)
+    setAdjustmentQuantity('')
+    setAdjustmentType('add')
     setAdjustmentReason('')
+    setCurrentStockLevel(null)
   }
 
   const handleRemoveItem = (index: number) => {
@@ -238,19 +324,24 @@ export default function AdjustmentsPage() {
     try {
       // Create stock movements for each item
       for (const item of adjustmentItems) {
-        await api.post('/stock-movements', {
+        const payload = {
           product_id: item.product_id,
           warehouse_id: item.warehouse_id,
-          movement_type: item.quantity > 0 ? 'in' : 'out',
-          quantity: Math.abs(item.quantity),
+          movement_type: 'adjustment',
+          quantity: item.quantity, // Keep the sign for adjustments
           reference_type: 'adjustment',
-          reason: item.reason,
-          processed_date: adjustmentDate
-        })
+          reason: item.reason
+        }
+        console.log('Sending stock movement payload:', payload)
+        
+        await api.post('/stock-movements', payload)
       }
 
       // Reset form and close modal
       setAdjustmentItems([])
+      setAdjustmentQuantity('')
+      setAdjustmentType('add')
+      setAdjustmentReason('')
       setAdjustmentDate(new Date().toISOString().split('T')[0])
       setIsCreateModalOpen(false)
       
@@ -258,9 +349,10 @@ export default function AdjustmentsPage() {
       await loadAdjustments()
       
       alert('Adjustment created successfully!')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating adjustment:', error)
-      alert('Failed to create adjustment. Please try again.')
+      const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
+      alert(`Failed to create adjustment: ${errorMessage}`)
     }
   }
 
@@ -579,7 +671,7 @@ export default function AdjustmentsPage() {
           </DialogHeader>
           
           <div className="space-y-6">
-            {/* Adjustment Date */}
+            {/* Adjustment Date and Processed By */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="adjustment-date">Adjustment Date *</Label>
@@ -589,6 +681,15 @@ export default function AdjustmentsPage() {
                   value={adjustmentDate}
                   onChange={(e) => setAdjustmentDate(e.target.value)}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Processed By</Label>
+                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-md border">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">
+                    {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -638,31 +739,102 @@ export default function AdjustmentsPage() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="quantity">Quantity *</Label>
+                    <Label>Adjustment Type *</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name="adjustmentType"
+                          value="add"
+                          checked={adjustmentType === 'add'}
+                          onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'subtract')}
+                          className="text-green-600"
+                        />
+                        <span className="text-green-600 font-medium">Add to Inventory</span>
+                      </label>
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name="adjustmentType"
+                          value="subtract"
+                          checked={adjustmentType === 'subtract'}
+                          onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'subtract')}
+                          className="text-red-600"
+                        />
+                        <span className="text-red-600 font-medium">Subtract from Inventory</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="quantity">Quantity *</Label>
                     <Input
                       id="quantity"
                       type="number"
+                      min="1"
                       value={adjustmentQuantity}
-                      onChange={(e) => setAdjustmentQuantity(parseInt(e.target.value) || 0)}
-                      placeholder="Positive for increase, negative for decrease"
+                      onChange={(e) => {
+                        const value = e.target.value
+                        // Remove leading zeros and prevent negative numbers
+                        const cleanValue = value.replace(/^0+/, '') || ''
+                        if (cleanValue === '' || (parseInt(cleanValue) > 0 && cleanValue === parseInt(cleanValue).toString())) {
+                          setAdjustmentQuantity(cleanValue)
+                        }
+                      }}
+                      placeholder="Enter quantity amount"
                     />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="reason">Reason *</Label>
-                    <Input
-                      id="reason"
-                      value={adjustmentReason}
-                      onChange={(e) => setAdjustmentReason(e.target.value)}
-                      placeholder="Reason for adjustment"
-                    />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="reason">Reason *</Label>
+                      <Input
+                        id="reason"
+                        value={adjustmentReason}
+                        onChange={(e) => setAdjustmentReason(e.target.value)}
+                        placeholder="Reason for adjustment"
+                      />
+                    </div>
                   </div>
                 </div>
+
+                {/* Preview */}
+                {adjustmentQuantity.trim() && parseInt(adjustmentQuantity) > 0 && (
+                  <div className="p-3 bg-gray-50 rounded-lg border">
+                    <p className="text-sm font-medium text-gray-700">Preview:</p>
+                    <p className="text-sm text-gray-600">
+                      {adjustmentType === 'add' ? (
+                        <span className="text-green-600">+{adjustmentQuantity} (Add to inventory)</span>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-red-600">-{adjustmentQuantity} (Subtract from inventory)</span>
+                          {isCheckingStock ? (
+                            <div className="text-xs text-gray-500 flex items-center">
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500 mr-2"></div>
+                              Checking stock level...
+                            </div>
+                          ) : currentStockLevel !== null ? (
+                            <div className="text-xs text-gray-500">
+                              Current stock: {currentStockLevel}
+                              {currentStockLevel < adjustmentQuantity && (
+                                <span className="text-red-600 font-medium ml-2">⚠️ Insufficient stock!</span>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </p>
+                  </div>
+                )}
                 
-                <Button onClick={handleAddItem} className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white">
-                  Add Item
+                <Button 
+                  onClick={handleAddItem} 
+                  disabled={isCheckingStock || (adjustmentType === 'subtract' && currentStockLevel !== null && currentStockLevel < parseInt(adjustmentQuantity))}
+                  className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isCheckingStock ? 'Checking Stock...' : 'Add Item'}
                 </Button>
               </CardContent>
             </Card>

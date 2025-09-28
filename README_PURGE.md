@@ -11,6 +11,10 @@ These scripts will completely purge all inventory-related data from the database
 - ✅ Purchase orders (created from stock movements)
 - ✅ Sales orders (if any exist)
 - ✅ Stock levels (current inventory quantities)
+- ✅ Adjustments (inventory adjustments)
+- ✅ Adjustment items (individual adjustment items)
+- ✅ Transfers (warehouse transfers)
+- ✅ Transfer items (individual transfer items)
 
 **What it preserves:**
 - ✅ Products (product catalog)
@@ -47,6 +51,10 @@ DELETE FROM stock_movements;
 DELETE FROM purchase_orders;
 DELETE FROM sales_orders;
 DELETE FROM stock_levels;
+DELETE FROM adjustment_items;
+DELETE FROM adjustments;
+DELETE FROM transfer_items;
+DELETE FROM transfers;
 ```
 
 ## After Purging
@@ -55,6 +63,8 @@ After running the purge script:
 - **Stock Levels page** will be empty (no current inventory)
 - **Stock History page** will be empty (no movement history)
 - **Stock-In Orders page** will be empty (no purchase orders)
+- **Adjustments page** will be empty (no adjustment records)
+- **Transfers page** will be empty (no transfer records)
 - **Products, Warehouses, Suppliers** will remain intact
 
 ## Restarting with Clean Data

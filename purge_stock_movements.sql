@@ -13,6 +13,14 @@ DELETE FROM purchase_orders;
 -- Delete all stock levels
 DELETE FROM stock_levels;
 
+-- Delete all adjustments and adjustment items
+DELETE FROM adjustment_items;
+DELETE FROM adjustments;
+
+-- Delete all transfers and transfer items
+DELETE FROM transfer_items;
+DELETE FROM transfers;
+
 -- Re-enable foreign key checks
 SET session_replication_role = DEFAULT;
 
@@ -21,7 +29,15 @@ SELECT 'Stock Movements' as table_name, COUNT(*) as remaining_count FROM stock_m
 UNION ALL
 SELECT 'Purchase Orders', COUNT(*) FROM purchase_orders
 UNION ALL
-SELECT 'Stock Levels', COUNT(*) FROM stock_levels;
+SELECT 'Stock Levels', COUNT(*) FROM stock_levels
+UNION ALL
+SELECT 'Adjustments', COUNT(*) FROM adjustments
+UNION ALL
+SELECT 'Adjustment Items', COUNT(*) FROM adjustment_items
+UNION ALL
+SELECT 'Transfers', COUNT(*) FROM transfers
+UNION ALL
+SELECT 'Transfer Items', COUNT(*) FROM transfer_items;
 
 -- Show success message
-SELECT 'All stock movements, purchase orders, and stock levels purged successfully!' as message;
+SELECT 'All stock movements, purchase orders, stock levels, adjustments, and transfers purged successfully!' as message;

@@ -8,6 +8,40 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// Main adjustments table for inventory adjustments
+type Adjustment struct {
+	ID pgtype.UUID `json:"id"`
+	// Unique reference number for the adjustment (e.g., ADJ-2024-001)
+	ReferenceNumber string      `json:"reference_number"`
+	AdjustmentDate  pgtype.Date `json:"adjustment_date"`
+	// Total quantity of all items in the adjustment
+	TotalQuantity int32   `json:"total_quantity"`
+	Reason        *string `json:"reason"`
+	// Current status of the adjustment
+	Status string `json:"status"`
+	// User who created the adjustment
+	CreatedBy pgtype.UUID `json:"created_by"`
+	// User who processed/approved the adjustment
+	ProcessedBy   pgtype.UUID        `json:"processed_by"`
+	ProcessedDate pgtype.Timestamptz `json:"processed_date"`
+	Notes         *string            `json:"notes"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Individual items within an adjustment
+type AdjustmentItem struct {
+	ID           pgtype.UUID `json:"id"`
+	AdjustmentID pgtype.UUID `json:"adjustment_id"`
+	ProductID    pgtype.UUID `json:"product_id"`
+	WarehouseID  pgtype.UUID `json:"warehouse_id"`
+	// Quantity adjustment (positive for add, negative for subtract)
+	Quantity int32 `json:"quantity"`
+	// Reason for this specific item adjustment
+	Reason    *string            `json:"reason"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Category struct {
 	ID          pgtype.UUID        `json:"id"`
 	Name        string             `json:"name"`
@@ -152,6 +186,41 @@ type Supplier struct {
 	IsActive      *bool              `json:"is_active"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Main transfers table for inventory transfers between warehouses
+type Transfer struct {
+	ID pgtype.UUID `json:"id"`
+	// Unique reference number for the transfer (e.g., TRF-2024-001)
+	ReferenceNumber string      `json:"reference_number"`
+	TransferDate    pgtype.Date `json:"transfer_date"`
+	FromWarehouseID pgtype.UUID `json:"from_warehouse_id"`
+	ToWarehouseID   pgtype.UUID `json:"to_warehouse_id"`
+	// Total quantity of all items in the transfer
+	TotalQuantity int32 `json:"total_quantity"`
+	// Current status of the transfer
+	Status string  `json:"status"`
+	Reason *string `json:"reason"`
+	// User who created the transfer
+	CreatedBy pgtype.UUID `json:"created_by"`
+	// User who processed the transfer
+	ProcessedBy   pgtype.UUID        `json:"processed_by"`
+	ProcessedDate pgtype.Timestamptz `json:"processed_date"`
+	Notes         *string            `json:"notes"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Individual items within a transfer
+type TransferItem struct {
+	ID         pgtype.UUID `json:"id"`
+	TransferID pgtype.UUID `json:"transfer_id"`
+	ProductID  pgtype.UUID `json:"product_id"`
+	// Quantity to transfer (always positive)
+	Quantity int32 `json:"quantity"`
+	// Reason for this specific item transfer
+	Reason    *string            `json:"reason"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type User struct {
