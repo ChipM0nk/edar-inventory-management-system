@@ -60,8 +60,8 @@ RETURNING *;
 DELETE FROM adjustments WHERE id = $1;
 
 -- name: CreateAdjustmentItem :one
-INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, reason)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, cost_price, reason)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: GetAdjustmentItems :many
@@ -76,7 +76,7 @@ ORDER BY ai.created_at;
 
 -- name: UpdateAdjustmentItem :one
 UPDATE adjustment_items 
-SET product_id = $2, warehouse_id = $3, quantity = $4, reason = $5
+SET product_id = $2, warehouse_id = $3, quantity = $4, cost_price = $5, reason = $6
 WHERE id = $1
 RETURNING *;
 

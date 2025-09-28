@@ -184,7 +184,6 @@ func (s *PurchaseOrderService) CancelPurchaseOrder(id string, reason string) (*m
 				ReferenceType:   utils.StringPtr("purchase_order_cancellation"),
 				ReferenceID:     utils.UUIDToPgxUUID(purchaseOrderID),
 				ReferenceNumber: utils.StringPtr("PO-CANCEL-" + purchaseOrderID.String()),
-				Reason:          utils.StringPtr("Purchase order cancellation: " + reason),
 				UserID:          movement.UserID, // Use the same user who created the original movement
 				ProcessedBy:     movement.ProcessedBy, // Use the same processor
 				ProcessedDate:   utils.TimeToPgxTimestamptz(time.Now()),

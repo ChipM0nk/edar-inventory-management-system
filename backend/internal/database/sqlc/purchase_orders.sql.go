@@ -225,7 +225,7 @@ func (q *Queries) GetPurchaseOrderItems(ctx context.Context, purchaseOrderID pgt
 }
 
 const GetPurchaseOrderStockMovements = `-- name: GetPurchaseOrderStockMovements :many
-SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name
+SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name
 FROM stock_movements sm
 JOIN products p ON sm.product_id = p.id
 JOIN warehouses w ON sm.warehouse_id = w.id
@@ -240,7 +240,6 @@ type GetPurchaseOrderStockMovementsRow struct {
 	Quantity        int32              `json:"quantity"`
 	ReferenceType   *string            `json:"reference_type"`
 	ReferenceID     pgtype.UUID        `json:"reference_id"`
-	Reason          *string            `json:"reason"`
 	UserID          pgtype.UUID        `json:"user_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	ProcessedBy     pgtype.UUID        `json:"processed_by"`
@@ -270,7 +269,6 @@ func (q *Queries) GetPurchaseOrderStockMovements(ctx context.Context, referenceI
 			&i.Quantity,
 			&i.ReferenceType,
 			&i.ReferenceID,
-			&i.Reason,
 			&i.UserID,
 			&i.CreatedAt,
 			&i.ProcessedBy,

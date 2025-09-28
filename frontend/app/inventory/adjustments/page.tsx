@@ -50,6 +50,7 @@ interface AdjustmentItem {
   warehouse_id: string
   warehouse_name: string
   quantity: number
+  cost_price: number
   reason: string
 }
 
@@ -85,11 +86,13 @@ export default function AdjustmentsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null)
   const [adjustmentQuantity, setAdjustmentQuantity] = useState('')
+  const [adjustmentCostPrice, setAdjustmentCostPrice] = useState('')
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract'>('add')
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [adjustmentDate, setAdjustmentDate] = useState(new Date().toISOString().split('T')[0])
   const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null)
   const [isCheckingStock, setIsCheckingStock] = useState(false)
+  const [generatedReferenceNumber, setGeneratedReferenceNumber] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -106,7 +109,26 @@ export default function AdjustmentsPage() {
     }
   }, [user])
 
-  // Check stock level when product, warehouse, or quantity changes for subtraction
+  // Fetch current stock when both product and warehouse are selected
+  useEffect(() => {
+    if (selectedProduct && selectedWarehouse && currentStockLevel === null) {
+      const fetchStock = async () => {
+        setIsCheckingStock(true)
+        try {
+          const currentStock = await checkStockLevel(selectedProduct.id, selectedWarehouse.id)
+          setCurrentStockLevel(currentStock)
+        } catch (error) {
+          console.error('Error checking stock:', error)
+          setCurrentStockLevel(0)
+        } finally {
+          setIsCheckingStock(false)
+        }
+      }
+      fetchStock()
+    }
+  }, [selectedProduct, selectedWarehouse, currentStockLevel])
+
+  // Check stock level when quantity changes for subtraction validation
   useEffect(() => {
     const quantity = parseInt(adjustmentQuantity)
     if (adjustmentType === 'subtract' && selectedProduct && selectedWarehouse && adjustmentQuantity.trim() && quantity > 0) {
@@ -123,9 +145,9 @@ export default function AdjustmentsPage() {
         }
       }
       checkStock()
-    } else {
-      setCurrentStockLevel(null)
     }
+    // Don't reset currentStockLevel when switching adjustment types
+    // Only reset when product or warehouse changes (handled in their respective onChange handlers)
   }, [adjustmentType, selectedProduct, selectedWarehouse, adjustmentQuantity])
 
   // Filter adjustments based on search term
@@ -157,54 +179,28 @@ export default function AdjustmentsPage() {
   const loadAdjustments = async () => {
     try {
       setIsLoadingData(true)
-      const response = await api.get('/stock-movements?limit=100')
-      const movements = response.data.stock_movements || []
+      const response = await api.get('/adjustments?limit=100')
+      const adjustments = response.data.adjustments || []
       
-      console.log('All movements:', movements)
+      console.log('Adjustments from API:', adjustments)
       
-      // Filter and group movements by reference_id for adjustments
-      const adjustmentsMap = new Map<string, Adjustment>()
+      // Convert backend adjustments to frontend format
+      const convertedAdjustments = adjustments.map((adj: any) => ({
+        id: adj.id,
+        reference_id: adj.reference_number,
+        total_quantity: adj.total_quantity,
+        processed_by: adj.processed_by_first_name && adj.processed_by_last_name 
+          ? `${adj.processed_by_first_name} ${adj.processed_by_last_name}`
+          : adj.created_by_first_name && adj.created_by_last_name
+          ? `${adj.created_by_first_name} ${adj.created_by_last_name}`
+          : 'Unknown',
+        processed_date: adj.processed_date || adj.created_at,
+        created_at: adj.created_at,
+        items: [] // Items will be loaded separately if needed
+      }))
       
-      const adjustmentMovements = movements.filter((movement: any) => movement.reference_type === 'adjustment')
-      console.log('Adjustment movements:', adjustmentMovements)
-      
-      adjustmentMovements.forEach((movement: any) => {
-          // For adjustments, group by date and user since they don't have reference_id
-          // This creates logical batches of adjustments made at the same time
-          const refId = movement.reference_id || `${movement.processed_date || movement.created_at}-${movement.user_id || 'unknown'}`
-          
-          if (!adjustmentsMap.has(refId)) {
-            adjustmentsMap.set(refId, {
-              id: movement.id,
-              reference_id: refId,
-              total_quantity: 0,
-              processed_by: movement.processed_by_first_name && movement.processed_by_last_name 
-                ? `${movement.processed_by_first_name} ${movement.processed_by_last_name}`
-                : movement.user_first_name && movement.user_last_name
-                ? `${movement.user_first_name} ${movement.user_last_name}`
-                : 'Unknown',
-              processed_date: movement.processed_date || movement.created_at,
-              created_at: movement.created_at,
-              items: []
-            })
-          }
-          
-          const adjustment = adjustmentsMap.get(refId)!
-          adjustment.total_quantity += Math.abs(movement.quantity)
-          adjustment.items.push({
-            product_id: movement.product_id,
-            product_name: movement.product_name,
-            product_sku: movement.product_sku,
-            warehouse_id: movement.warehouse_id,
-            warehouse_name: movement.warehouse_name,
-            quantity: movement.quantity,
-            reason: movement.reason || 'No reason provided'
-          })
-        })
-      
-      const adjustmentsArray = Array.from(adjustmentsMap.values())
-      console.log('Final adjustments:', adjustmentsArray)
-      setAdjustments(adjustmentsArray)
+      console.log('Converted adjustments:', convertedAdjustments)
+      setAdjustments(convertedAdjustments)
     } catch (error) {
       console.error('Error loading adjustments:', error)
     } finally {
@@ -240,6 +236,31 @@ export default function AdjustmentsPage() {
     })
   }
 
+  const generateReferenceNumber = (): string => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    const hours = String(now.getHours()).padStart(2, '0')
+    const minutes = String(now.getMinutes()).padStart(2, '0')
+    const seconds = String(now.getSeconds()).padStart(2, '0')
+    
+    return `ADJ-${year}${month}${day}-${hours}${minutes}${seconds}`
+  }
+
+  const resetForm = () => {
+    setAdjustmentItems([])
+    setAdjustmentQuantity('')
+    setAdjustmentCostPrice('')
+    setAdjustmentType('add')
+    setAdjustmentReason('')
+    setAdjustmentDate(new Date().toISOString().split('T')[0])
+    setSelectedProduct(null)
+    setSelectedWarehouse(null)
+    setCurrentStockLevel(null)
+    setGeneratedReferenceNumber(null)
+  }
+
   const handleAdjustmentClick = (adjustment: Adjustment) => {
     setSelectedAdjustment(adjustment)
     setIsModalOpen(true)
@@ -252,17 +273,21 @@ export default function AdjustmentsPage() {
 
   const checkStockLevel = async (productId: string, warehouseId: string): Promise<number> => {
     try {
+      setIsCheckingStock(true)
       const response = await api.get(`/stock-levels/${productId}/${warehouseId}`)
       return response.data.quantity || 0
     } catch (error) {
       console.error('Error checking stock level:', error)
       return 0
+    } finally {
+      setIsCheckingStock(false)
     }
   }
 
   const handleAddItem = async () => {
     const quantity = parseInt(adjustmentQuantity)
-    if (!selectedProduct || !selectedWarehouse || !adjustmentQuantity.trim() || quantity <= 0 || !adjustmentReason.trim()) {
+    const costPrice = parseFloat(adjustmentCostPrice)
+    if (!selectedProduct || !selectedWarehouse || !adjustmentQuantity.trim() || quantity <= 0 || !adjustmentCostPrice.trim() || costPrice < 0 || !adjustmentReason.trim()) {
       alert('Please fill in all required fields with valid values')
       return
     }
@@ -297,6 +322,7 @@ export default function AdjustmentsPage() {
       warehouse_id: selectedWarehouse.id,
       warehouse_name: selectedWarehouse.name,
       quantity: finalQuantity,
+      cost_price: costPrice,
       reason: adjustmentReason
     }
 
@@ -306,6 +332,7 @@ export default function AdjustmentsPage() {
     setSelectedProduct(null)
     setSelectedWarehouse(null)
     setAdjustmentQuantity('')
+    setAdjustmentCostPrice('')
     setAdjustmentType('add')
     setAdjustmentReason('')
     setCurrentStockLevel(null)
@@ -321,38 +348,53 @@ export default function AdjustmentsPage() {
       return
     }
 
+    if (!user) {
+      alert('User not authenticated')
+      return
+    }
+
     try {
-      // Create stock movements for each item
-      for (const item of adjustmentItems) {
-        const payload = {
+      // Generate reference number
+      const referenceNumber = generateReferenceNumber()
+      setGeneratedReferenceNumber(referenceNumber)
+
+      // Calculate total quantity
+      const totalQuantity = adjustmentItems.reduce((sum, item) => sum + Math.abs(item.quantity), 0)
+
+      // Create adjustment using backend API
+      const adjustmentPayload = {
+        reference_number: referenceNumber,
+        adjustment_date: new Date(adjustmentDate).toISOString(),
+        total_quantity: totalQuantity,
+        reason: 'Inventory adjustment',
+        status: 'completed',
+        created_by: user.id,
+        items: adjustmentItems.map(item => ({
           product_id: item.product_id,
           warehouse_id: item.warehouse_id,
-          movement_type: 'adjustment',
-          quantity: item.quantity, // Keep the sign for adjustments
-          reference_type: 'adjustment',
+          quantity: item.quantity,
+          cost_price: item.cost_price,
           reason: item.reason
-        }
-        console.log('Sending stock movement payload:', payload)
-        
-        await api.post('/stock-movements', payload)
+        }))
       }
 
+      console.log('Sending adjustment payload:', adjustmentPayload)
+      
+      await api.post('/adjustments', adjustmentPayload)
+
       // Reset form and close modal
-      setAdjustmentItems([])
-      setAdjustmentQuantity('')
-      setAdjustmentType('add')
-      setAdjustmentReason('')
-      setAdjustmentDate(new Date().toISOString().split('T')[0])
+      resetForm()
       setIsCreateModalOpen(false)
       
       // Reload adjustments
       await loadAdjustments()
       
-      alert('Adjustment created successfully!')
+      alert(`Adjustment created successfully!\nReference Number: ${referenceNumber}`)
     } catch (error: any) {
       console.error('Error creating adjustment:', error)
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
       alert(`Failed to create adjustment: ${errorMessage}`)
+      setGeneratedReferenceNumber(null) // Reset reference number on error
     }
   }
 
@@ -658,7 +700,12 @@ export default function AdjustmentsPage() {
       </Dialog>
 
       {/* Create Adjustment Modal */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+      <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
+        setIsCreateModalOpen(open)
+        if (!open) {
+          resetForm() // Clear form and success message when modal is closed
+        }
+      }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -669,6 +716,25 @@ export default function AdjustmentsPage() {
               Add inventory adjustments to correct stock levels
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Success Message with Reference Number */}
+          {generatedReferenceNumber && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-green-800">Adjustment Created Successfully!</h3>
+                  <p className="text-sm text-green-700 mt-1">
+                    Reference Number: <span className="font-mono font-semibold">{generatedReferenceNumber}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           <div className="space-y-6">
             {/* Adjustment Date and Processed By */}
@@ -701,29 +767,12 @@ export default function AdjustmentsPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Product *</Label>
-                    <Select value={selectedProduct?.id || ''} onValueChange={(value) => {
-                      const product = products.find(p => p.id === value)
-                      setSelectedProduct(product || null)
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} ({product.sku})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
                     <Label>Warehouse *</Label>
                     <Select value={selectedWarehouse?.id || ''} onValueChange={(value) => {
                       const warehouse = warehouses.find(w => w.id === value)
                       setSelectedWarehouse(warehouse || null)
+                      setSelectedProduct(null) // Reset product when warehouse changes
+                      setCurrentStockLevel(null) // Reset current stock when warehouse changes
                     }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a warehouse" />
@@ -737,7 +786,56 @@ export default function AdjustmentsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Product *</Label>
+                    <Select 
+                      value={selectedProduct?.id || ''} 
+                      onValueChange={(value) => {
+                        const product = products.find(p => p.id === value)
+                        setSelectedProduct(product || null)
+                        // Stock will be fetched automatically by useEffect when both product and warehouse are selected
+                      }}
+                      disabled={!selectedWarehouse}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedWarehouse ? "Select a product" : "Select warehouse first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.name} ({product.sku})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!selectedWarehouse && (
+                      <p className="text-sm text-gray-500">Please select a warehouse first</p>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Current Stock Display */}
+                {selectedProduct && selectedWarehouse && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Current Stock:</span>
+                      {isCheckingStock ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"></div>
+                          <span className="text-sm text-gray-500">Loading...</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm font-semibold text-gray-900">
+                          {currentStockLevel !== null ? currentStockLevel : 'N/A'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {selectedProduct.name} in {selectedWarehouse.name}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -768,7 +866,7 @@ export default function AdjustmentsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="quantity">Quantity *</Label>
                     <Input
@@ -789,6 +887,25 @@ export default function AdjustmentsPage() {
                     </div>
                     
                     <div className="space-y-2">
+                      <Label htmlFor="cost_price">Cost Price *</Label>
+                      <Input
+                        id="cost_price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={adjustmentCostPrice}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          // Allow decimal numbers and prevent negative numbers
+                          if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
+                            setAdjustmentCostPrice(value)
+                          }
+                        }}
+                        placeholder="Enter cost price"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
                       <Label htmlFor="reason">Reason *</Label>
                       <Input
                         id="reason"
@@ -804,12 +921,22 @@ export default function AdjustmentsPage() {
                 {adjustmentQuantity.trim() && parseInt(adjustmentQuantity) > 0 && (
                   <div className="p-3 bg-gray-50 rounded-lg border">
                     <p className="text-sm font-medium text-gray-700">Preview:</p>
-                    <p className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-600 space-y-1">
                       {adjustmentType === 'add' ? (
-                        <span className="text-green-600">+{adjustmentQuantity} (Add to inventory)</span>
+                        <div>
+                          <span className="text-green-600">+{adjustmentQuantity} (Add to inventory)</span>
+                          {adjustmentCostPrice.trim() && (
+                            <span className="ml-2 text-gray-500">@ ${parseFloat(adjustmentCostPrice).toFixed(2)} each</span>
+                          )}
+                        </div>
                       ) : (
                         <div className="space-y-1">
-                          <span className="text-red-600">-{adjustmentQuantity} (Subtract from inventory)</span>
+                          <div>
+                            <span className="text-red-600">-{adjustmentQuantity} (Subtract from inventory)</span>
+                            {adjustmentCostPrice.trim() && (
+                              <span className="ml-2 text-gray-500">@ ${parseFloat(adjustmentCostPrice).toFixed(2)} each</span>
+                            )}
+                          </div>
                           {isCheckingStock ? (
                             <div className="text-xs text-gray-500 flex items-center">
                               <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500 mr-2"></div>
@@ -825,7 +952,12 @@ export default function AdjustmentsPage() {
                           ) : null}
                         </div>
                       )}
-                    </p>
+                      {adjustmentCostPrice.trim() && adjustmentQuantity.trim() && (
+                        <div className="text-xs text-gray-500">
+                          Total Value: ${(parseFloat(adjustmentCostPrice) * parseInt(adjustmentQuantity)).toFixed(2)}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
                 
@@ -853,6 +985,8 @@ export default function AdjustmentsPage() {
                           <TableHead>Product</TableHead>
                           <TableHead>Warehouse</TableHead>
                           <TableHead>Quantity</TableHead>
+                          <TableHead>Cost Price</TableHead>
+                          <TableHead>Total Value</TableHead>
                           <TableHead>Reason</TableHead>
                           <TableHead>Action</TableHead>
                         </TableRow>
@@ -866,6 +1000,12 @@ export default function AdjustmentsPage() {
                             <TableCell>{item.warehouse_name}</TableCell>
                             <TableCell className={`font-medium ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                               {item.quantity > 0 ? '+' : ''}{item.quantity}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              ${item.cost_price.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              ${(Math.abs(item.quantity) * item.cost_price).toFixed(2)}
                             </TableCell>
                             <TableCell>{item.reason}</TableCell>
                             <TableCell>
@@ -889,7 +1029,10 @@ export default function AdjustmentsPage() {
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                resetForm()
+                setIsCreateModalOpen(false)
+              }}>
                 Cancel
               </Button>
               <Button 

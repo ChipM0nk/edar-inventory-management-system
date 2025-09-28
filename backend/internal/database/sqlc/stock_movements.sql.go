@@ -56,9 +56,9 @@ func (q *Queries) CountStockMovementsWithFilter(ctx context.Context, arg *CountS
 }
 
 const CreateStockMovement = `-- name: CreateStockMovement :one
-INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, cost_price, total_amount, reference_type, reference_id, reference_number, reason, user_id, processed_by, processed_date)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, product_id, warehouse_id, movement_type, quantity, reference_type, reference_id, reason, user_id, created_at, processed_by, processed_date, cost_price, total_amount, reference_number
+INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, cost_price, total_amount, reference_type, reference_id, reference_number, user_id, processed_by, processed_date)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, product_id, warehouse_id, movement_type, quantity, reference_type, reference_id, user_id, created_at, processed_by, processed_date, cost_price, total_amount, reference_number
 `
 
 type CreateStockMovementParams struct {
@@ -71,7 +71,6 @@ type CreateStockMovementParams struct {
 	ReferenceType   *string            `json:"reference_type"`
 	ReferenceID     pgtype.UUID        `json:"reference_id"`
 	ReferenceNumber *string            `json:"reference_number"`
-	Reason          *string            `json:"reason"`
 	UserID          pgtype.UUID        `json:"user_id"`
 	ProcessedBy     pgtype.UUID        `json:"processed_by"`
 	ProcessedDate   pgtype.Timestamptz `json:"processed_date"`
@@ -88,7 +87,6 @@ func (q *Queries) CreateStockMovement(ctx context.Context, arg *CreateStockMovem
 		arg.ReferenceType,
 		arg.ReferenceID,
 		arg.ReferenceNumber,
-		arg.Reason,
 		arg.UserID,
 		arg.ProcessedBy,
 		arg.ProcessedDate,
@@ -102,7 +100,6 @@ func (q *Queries) CreateStockMovement(ctx context.Context, arg *CreateStockMovem
 		&i.Quantity,
 		&i.ReferenceType,
 		&i.ReferenceID,
-		&i.Reason,
 		&i.UserID,
 		&i.CreatedAt,
 		&i.ProcessedBy,
@@ -116,7 +113,7 @@ func (q *Queries) CreateStockMovement(ctx context.Context, arg *CreateStockMovem
 
 const GetStockInTransactionDetails = `-- name: GetStockInTransactionDetails :many
 SELECT 
-    sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number,
+    sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number,
     p.name as product_name,
     p.sku,
     w.name as warehouse_name,
@@ -143,7 +140,6 @@ type GetStockInTransactionDetailsRow struct {
 	Quantity             int32              `json:"quantity"`
 	ReferenceType        *string            `json:"reference_type"`
 	ReferenceID          pgtype.UUID        `json:"reference_id"`
-	Reason               *string            `json:"reason"`
 	UserID               pgtype.UUID        `json:"user_id"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	ProcessedBy          pgtype.UUID        `json:"processed_by"`
@@ -178,7 +174,6 @@ func (q *Queries) GetStockInTransactionDetails(ctx context.Context, referenceID 
 			&i.Quantity,
 			&i.ReferenceType,
 			&i.ReferenceID,
-			&i.Reason,
 			&i.UserID,
 			&i.CreatedAt,
 			&i.ProcessedBy,
@@ -273,7 +268,7 @@ func (q *Queries) ListStockInTransactions(ctx context.Context, arg *ListStockInT
 }
 
 const ListStockMovements = `-- name: ListStockMovements :many
-SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name, 
+SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name, 
        pb.first_name as processed_by_first_name, pb.last_name as processed_by_last_name,
        po.supplier_name
 FROM stock_movements sm
@@ -299,7 +294,6 @@ type ListStockMovementsRow struct {
 	Quantity             int32              `json:"quantity"`
 	ReferenceType        *string            `json:"reference_type"`
 	ReferenceID          pgtype.UUID        `json:"reference_id"`
-	Reason               *string            `json:"reason"`
 	UserID               pgtype.UUID        `json:"user_id"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	ProcessedBy          pgtype.UUID        `json:"processed_by"`
@@ -334,7 +328,6 @@ func (q *Queries) ListStockMovements(ctx context.Context, arg *ListStockMovement
 			&i.Quantity,
 			&i.ReferenceType,
 			&i.ReferenceID,
-			&i.Reason,
 			&i.UserID,
 			&i.CreatedAt,
 			&i.ProcessedBy,
@@ -362,7 +355,7 @@ func (q *Queries) ListStockMovements(ctx context.Context, arg *ListStockMovement
 }
 
 const ListStockMovementsWithFilter = `-- name: ListStockMovementsWithFilter :many
-SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.reason, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name,
+SELECT sm.id, sm.product_id, sm.warehouse_id, sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.user_id, sm.created_at, sm.processed_by, sm.processed_date, sm.cost_price, sm.total_amount, sm.reference_number, p.name as product_name, p.sku, w.name as warehouse_name, u.first_name, u.last_name,
        pb.first_name as processed_by_first_name, pb.last_name as processed_by_last_name,
        po.supplier_name
 FROM stock_movements sm
@@ -398,7 +391,6 @@ type ListStockMovementsWithFilterRow struct {
 	Quantity             int32              `json:"quantity"`
 	ReferenceType        *string            `json:"reference_type"`
 	ReferenceID          pgtype.UUID        `json:"reference_id"`
-	Reason               *string            `json:"reason"`
 	UserID               pgtype.UUID        `json:"user_id"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	ProcessedBy          pgtype.UUID        `json:"processed_by"`
@@ -441,7 +433,6 @@ func (q *Queries) ListStockMovementsWithFilter(ctx context.Context, arg *ListSto
 			&i.Quantity,
 			&i.ReferenceType,
 			&i.ReferenceID,
-			&i.Reason,
 			&i.UserID,
 			&i.CreatedAt,
 			&i.ProcessedBy,

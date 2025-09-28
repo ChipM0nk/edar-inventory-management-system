@@ -40,6 +40,8 @@ type AdjustmentItem struct {
 	// Reason for this specific item adjustment
 	Reason    *string            `json:"reason"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	// Cost price per unit for this adjustment item
+	CostPrice pgtype.Numeric `json:"cost_price"`
 }
 
 type Category struct {
@@ -154,6 +156,7 @@ type StockLevel struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Stock movements table - reason is now tracked at the adjustment/transfer level
 type StockMovement struct {
 	ID              pgtype.UUID        `json:"id"`
 	ProductID       pgtype.UUID        `json:"product_id"`
@@ -162,7 +165,6 @@ type StockMovement struct {
 	Quantity        int32              `json:"quantity"`
 	ReferenceType   *string            `json:"reference_type"`
 	ReferenceID     pgtype.UUID        `json:"reference_id"`
-	Reason          *string            `json:"reason"`
 	UserID          pgtype.UUID        `json:"user_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	ProcessedBy     pgtype.UUID        `json:"processed_by"`

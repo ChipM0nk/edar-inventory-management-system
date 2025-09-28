@@ -45,6 +45,7 @@ func main() {
 	warehouseService := services.NewWarehouseService(db)
 	purchaseOrderService := services.NewPurchaseOrderService(db)
 	documentService := services.NewDocumentService(db)
+	adjustmentService := services.NewAdjustmentService(db)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userService, jwtService)
@@ -55,6 +56,7 @@ func main() {
 	warehouseHandler := handlers.NewWarehouseHandler(warehouseService)
 	purchaseOrderHandler := handlers.NewPurchaseOrderHandler(purchaseOrderService)
 	documentHandler := handlers.NewDocumentHandler(documentService)
+	adjustmentHandler := handlers.NewAdjustmentHandler(adjustmentService)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -171,6 +173,16 @@ func main() {
 				documents.POST("/:id/validate", documentHandler.ValidateDocument)
 				documents.GET("/:id/validation-status", documentHandler.GetDocumentValidationStatus)
 				documents.DELETE("/:id", documentHandler.DeleteDocument)
+			}
+
+			// Adjustments
+			adjustments := protected.Group("/adjustments")
+			{
+				adjustments.GET("", adjustmentHandler.ListAdjustments)
+				adjustments.POST("", adjustmentHandler.CreateAdjustment)
+				adjustments.GET("/:id", adjustmentHandler.GetAdjustment)
+				adjustments.PUT("/:id", adjustmentHandler.UpdateAdjustment)
+				adjustments.DELETE("/:id", adjustmentHandler.DeleteAdjustment)
 			}
 
 			// Products by supplier

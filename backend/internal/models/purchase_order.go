@@ -7,7 +7,7 @@ import (
 
 type PurchaseOrder struct {
 	ID                   string     `json:"id"`
-	PoNumber             string     `json:"po_number"`
+	PoNumber             string     `json:"po_number" validate:"required"`
 	SupplierName         string     `json:"supplier_name"`
 	SupplierContact      *string    `json:"supplier_contact"`
 	TotalAmount          float64    `json:"total_amount"`
@@ -24,7 +24,7 @@ type PurchaseOrder struct {
 }
 
 type CreatePurchaseOrderRequest struct {
-	PoNumber             string     `json:"po_number"`
+	PoNumber             string     `json:"po_number" validate:"required"`
 	SupplierName         string     `json:"supplier_name"`
 	SupplierContact      *string    `json:"supplier_contact"`
 	OrderDate            time.Time  `json:"order_date"`

@@ -1,6 +1,6 @@
 -- name: CreateStockMovement :one
-INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, cost_price, total_amount, reference_type, reference_id, reference_number, reason, user_id, processed_by, processed_date)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, cost_price, total_amount, reference_type, reference_id, reference_number, user_id, processed_by, processed_date)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: ListStockMovements :many

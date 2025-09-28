@@ -71,7 +71,6 @@ func (s *StockService) CreateStockMovement(ctx context.Context, req models.Creat
 		TotalAmount:   utils.OptionalFloat64ToPgxNumeric(totalAmount),
 		ReferenceType: req.ReferenceType,
 		ReferenceID:   utils.OptionalUUIDToPgxUUID(req.ReferenceID),
-		Reason:        req.Reason,
 		UserID:        utils.UUIDToPgxUUID(*userID),
 		ProcessedBy:   utils.UUIDToPgxUUID(*userID), // Default to current user
 		ProcessedDate: utils.TimeToPgxTimestamptz(time.Now()),
@@ -143,7 +142,6 @@ func (s *StockService) CreateStockMovement(ctx context.Context, req models.Creat
 		Quantity:      int(stockMovement.Quantity),
 		ReferenceType: stockMovement.ReferenceType,
 		ReferenceID:   &referenceID,
-		Reason:        stockMovement.Reason,
 		UserID:        &userIDValue,
 		ProcessedBy:   &processedByValue,
 		ProcessedDate: &processedDateValue,
@@ -302,7 +300,6 @@ func (s *StockService) ListStockMovements(ctx context.Context, filter models.Sto
 				Quantity:             row.Quantity,
 				ReferenceType:        row.ReferenceType,
 				ReferenceID:          row.ReferenceID,
-				Reason:               row.Reason,
 				UserID:               row.UserID,
 				CreatedAt:            row.CreatedAt,
 				ProcessedBy:          row.ProcessedBy,
@@ -342,7 +339,6 @@ func (s *StockService) ListStockMovements(ctx context.Context, filter models.Sto
 			ReferenceType: movement.ReferenceType,
 			ReferenceID:   &referenceID,
 			ReferenceNumber: movement.ReferenceNumber,
-			Reason:        movement.Reason,
 			UserID:        &userID,
 			ProcessedBy:   processedBy,
 			ProcessedDate: processedDate,
@@ -472,7 +468,6 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 			ReferenceType:   &referenceType,
 			ReferenceID:     utils.UUIDToPgxUUID(bulkReferenceID), // Use the same reference ID for all movements
 			ReferenceNumber: req.ReferenceNumber,
-			Reason:          item.Reason,
 			UserID:          utils.OptionalUUIDToPgxUUID(userID),
 			ProcessedBy:     utils.UUIDToPgxUUID(req.ProcessedBy), // Use the provided processed_by
 			ProcessedDate:   utils.TimeToPgxTimestamptz(req.ProcessedDate),
@@ -529,7 +524,6 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 			ReferenceType:   stockMovement.ReferenceType,
 			ReferenceID:     utils.OptionalPgxUUIDToUUID(stockMovement.ReferenceID),
 			ReferenceNumber: stockMovement.ReferenceNumber,
-			Reason:          stockMovement.Reason,
 			UserID:          utils.OptionalPgxUUIDToUUID(stockMovement.UserID),
 			ProcessedBy:     utils.OptionalPgxUUIDToUUID(stockMovement.ProcessedBy),
 			ProcessedDate:   utils.OptionalPgxTimestamptzToTimePtr(stockMovement.ProcessedDate),

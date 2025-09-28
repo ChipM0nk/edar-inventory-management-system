@@ -59,7 +59,7 @@ const stockInSchema = z.object({
   warehouse_id: z.string().min(1, 'Warehouse is required'),
   received_date: z.string().min(1, 'Received date is required'),
   processed_by: z.string().min(1, 'Processed by is required'),
-  reference_number: z.string().optional(),
+  reference_number: z.string().min(1, 'PO Reference Number is required'),
   documents: z.array(z.any()).optional(),
   notes: z.string().optional(),
 })
@@ -380,7 +380,7 @@ export default function NewStockMovementPage() {
 
       // Create purchase order first
       const purchaseOrderData = {
-        po_number: data.reference_number || `PO-${Date.now()}`,
+        po_number: data.reference_number,
         supplier_name: selectedSupplierData.name,
         supplier_contact: selectedSupplierData.email,
         order_date: new Date().toISOString(),
@@ -598,7 +598,7 @@ export default function NewStockMovementPage() {
                     </div>
 
                     <div>
-                      <Label htmlFor="reference_number">PO Reference Number</Label>
+                      <Label htmlFor="reference_number">PO Reference Number *</Label>
                       <Input
                         {...form.register('reference_number')}
                         placeholder="PO-12345"

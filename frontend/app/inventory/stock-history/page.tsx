@@ -35,7 +35,6 @@ interface StockMovement {
   total_amount?: number
   reference_type?: string
   reference_id?: string
-  reason?: string
   user_id?: string
   processed_by?: string
   processed_date?: string
@@ -88,8 +87,7 @@ export default function StockHistoryPage() {
         (movement) =>
           movement.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           movement.product_sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          movement.warehouse_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          movement.reason?.toLowerCase().includes(searchTerm.toLowerCase())
+          movement.warehouse_name.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -223,7 +221,7 @@ export default function StockHistoryPage() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
-                      placeholder="Search by product name, SKU, warehouse, or reason..."
+                      placeholder="Search by product name, SKU, or warehouse..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
@@ -278,7 +276,6 @@ export default function StockHistoryPage() {
                           <TableHead>Quantity</TableHead>
                           <TableHead>Cost Price</TableHead>
                           <TableHead>Total Amount</TableHead>
-                          <TableHead>Reason</TableHead>
                           <TableHead>Processed By</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
@@ -321,9 +318,6 @@ export default function StockHistoryPage() {
                             </TableCell>
                             <TableCell className="font-mono text-sm">
                               {movement.total_amount ? `₱${movement.total_amount.toFixed(2)}` : '-'}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-500">
-                              {movement.reason || '-'}
                             </TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {movement.processed_by_name || movement.user_name || '-'}
@@ -451,8 +445,6 @@ export default function StockHistoryPage() {
                       <p className="text-sm text-gray-900 font-mono">{selectedMovement.reference_id || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Reason</p>
-                      <p className="text-sm text-gray-900">{selectedMovement.reason || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-600">Processed By</p>

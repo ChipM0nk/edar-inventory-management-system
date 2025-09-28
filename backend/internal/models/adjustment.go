@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 	"github.com/google/uuid"
 )
@@ -46,6 +47,7 @@ type CreateAdjustmentRequest struct {
 	Reason          *string    `json:"reason,omitempty"`
 	Status          string     `json:"status" validate:"oneof=pending approved completed cancelled"`
 	Notes           *string    `json:"notes,omitempty"`
+	CreatedBy       uuid.UUID  `json:"created_by" validate:"required"`
 	Items           []CreateAdjustmentItemRequest `json:"items" validate:"required,min=1"`
 }
 
@@ -53,6 +55,7 @@ type CreateAdjustmentItemRequest struct {
 	ProductID   uuid.UUID `json:"product_id" validate:"required"`
 	WarehouseID uuid.UUID `json:"warehouse_id" validate:"required"`
 	Quantity    int       `json:"quantity" validate:"required"`
+	CostPrice   float64   `json:"cost_price" validate:"required,min=0"`
 	Reason      *string   `json:"reason,omitempty"`
 }
 
@@ -83,4 +86,35 @@ type AdjustmentListResponse struct {
 	Page        int          `json:"page"`
 	Limit       int          `json:"limit"`
 	TotalPages  int          `json:"total_pages"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for CreateAdjustmentRequest
+func (r *CreateAdjustmentRequest) UnmarshalJSON(data []byte) error {
+	type Alias CreateAdjustmentRequest
+	aux := &struct {
+		AdjustmentDate string `json:"adjustment_date"`
+		*Alias
+	}{
+		Alias: (*Alias)(r),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Parse adjustment_date
+	if aux.AdjustmentDate != "" {
+		// Try parsing as ISO 8601 first
+		if t, err := time.Parse(time.RFC3339, aux.AdjustmentDate); err == nil {
+			r.AdjustmentDate = t
+		} else if t, err := time.Parse("2006-01-02T15:04:05Z", aux.AdjustmentDate); err == nil {
+			r.AdjustmentDate = t
+		} else if t, err := time.Parse("2006-01-02", aux.AdjustmentDate); err == nil {
+			r.AdjustmentDate = t
+		} else {
+			return err
+		}
+	}
+
+	return nil
 }

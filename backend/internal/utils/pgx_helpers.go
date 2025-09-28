@@ -205,3 +205,13 @@ func PgxDateToTimePtr(d pgtype.Date) *time.Time {
 	}
 	return &d.Time
 }
+
+// Helper function to convert int32 to int32 pointer
+func Int32Ptr(value int32) *int32 {
+	return &value
+}
+
+// Helper function to convert time to time pointer
+func TimePtr(t time.Time) *time.Time {
+	return &t
+}

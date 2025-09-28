@@ -35,7 +35,6 @@ type StockMovement struct {
 	ReferenceType *string    `json:"reference_type" db:"reference_type"`
 	ReferenceID   *uuid.UUID `json:"reference_id" db:"reference_id"`
 	ReferenceNumber *string  `json:"reference_number,omitempty" db:"reference_number"`
-	Reason        *string    `json:"reason" db:"reason"`
 	UserID        *uuid.UUID `json:"user_id" db:"user_id"`
 	ProcessedBy   *uuid.UUID `json:"processed_by" db:"processed_by"`
 	ProcessedDate *time.Time `json:"processed_date" db:"processed_date"`
@@ -59,7 +58,6 @@ type CreateStockMovementRequest struct {
 	CostPrice     *float64   `json:"cost_price,omitempty" validate:"omitempty,min=0"`
 	ReferenceType *string    `json:"reference_type"`
 	ReferenceID   *uuid.UUID `json:"reference_id"`
-	Reason        *string    `json:"reason"`
 }
 
 type BulkStockMovementRequest struct {
@@ -76,7 +74,6 @@ type BulkStockMovementItem struct {
 	WarehouseID uuid.UUID `json:"warehouse_id" validate:"required"`
 	Quantity    int       `json:"quantity" validate:"required,min=1"`
 	CostPrice   *float64  `json:"cost_price,omitempty" validate:"omitempty,min=0"`
-	Reason      *string   `json:"reason"`
 }
 
 type StockLevelFilter struct {

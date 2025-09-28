@@ -28,6 +28,12 @@ func (h *PurchaseOrderHandler) CreatePurchaseOrder(c *gin.Context) {
 		return
 	}
 
+	// Validate required fields
+	if req.PoNumber == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "PO Reference Number is required"})
+		return
+	}
+
 	purchaseOrder, err := h.purchaseOrderService.CreatePurchaseOrder(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create purchase order"})

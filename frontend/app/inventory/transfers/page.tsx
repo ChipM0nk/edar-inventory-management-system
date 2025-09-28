@@ -155,7 +155,7 @@ export default function TransfersPage() {
             to_warehouse_id: movement.warehouse_id, // This would need to be determined from the transfer logic
             to_warehouse_name: movement.warehouse_name,
             quantity: movement.quantity,
-            reason: movement.reason || 'No reason provided'
+            reason: 'N/A' // Reason is now tracked at transfer level
           })
         })
       
