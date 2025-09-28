@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { getStatusColor, getStatusDisplayText } from '@/lib/utils'
 import { AppLayout } from '@/components/app-layout'
+import { DocumentViewerDialog } from '@/components/purchase-orders/document-viewer-dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -51,11 +52,16 @@ interface PurchaseOrder {
 
 interface Document {
   id: string
+  purchase_order_id: string
   file_name: string
   file_path: string
   file_size: number
   file_type: string
   uploaded_at: string
+  has_po_reference?: boolean
+  has_matching_date?: boolean
+  validation_status?: string
+  validation_notes?: string
 }
 
 export default function PurchasePage() {
@@ -80,6 +86,7 @@ export default function PurchasePage() {
   const [showDocumentUpload, setShowDocumentUpload] = useState(false)
   const [viewingDocument, setViewingDocument] = useState<string | null>(null)
   const [documentViewerUrl, setDocumentViewerUrl] = useState<string | null>(null)
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null)
   
   // Cancel confirmation state
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -288,10 +295,13 @@ export default function PurchasePage() {
   const loadDocuments = async (purchaseOrderId: string) => {
     try {
       setIsLoadingDocuments(true)
+      console.log('Loading documents for purchase order ID:', purchaseOrderId)
       const response = await api.get(`/documents/purchase-order/${purchaseOrderId}`)
+      console.log('Documents response:', response.data)
       setDocuments(response.data || [])
     } catch (error) {
       console.error('Error loading documents:', error)
+      console.error('Error details:', (error as any).response?.data)
       setDocuments([])
     } finally {
       setIsLoadingDocuments(false)
@@ -317,16 +327,23 @@ export default function PurchasePage() {
       setIsUploadingDocuments(true)
       const formData = new FormData()
       
+      // Debug: Log the selected order and files
+      console.log('Selected order for upload:', selectedOrder)
+      console.log('Upload files:', uploadedFiles)
+      console.log('Purchase order ID being sent:', selectedOrder.id)
+      
       uploadedFiles.forEach((file, index) => {
         formData.append(`documents`, file)
       })
-      formData.append('purchase_order_id', selectedOrder.reference_id)
+      formData.append('purchase_order_id', selectedOrder.id!)
 
-      await api.post('/documents/upload', formData, {
+      const response = await api.post('/documents/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       })
+      
+      console.log('Upload response:', response.data)
 
       // Reload documents and clear upload files
       await loadDocuments(selectedOrder.id!)
@@ -336,6 +353,7 @@ export default function PurchasePage() {
       alert('Documents uploaded successfully!')
     } catch (error) {
       console.error('Error uploading documents:', error)
+      console.error('Error details:', (error as any).response?.data)
       alert('Error uploading documents. Please try again.')
     } finally {
       setIsUploadingDocuments(false)
@@ -430,18 +448,8 @@ export default function PurchasePage() {
       const blob = new Blob([response.data], { type: document.file_type })
       const url = window.URL.createObjectURL(blob)
       
-      // Open in new tab
-      const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
-      if (!newWindow) {
-        alert('Please allow popups to view documents, or try downloading the file instead.')
-        window.URL.revokeObjectURL(url)
-        return
-      }
-      
-      // Clean up the URL after a delay to free memory
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url)
-      }, 60000) // Increased to 60 seconds for better user experience
+      // Set the document URL for the viewer dialog
+      setDocumentUrl(url)
       
     } catch (error: any) {
       console.error('Error viewing document:', error)
@@ -454,7 +462,6 @@ export default function PurchasePage() {
       } else {
         alert('Error viewing document. Please try again or download the file instead.')
       }
-    } finally {
       setViewingDocument(null)
     }
   }
@@ -1535,6 +1542,23 @@ export default function PurchasePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Document Viewer Dialog */}
+      <DocumentViewerDialog
+        isOpen={viewingDocument !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingDocument(null)
+            if (documentUrl) {
+              window.URL.revokeObjectURL(documentUrl)
+              setDocumentUrl(null)
+            }
+          }
+        }}
+        document={documents.find(doc => doc.id === viewingDocument) || null}
+        documentUrl={documentUrl}
+        onDownload={downloadDocument}
+      />
     </>
   )
 }

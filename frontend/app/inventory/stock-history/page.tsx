@@ -118,7 +118,7 @@ export default function StockHistoryPage() {
     })
   }
 
-  const getMovementTypeColor = (type: string) => {
+  const getMovementTypeColor = (type: string, quantity?: number) => {
     switch (type) {
       case 'in':
         return 'bg-green-100 text-green-800'
@@ -127,13 +127,16 @@ export default function StockHistoryPage() {
       case 'transfer':
         return 'bg-blue-100 text-blue-800'
       case 'adjustment':
+        if (quantity !== undefined) {
+          return quantity >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }
         return 'bg-yellow-100 text-yellow-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const getMovementTypeLabel = (type: string) => {
+  const getMovementTypeLabel = (type: string, quantity?: number) => {
     switch (type) {
       case 'in':
         return 'Stock In'
@@ -142,6 +145,9 @@ export default function StockHistoryPage() {
       case 'transfer':
         return 'Transfer'
       case 'adjustment':
+        if (quantity !== undefined) {
+          return quantity >= 0 ? 'Adjustment (Stock In)' : 'Adjustment (Stock Out)'
+        }
         return 'Adjustment'
       default:
         return type
@@ -288,8 +294,8 @@ export default function StockHistoryPage() {
                               {formatDate(movement.created_at)}
                             </TableCell>
                             <TableCell>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMovementTypeColor(movement.movement_type)}`}>
-                                {getMovementTypeLabel(movement.movement_type)}
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMovementTypeColor(movement.movement_type, movement.quantity)}`}>
+                                {getMovementTypeLabel(movement.movement_type, movement.quantity)}
                               </span>
                             </TableCell>
                             <TableCell className="font-medium">
@@ -301,8 +307,14 @@ export default function StockHistoryPage() {
                             <TableCell>
                               {movement.warehouse_name}
                             </TableCell>
-                            <TableCell className={`font-medium ${movement.movement_type === 'in' ? 'text-green-600' : movement.movement_type === 'out' ? 'text-red-600' : ''}`}>
-                              {movement.movement_type === 'in' ? '+' : movement.movement_type === 'out' ? '-' : ''}{movement.quantity}
+                            <TableCell className={`font-medium ${
+                              movement.movement_type === 'in' ? 'text-green-600' : 
+                              movement.movement_type === 'out' ? 'text-red-600' : 
+                              movement.movement_type === 'adjustment' ? (movement.quantity >= 0 ? 'text-green-600' : 'text-red-600') : ''
+                            }`}>
+                              {movement.movement_type === 'in' ? '+' : 
+                               movement.movement_type === 'out' ? '-' : 
+                               movement.movement_type === 'adjustment' ? (movement.quantity >= 0 ? '+' : '') : ''}{movement.quantity}
                             </TableCell>
                             <TableCell className="font-mono text-sm">
                               {movement.cost_price ? `₱${movement.cost_price.toFixed(2)}` : '-'}
@@ -371,8 +383,8 @@ export default function StockHistoryPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMovementTypeColor(selectedMovement.movement_type)}`}>
-                        {getMovementTypeLabel(selectedMovement.movement_type)}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMovementTypeColor(selectedMovement.movement_type, selectedMovement.quantity)}`}>
+                        {getMovementTypeLabel(selectedMovement.movement_type, selectedMovement.quantity)}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
