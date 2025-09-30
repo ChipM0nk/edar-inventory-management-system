@@ -13,6 +13,7 @@ WHERE po.id = $1;
 SELECT po.*, u.first_name, u.last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
+WHERE po.status != 'cancelled'
 ORDER BY po.order_date DESC, po.created_at DESC
 LIMIT $1 OFFSET $2;
 
@@ -20,7 +21,8 @@ LIMIT $1 OFFSET $2;
 SELECT po.*, u.first_name, u.last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
-WHERE ($1::text IS NULL OR po.status = $1)
+WHERE po.status != 'cancelled'
+  AND ($1::text IS NULL OR po.status = $1)
   AND ($2::text IS NULL OR po.supplier_name ILIKE '%' || $2 || '%')
   AND ($3::date IS NULL OR po.order_date >= $3)
   AND ($4::date IS NULL OR po.order_date <= $4)
@@ -40,12 +42,13 @@ WHERE id = $1
 RETURNING *;
 
 -- name: CountPurchaseOrders :one
-SELECT COUNT(*) FROM purchase_orders;
+SELECT COUNT(*) FROM purchase_orders WHERE status != 'cancelled';
 
 -- name: CountPurchaseOrdersWithFilter :one
 SELECT COUNT(*)
 FROM purchase_orders po
-WHERE ($1::text IS NULL OR po.status = $1)
+WHERE po.status != 'cancelled'
+  AND ($1::text IS NULL OR po.status = $1)
   AND ($2::text IS NULL OR po.supplier_name ILIKE '%' || $2 || '%')
   AND ($3::date IS NULL OR po.order_date >= $3)
   AND ($4::date IS NULL OR po.order_date <= $4);

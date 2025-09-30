@@ -40,7 +40,7 @@ func (q *Queries) CancelPurchaseOrder(ctx context.Context, id pgtype.UUID) (*Pur
 }
 
 const CountPurchaseOrders = `-- name: CountPurchaseOrders :one
-SELECT COUNT(*) FROM purchase_orders
+SELECT COUNT(*) FROM purchase_orders WHERE status != 'cancelled'
 `
 
 func (q *Queries) CountPurchaseOrders(ctx context.Context) (int64, error) {
@@ -53,7 +53,8 @@ func (q *Queries) CountPurchaseOrders(ctx context.Context) (int64, error) {
 const CountPurchaseOrdersWithFilter = `-- name: CountPurchaseOrdersWithFilter :one
 SELECT COUNT(*)
 FROM purchase_orders po
-WHERE ($1::text IS NULL OR po.status = $1)
+WHERE po.status != 'cancelled'
+  AND ($1::text IS NULL OR po.status = $1)
   AND ($2::text IS NULL OR po.supplier_name ILIKE '%' || $2 || '%')
   AND ($3::date IS NULL OR po.order_date >= $3)
   AND ($4::date IS NULL OR po.order_date <= $4)
@@ -294,6 +295,7 @@ const ListPurchaseOrders = `-- name: ListPurchaseOrders :many
 SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, u.first_name, u.last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
+WHERE po.status != 'cancelled'
 ORDER BY po.order_date DESC, po.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -361,7 +363,8 @@ const ListPurchaseOrdersWithFilter = `-- name: ListPurchaseOrdersWithFilter :man
 SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, u.first_name, u.last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
-WHERE ($1::text IS NULL OR po.status = $1)
+WHERE po.status != 'cancelled'
+  AND ($1::text IS NULL OR po.status = $1)
   AND ($2::text IS NULL OR po.supplier_name ILIKE '%' || $2 || '%')
   AND ($3::date IS NULL OR po.order_date >= $3)
   AND ($4::date IS NULL OR po.order_date <= $4)
