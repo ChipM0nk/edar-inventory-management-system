@@ -87,12 +87,21 @@ func (s *PurchaseOrderService) GetPurchaseOrder(id string) (*models.PurchaseOrde
 
 func (s *PurchaseOrderService) ListPurchaseOrders(limit, offset int32) ([]models.PurchaseOrder, error) {
 	ctx := context.Background()
+	fmt.Printf("ListPurchaseOrders called with limit=%d, offset=%d\n", limit, offset)
+	
 	pos, err := s.db.ListPurchaseOrders(ctx, &sqlc.ListPurchaseOrdersParams{
 		Limit:  limit,
 		Offset: offset,
 	})
 	if err != nil {
+		fmt.Printf("Error querying purchase orders: %v\n", err)
 		return nil, err
+	}
+
+	fmt.Printf("Found %d purchase orders in database\n", len(pos))
+	for i, po := range pos {
+		fmt.Printf("PO %d: ID=%s, Number=%s, Supplier=%s, Status=%s\n", 
+			i+1, po.ID.Bytes, po.PoNumber, po.SupplierName, po.Status)
 	}
 
 	result := make([]models.PurchaseOrder, len(pos))
@@ -103,7 +112,7 @@ func (s *PurchaseOrderService) ListPurchaseOrders(limit, offset int32) ([]models
 			SupplierName:         po.SupplierName,
 			SupplierContact:      po.SupplierContact,
 			TotalAmount:          utils.PgxNumericToFloat64(po.TotalAmount),
-			Status:               "received", // Always return received
+			Status:               po.Status, // Use actual status from database
 			OrderDate:            utils.PgxDateToTime(po.OrderDate),
 			ExpectedDeliveryDate: utils.PgxDateToTimePtr(po.ExpectedDeliveryDate),
 			ReceivedDate:         utils.PgxDateToTimePtr(po.ReceivedDate),
@@ -116,6 +125,7 @@ func (s *PurchaseOrderService) ListPurchaseOrders(limit, offset int32) ([]models
 		}
 	}
 
+	fmt.Printf("Returning %d purchase orders\n", len(result))
 	return result, nil
 }
 

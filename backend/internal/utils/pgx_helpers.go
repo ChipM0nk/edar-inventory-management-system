@@ -215,3 +215,10 @@ func Int32Ptr(value int32) *int32 {
 func TimePtr(t time.Time) *time.Time {
 	return &t
 }
+
+func UUIDToPgxUUIDPtr(uuid *uuid.UUID) pgtype.UUID {
+	if uuid == nil {
+		return pgtype.UUID{Valid: false}
+	}
+	return pgtype.UUID{Bytes: *uuid, Valid: true}
+}

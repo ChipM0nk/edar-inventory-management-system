@@ -34,14 +34,17 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 
 	// Create the adjustment
 	adjustmentParams := sqlc.CreateAdjustmentParams{
-		ReferenceNumber: req.ReferenceNumber,
-		AdjustmentDate:  utils.TimeToPgxDate(req.AdjustmentDate),
-		TotalQuantity:   int32(req.TotalQuantity),
-		Reason:          req.Reason,
-		Notes:           req.Notes,
-		Status:          "completed", // Auto-complete adjustments
-		CreatedBy:       utils.UUIDToPgxUUID(req.CreatedBy),
-		ProcessedBy:     utils.UUIDToPgxUUID(req.CreatedBy), // Set processed by to creator
+		ReferenceNumber:  req.ReferenceNumber,
+		AdjustmentDate:   utils.TimeToPgxDate(req.AdjustmentDate),
+		TotalQuantity:    int32(req.TotalQuantity),
+		Reason:           req.Reason,
+		Notes:            req.Notes,
+		Status:           "completed", // Auto-complete adjustments
+		CreatedBy:        utils.UUIDToPgxUUID(req.CreatedBy),
+		ProcessedBy:      utils.UUIDToPgxUUID(req.CreatedBy), // Set processed by to creator
+		ReferenceType:    req.ReferenceType,
+		ReferenceID:      utils.UUIDToPgxUUIDPtr(req.ReferenceID),
+		AdjustmentReason: req.AdjustmentReason,
 	}
 
 	adjustment, err := s.db.Queries.WithTx(tx).CreateAdjustment(ctx, &adjustmentParams)
@@ -52,12 +55,18 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 	// Create adjustment items
 	for _, item := range req.Items {
 		itemParams := sqlc.CreateAdjustmentItemParams{
-			AdjustmentID: adjustment.ID,
-			ProductID:    utils.UUIDToPgxUUID(item.ProductID),
-			WarehouseID:  utils.UUIDToPgxUUID(item.WarehouseID),
-			Quantity:     int32(item.Quantity),
-			CostPrice:    utils.Float64ToPgxNumeric(item.CostPrice),
-			Reason:       item.Reason,
+			AdjustmentID:     adjustment.ID,
+			ProductID:        utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID:      utils.UUIDToPgxUUID(item.WarehouseID),
+			Quantity:         int32(item.Quantity),
+			CostPrice:        utils.Float64ToPgxNumeric(item.CostPrice),
+			Reason:           item.Reason,
+			ReferenceType:    item.ReferenceType,
+			ReferenceID:      utils.UUIDToPgxUUIDPtr(item.ReferenceID),
+			ReferenceNumber:  item.ReferenceNumber,
+			AdjustmentReason: item.AdjustmentReason,
+			ExpectedQuantity: utils.OptionalIntToInt32Ptr(item.ExpectedQuantity),
+			ActualQuantity:   utils.OptionalIntToInt32Ptr(item.ActualQuantity),
 		}
 
 		_, err := s.db.Queries.WithTx(tx).CreateAdjustmentItem(ctx, &itemParams)

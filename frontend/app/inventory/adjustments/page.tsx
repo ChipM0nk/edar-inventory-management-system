@@ -93,6 +93,14 @@ export default function AdjustmentsPage() {
   const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null)
   const [isCheckingStock, setIsCheckingStock] = useState(false)
   const [generatedReferenceNumber, setGeneratedReferenceNumber] = useState<string | null>(null)
+  
+  // Reference fields for PO/SO connections
+  const [referenceType, setReferenceType] = useState<string>('')
+  const [referenceId, setReferenceId] = useState<string>('')
+  const [referenceNumber, setReferenceNumber] = useState<string>('')
+  const [adjustmentReasonType, setAdjustmentReasonType] = useState<string>('')
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
+  const [salesOrders, setSalesOrders] = useState<any[]>([])
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -106,6 +114,8 @@ export default function AdjustmentsPage() {
       loadAdjustments()
       loadProducts()
       loadWarehouses()
+      loadPurchaseOrders()
+      loadSalesOrders()
     }
   }, [user])
 
@@ -226,6 +236,35 @@ export default function AdjustmentsPage() {
     }
   }
 
+  const loadPurchaseOrders = async () => {
+    try {
+      console.log('Loading purchase orders...')
+      const response = await api.get('/purchase-orders?limit=100')
+      console.log('Purchase orders API response:', response)
+      console.log('Response data:', response.data)
+      console.log('Response status:', response.status)
+      
+      const purchaseOrders = response.data || []
+      console.log('Loaded purchase orders for adjustments:', purchaseOrders)
+      console.log('Number of purchase orders:', purchaseOrders.length)
+      
+      setPurchaseOrders(purchaseOrders)
+    } catch (error) {
+      console.error('Error loading purchase orders:', error)
+      console.error('Error details:', error.response?.data)
+      console.error('Error status:', error.response?.status)
+    }
+  }
+
+  const loadSalesOrders = async () => {
+    try {
+      // Placeholder for sales orders - implement when sales order API is available
+      setSalesOrders([])
+    } catch (error) {
+      console.error('Error loading sales orders:', error)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -259,6 +298,11 @@ export default function AdjustmentsPage() {
     setSelectedWarehouse(null)
     setCurrentStockLevel(null)
     setGeneratedReferenceNumber(null)
+    // Reset reference fields
+    setReferenceType('')
+    setReferenceId('')
+    setReferenceNumber('')
+    setAdjustmentReasonType('')
   }
 
   const handleAdjustmentClick = (adjustment: Adjustment) => {
@@ -369,12 +413,21 @@ export default function AdjustmentsPage() {
         reason: 'Inventory adjustment',
         status: 'completed',
         created_by: user.id,
+        // Reference fields for PO/SO connections
+        reference_type: referenceType || null,
+        reference_id: referenceId || null,
+        adjustment_reason: adjustmentReasonType || null,
         items: adjustmentItems.map(item => ({
           product_id: item.product_id,
           warehouse_id: item.warehouse_id,
           quantity: item.quantity,
           cost_price: item.cost_price,
-          reason: item.reason
+          reason: item.reason,
+          // Reference fields for item-level tracking
+          reference_type: referenceType || null,
+          reference_id: referenceId || null,
+          reference_number: referenceNumber || null,
+          adjustment_reason: adjustmentReasonType || null
         }))
       }
 
@@ -758,6 +811,115 @@ export default function AdjustmentsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Reference Fields for PO/SO Connections */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Reference Information (Optional)</CardTitle>
+                <CardDescription>
+                  Link this adjustment to a Purchase Order or Sales Order for better tracking
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reference-type">Reference Type</Label>
+                    <Select value={referenceType} onValueChange={setReferenceType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select reference type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="purchase_order">Purchase Order</SelectItem>
+                        <SelectItem value="sales_order">Sales Order</SelectItem>
+                        <SelectItem value="cycle_count">Cycle Count</SelectItem>
+                        <SelectItem value="damage">Damage</SelectItem>
+                        <SelectItem value="theft">Theft</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                        <SelectItem value="transfer">Transfer</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="adjustment-reason">Adjustment Reason</Label>
+                    <Select value={adjustmentReasonType} onValueChange={setAdjustmentReasonType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select reason" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="receiving_discrepancy">Receiving Discrepancy</SelectItem>
+                        <SelectItem value="damaged_goods">Damaged Goods</SelectItem>
+                        <SelectItem value="quality_issue">Quality Issue</SelectItem>
+                        <SelectItem value="short_shipment">Short Shipment</SelectItem>
+                        <SelectItem value="over_shipment">Over Shipment</SelectItem>
+                        <SelectItem value="customer_return">Customer Return</SelectItem>
+                        <SelectItem value="defective_return">Defective Return</SelectItem>
+                        <SelectItem value="exchange">Exchange</SelectItem>
+                        <SelectItem value="warranty_replacement">Warranty Replacement</SelectItem>
+                        <SelectItem value="cycle_count_correction">Cycle Count Correction</SelectItem>
+                        <SelectItem value="theft_loss">Theft Loss</SelectItem>
+                        <SelectItem value="expired_product">Expired Product</SelectItem>
+                        <SelectItem value="storage_damage">Storage Damage</SelectItem>
+                        <SelectItem value="transfer_correction">Transfer Correction</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {referenceType === 'purchase_order' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase-order">Purchase Order</Label>
+                    <Select value={referenceId} onValueChange={(value) => {
+                      setReferenceId(value)
+                      const po = purchaseOrders.find(po => po.id === value)
+                      setReferenceNumber(po?.po_number || '')
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Purchase Order" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {purchaseOrders.length > 0 ? (
+                          purchaseOrders.map((po) => (
+                            <SelectItem key={po.id} value={po.id}>
+                              {po.po_number} - {po.supplier_name} ({po.status})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-orders" disabled>
+                            No purchase orders available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {referenceType === 'sales_order' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="sales-order">Sales Order</Label>
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">
+                        Sales Order integration coming soon. Please use "Other" reference type for now.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {referenceType && referenceType !== 'purchase_order' && referenceType !== 'sales_order' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="reference-number">Reference Number</Label>
+                    <Input
+                      id="reference-number"
+                      value={referenceNumber}
+                      onChange={(e) => setReferenceNumber(e.target.value)}
+                      placeholder="Enter reference number"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Add Item Form */}
             <Card>

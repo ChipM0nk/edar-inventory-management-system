@@ -8,40 +8,40 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Main adjustments table for inventory adjustments
 type Adjustment struct {
-	ID pgtype.UUID `json:"id"`
-	// Unique reference number for the adjustment (e.g., ADJ-2024-001)
-	ReferenceNumber string      `json:"reference_number"`
-	AdjustmentDate  pgtype.Date `json:"adjustment_date"`
-	// Total quantity of all items in the adjustment
-	TotalQuantity int32   `json:"total_quantity"`
-	Reason        *string `json:"reason"`
-	// Current status of the adjustment
-	Status string `json:"status"`
-	// User who created the adjustment
-	CreatedBy pgtype.UUID `json:"created_by"`
-	// User who processed/approved the adjustment
-	ProcessedBy   pgtype.UUID        `json:"processed_by"`
-	ProcessedDate pgtype.Timestamptz `json:"processed_date"`
-	Notes         *string            `json:"notes"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID               pgtype.UUID        `json:"id"`
+	ReferenceNumber  string             `json:"reference_number"`
+	AdjustmentDate   pgtype.Date        `json:"adjustment_date"`
+	TotalQuantity    int32              `json:"total_quantity"`
+	Reason           *string            `json:"reason"`
+	Status           string             `json:"status"`
+	CreatedBy        pgtype.UUID        `json:"created_by"`
+	ProcessedBy      pgtype.UUID        `json:"processed_by"`
+	ProcessedDate    pgtype.Timestamptz `json:"processed_date"`
+	Notes            *string            `json:"notes"`
+	ReferenceType    *string            `json:"reference_type"`
+	ReferenceID      pgtype.UUID        `json:"reference_id"`
+	AdjustmentReason *string            `json:"adjustment_reason"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
-// Individual items within an adjustment
 type AdjustmentItem struct {
-	ID           pgtype.UUID `json:"id"`
-	AdjustmentID pgtype.UUID `json:"adjustment_id"`
-	ProductID    pgtype.UUID `json:"product_id"`
-	WarehouseID  pgtype.UUID `json:"warehouse_id"`
-	// Quantity adjustment (positive for add, negative for subtract)
-	Quantity int32 `json:"quantity"`
-	// Reason for this specific item adjustment
-	Reason    *string            `json:"reason"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	// Cost price per unit for this adjustment item
-	CostPrice pgtype.Numeric `json:"cost_price"`
+	ID               pgtype.UUID        `json:"id"`
+	AdjustmentID     pgtype.UUID        `json:"adjustment_id"`
+	ProductID        pgtype.UUID        `json:"product_id"`
+	WarehouseID      pgtype.UUID        `json:"warehouse_id"`
+	Quantity         int32              `json:"quantity"`
+	CostPrice        pgtype.Numeric     `json:"cost_price"`
+	Reason           *string            `json:"reason"`
+	ReferenceType    *string            `json:"reference_type"`
+	ReferenceID      pgtype.UUID        `json:"reference_id"`
+	ReferenceNumber  *string            `json:"reference_number"`
+	AdjustmentReason *string            `json:"adjustment_reason"`
+	ExpectedQuantity *int32             `json:"expected_quantity"`
+	ActualQuantity   *int32             `json:"actual_quantity"`
+	VarianceQuantity *int32             `json:"variance_quantity"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
 type Category struct {

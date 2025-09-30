@@ -1,6 +1,6 @@
 -- name: CreateAdjustment :one
-INSERT INTO adjustments (reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO adjustments (reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, reference_type, reference_id, adjustment_reason)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: GetAdjustment :one
@@ -60,8 +60,8 @@ RETURNING *;
 DELETE FROM adjustments WHERE id = $1;
 
 -- name: CreateAdjustmentItem :one
-INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, cost_price, reason)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, cost_price, reason, reference_type, reference_id, reference_number, adjustment_reason, expected_quantity, actual_quantity)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: GetAdjustmentItems :many

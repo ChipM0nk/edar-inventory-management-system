@@ -54,21 +54,24 @@ func (q *Queries) CountAdjustmentsWithFilter(ctx context.Context, arg *CountAdju
 }
 
 const CreateAdjustment = `-- name: CreateAdjustment :one
-INSERT INTO adjustments (reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, created_at, updated_at
+INSERT INTO adjustments (reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, reference_type, reference_id, adjustment_reason)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, reference_type, reference_id, adjustment_reason, created_at, updated_at
 `
 
 type CreateAdjustmentParams struct {
-	ReferenceNumber string             `json:"reference_number"`
-	AdjustmentDate  pgtype.Date        `json:"adjustment_date"`
-	TotalQuantity   int32              `json:"total_quantity"`
-	Reason          *string            `json:"reason"`
-	Status          string             `json:"status"`
-	CreatedBy       pgtype.UUID        `json:"created_by"`
-	ProcessedBy     pgtype.UUID        `json:"processed_by"`
-	ProcessedDate   pgtype.Timestamptz `json:"processed_date"`
-	Notes           *string            `json:"notes"`
+	ReferenceNumber  string             `json:"reference_number"`
+	AdjustmentDate   pgtype.Date        `json:"adjustment_date"`
+	TotalQuantity    int32              `json:"total_quantity"`
+	Reason           *string            `json:"reason"`
+	Status           string             `json:"status"`
+	CreatedBy        pgtype.UUID        `json:"created_by"`
+	ProcessedBy      pgtype.UUID        `json:"processed_by"`
+	ProcessedDate    pgtype.Timestamptz `json:"processed_date"`
+	Notes            *string            `json:"notes"`
+	ReferenceType    *string            `json:"reference_type"`
+	ReferenceID      pgtype.UUID        `json:"reference_id"`
+	AdjustmentReason *string            `json:"adjustment_reason"`
 }
 
 func (q *Queries) CreateAdjustment(ctx context.Context, arg *CreateAdjustmentParams) (*Adjustment, error) {
@@ -82,6 +85,9 @@ func (q *Queries) CreateAdjustment(ctx context.Context, arg *CreateAdjustmentPar
 		arg.ProcessedBy,
 		arg.ProcessedDate,
 		arg.Notes,
+		arg.ReferenceType,
+		arg.ReferenceID,
+		arg.AdjustmentReason,
 	)
 	var i Adjustment
 	err := row.Scan(
@@ -95,6 +101,9 @@ func (q *Queries) CreateAdjustment(ctx context.Context, arg *CreateAdjustmentPar
 		&i.ProcessedBy,
 		&i.ProcessedDate,
 		&i.Notes,
+		&i.ReferenceType,
+		&i.ReferenceID,
+		&i.AdjustmentReason,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -102,18 +111,24 @@ func (q *Queries) CreateAdjustment(ctx context.Context, arg *CreateAdjustmentPar
 }
 
 const CreateAdjustmentItem = `-- name: CreateAdjustmentItem :one
-INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, cost_price, reason)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, adjustment_id, product_id, warehouse_id, quantity, reason, created_at, cost_price
+INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, cost_price, reason, reference_type, reference_id, reference_number, adjustment_reason, expected_quantity, actual_quantity)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, adjustment_id, product_id, warehouse_id, quantity, cost_price, reason, reference_type, reference_id, reference_number, adjustment_reason, expected_quantity, actual_quantity, variance_quantity, created_at
 `
 
 type CreateAdjustmentItemParams struct {
-	AdjustmentID pgtype.UUID    `json:"adjustment_id"`
-	ProductID    pgtype.UUID    `json:"product_id"`
-	WarehouseID  pgtype.UUID    `json:"warehouse_id"`
-	Quantity     int32          `json:"quantity"`
-	CostPrice    pgtype.Numeric `json:"cost_price"`
-	Reason       *string        `json:"reason"`
+	AdjustmentID     pgtype.UUID    `json:"adjustment_id"`
+	ProductID        pgtype.UUID    `json:"product_id"`
+	WarehouseID      pgtype.UUID    `json:"warehouse_id"`
+	Quantity         int32          `json:"quantity"`
+	CostPrice        pgtype.Numeric `json:"cost_price"`
+	Reason           *string        `json:"reason"`
+	ReferenceType    *string        `json:"reference_type"`
+	ReferenceID      pgtype.UUID    `json:"reference_id"`
+	ReferenceNumber  *string        `json:"reference_number"`
+	AdjustmentReason *string        `json:"adjustment_reason"`
+	ExpectedQuantity *int32         `json:"expected_quantity"`
+	ActualQuantity   *int32         `json:"actual_quantity"`
 }
 
 func (q *Queries) CreateAdjustmentItem(ctx context.Context, arg *CreateAdjustmentItemParams) (*AdjustmentItem, error) {
@@ -124,6 +139,12 @@ func (q *Queries) CreateAdjustmentItem(ctx context.Context, arg *CreateAdjustmen
 		arg.Quantity,
 		arg.CostPrice,
 		arg.Reason,
+		arg.ReferenceType,
+		arg.ReferenceID,
+		arg.ReferenceNumber,
+		arg.AdjustmentReason,
+		arg.ExpectedQuantity,
+		arg.ActualQuantity,
 	)
 	var i AdjustmentItem
 	err := row.Scan(
@@ -132,9 +153,16 @@ func (q *Queries) CreateAdjustmentItem(ctx context.Context, arg *CreateAdjustmen
 		&i.ProductID,
 		&i.WarehouseID,
 		&i.Quantity,
-		&i.Reason,
-		&i.CreatedAt,
 		&i.CostPrice,
+		&i.Reason,
+		&i.ReferenceType,
+		&i.ReferenceID,
+		&i.ReferenceNumber,
+		&i.AdjustmentReason,
+		&i.ExpectedQuantity,
+		&i.ActualQuantity,
+		&i.VarianceQuantity,
+		&i.CreatedAt,
 	)
 	return &i, err
 }
@@ -167,7 +195,7 @@ func (q *Queries) DeleteAdjustmentItemsByAdjustmentId(ctx context.Context, adjus
 }
 
 const GetAdjustment = `-- name: GetAdjustment :one
-SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, 
+SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.reference_type, a.reference_id, a.adjustment_reason, a.created_at, a.updated_at, 
        u.first_name as created_by_first_name, u.last_name as created_by_last_name,
        p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
 FROM adjustments a
@@ -187,6 +215,9 @@ type GetAdjustmentRow struct {
 	ProcessedBy          pgtype.UUID        `json:"processed_by"`
 	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
 	Notes                *string            `json:"notes"`
+	ReferenceType        *string            `json:"reference_type"`
+	ReferenceID          pgtype.UUID        `json:"reference_id"`
+	AdjustmentReason     *string            `json:"adjustment_reason"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 	CreatedByFirstName   *string            `json:"created_by_first_name"`
@@ -209,6 +240,9 @@ func (q *Queries) GetAdjustment(ctx context.Context, id pgtype.UUID) (*GetAdjust
 		&i.ProcessedBy,
 		&i.ProcessedDate,
 		&i.Notes,
+		&i.ReferenceType,
+		&i.ReferenceID,
+		&i.AdjustmentReason,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CreatedByFirstName,
@@ -220,7 +254,7 @@ func (q *Queries) GetAdjustment(ctx context.Context, id pgtype.UUID) (*GetAdjust
 }
 
 const GetAdjustmentByReferenceNumber = `-- name: GetAdjustmentByReferenceNumber :one
-SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, 
+SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.reference_type, a.reference_id, a.adjustment_reason, a.created_at, a.updated_at, 
        u.first_name as created_by_first_name, u.last_name as created_by_last_name,
        p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
 FROM adjustments a
@@ -240,6 +274,9 @@ type GetAdjustmentByReferenceNumberRow struct {
 	ProcessedBy          pgtype.UUID        `json:"processed_by"`
 	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
 	Notes                *string            `json:"notes"`
+	ReferenceType        *string            `json:"reference_type"`
+	ReferenceID          pgtype.UUID        `json:"reference_id"`
+	AdjustmentReason     *string            `json:"adjustment_reason"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 	CreatedByFirstName   *string            `json:"created_by_first_name"`
@@ -262,6 +299,9 @@ func (q *Queries) GetAdjustmentByReferenceNumber(ctx context.Context, referenceN
 		&i.ProcessedBy,
 		&i.ProcessedDate,
 		&i.Notes,
+		&i.ReferenceType,
+		&i.ReferenceID,
+		&i.AdjustmentReason,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CreatedByFirstName,
@@ -273,7 +313,7 @@ func (q *Queries) GetAdjustmentByReferenceNumber(ctx context.Context, referenceN
 }
 
 const GetAdjustmentItems = `-- name: GetAdjustmentItems :many
-SELECT ai.id, ai.adjustment_id, ai.product_id, ai.warehouse_id, ai.quantity, ai.reason, ai.created_at, ai.cost_price, 
+SELECT ai.id, ai.adjustment_id, ai.product_id, ai.warehouse_id, ai.quantity, ai.cost_price, ai.reason, ai.reference_type, ai.reference_id, ai.reference_number, ai.adjustment_reason, ai.expected_quantity, ai.actual_quantity, ai.variance_quantity, ai.created_at, 
        p.name as product_name, p.sku as product_sku,
        w.name as warehouse_name
 FROM adjustment_items ai
@@ -284,17 +324,24 @@ ORDER BY ai.created_at
 `
 
 type GetAdjustmentItemsRow struct {
-	ID            pgtype.UUID        `json:"id"`
-	AdjustmentID  pgtype.UUID        `json:"adjustment_id"`
-	ProductID     pgtype.UUID        `json:"product_id"`
-	WarehouseID   pgtype.UUID        `json:"warehouse_id"`
-	Quantity      int32              `json:"quantity"`
-	Reason        *string            `json:"reason"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	CostPrice     pgtype.Numeric     `json:"cost_price"`
-	ProductName   string             `json:"product_name"`
-	ProductSku    string             `json:"product_sku"`
-	WarehouseName string             `json:"warehouse_name"`
+	ID               pgtype.UUID        `json:"id"`
+	AdjustmentID     pgtype.UUID        `json:"adjustment_id"`
+	ProductID        pgtype.UUID        `json:"product_id"`
+	WarehouseID      pgtype.UUID        `json:"warehouse_id"`
+	Quantity         int32              `json:"quantity"`
+	CostPrice        pgtype.Numeric     `json:"cost_price"`
+	Reason           *string            `json:"reason"`
+	ReferenceType    *string            `json:"reference_type"`
+	ReferenceID      pgtype.UUID        `json:"reference_id"`
+	ReferenceNumber  *string            `json:"reference_number"`
+	AdjustmentReason *string            `json:"adjustment_reason"`
+	ExpectedQuantity *int32             `json:"expected_quantity"`
+	ActualQuantity   *int32             `json:"actual_quantity"`
+	VarianceQuantity *int32             `json:"variance_quantity"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	ProductName      string             `json:"product_name"`
+	ProductSku       string             `json:"product_sku"`
+	WarehouseName    string             `json:"warehouse_name"`
 }
 
 func (q *Queries) GetAdjustmentItems(ctx context.Context, adjustmentID pgtype.UUID) ([]*GetAdjustmentItemsRow, error) {
@@ -312,9 +359,16 @@ func (q *Queries) GetAdjustmentItems(ctx context.Context, adjustmentID pgtype.UU
 			&i.ProductID,
 			&i.WarehouseID,
 			&i.Quantity,
-			&i.Reason,
-			&i.CreatedAt,
 			&i.CostPrice,
+			&i.Reason,
+			&i.ReferenceType,
+			&i.ReferenceID,
+			&i.ReferenceNumber,
+			&i.AdjustmentReason,
+			&i.ExpectedQuantity,
+			&i.ActualQuantity,
+			&i.VarianceQuantity,
+			&i.CreatedAt,
 			&i.ProductName,
 			&i.ProductSku,
 			&i.WarehouseName,
@@ -330,7 +384,7 @@ func (q *Queries) GetAdjustmentItems(ctx context.Context, adjustmentID pgtype.UU
 }
 
 const ListAdjustments = `-- name: ListAdjustments :many
-SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, 
+SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.reference_type, a.reference_id, a.adjustment_reason, a.created_at, a.updated_at, 
        u.first_name as created_by_first_name, u.last_name as created_by_last_name,
        p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
 FROM adjustments a
@@ -356,6 +410,9 @@ type ListAdjustmentsRow struct {
 	ProcessedBy          pgtype.UUID        `json:"processed_by"`
 	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
 	Notes                *string            `json:"notes"`
+	ReferenceType        *string            `json:"reference_type"`
+	ReferenceID          pgtype.UUID        `json:"reference_id"`
+	AdjustmentReason     *string            `json:"adjustment_reason"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 	CreatedByFirstName   *string            `json:"created_by_first_name"`
@@ -384,6 +441,9 @@ func (q *Queries) ListAdjustments(ctx context.Context, arg *ListAdjustmentsParam
 			&i.ProcessedBy,
 			&i.ProcessedDate,
 			&i.Notes,
+			&i.ReferenceType,
+			&i.ReferenceID,
+			&i.AdjustmentReason,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CreatedByFirstName,
@@ -402,7 +462,7 @@ func (q *Queries) ListAdjustments(ctx context.Context, arg *ListAdjustmentsParam
 }
 
 const ListAdjustmentsWithFilter = `-- name: ListAdjustmentsWithFilter :many
-SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, 
+SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.reference_type, a.reference_id, a.adjustment_reason, a.created_at, a.updated_at, 
        u.first_name as created_by_first_name, u.last_name as created_by_last_name,
        p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
 FROM adjustments a
@@ -438,6 +498,9 @@ type ListAdjustmentsWithFilterRow struct {
 	ProcessedBy          pgtype.UUID        `json:"processed_by"`
 	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
 	Notes                *string            `json:"notes"`
+	ReferenceType        *string            `json:"reference_type"`
+	ReferenceID          pgtype.UUID        `json:"reference_id"`
+	AdjustmentReason     *string            `json:"adjustment_reason"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 	CreatedByFirstName   *string            `json:"created_by_first_name"`
@@ -474,6 +537,9 @@ func (q *Queries) ListAdjustmentsWithFilter(ctx context.Context, arg *ListAdjust
 			&i.ProcessedBy,
 			&i.ProcessedDate,
 			&i.Notes,
+			&i.ReferenceType,
+			&i.ReferenceID,
+			&i.AdjustmentReason,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CreatedByFirstName,
@@ -496,7 +562,7 @@ UPDATE adjustments
 SET reference_number = $2, adjustment_date = $3, total_quantity = $4, reason = $5, 
     status = $6, processed_by = $7, processed_date = $8, notes = $9, updated_at = NOW()
 WHERE id = $1
-RETURNING id, reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, created_at, updated_at
+RETURNING id, reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, reference_type, reference_id, adjustment_reason, created_at, updated_at
 `
 
 type UpdateAdjustmentParams struct {
@@ -535,6 +601,9 @@ func (q *Queries) UpdateAdjustment(ctx context.Context, arg *UpdateAdjustmentPar
 		&i.ProcessedBy,
 		&i.ProcessedDate,
 		&i.Notes,
+		&i.ReferenceType,
+		&i.ReferenceID,
+		&i.AdjustmentReason,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -545,7 +614,7 @@ const UpdateAdjustmentItem = `-- name: UpdateAdjustmentItem :one
 UPDATE adjustment_items 
 SET product_id = $2, warehouse_id = $3, quantity = $4, cost_price = $5, reason = $6
 WHERE id = $1
-RETURNING id, adjustment_id, product_id, warehouse_id, quantity, reason, created_at, cost_price
+RETURNING id, adjustment_id, product_id, warehouse_id, quantity, cost_price, reason, reference_type, reference_id, reference_number, adjustment_reason, expected_quantity, actual_quantity, variance_quantity, created_at
 `
 
 type UpdateAdjustmentItemParams struct {
@@ -573,9 +642,16 @@ func (q *Queries) UpdateAdjustmentItem(ctx context.Context, arg *UpdateAdjustmen
 		&i.ProductID,
 		&i.WarehouseID,
 		&i.Quantity,
-		&i.Reason,
-		&i.CreatedAt,
 		&i.CostPrice,
+		&i.Reason,
+		&i.ReferenceType,
+		&i.ReferenceID,
+		&i.ReferenceNumber,
+		&i.AdjustmentReason,
+		&i.ExpectedQuantity,
+		&i.ActualQuantity,
+		&i.VarianceQuantity,
+		&i.CreatedAt,
 	)
 	return &i, err
 }

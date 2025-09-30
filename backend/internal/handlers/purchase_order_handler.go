@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"inventory-system/internal/models"
 	"inventory-system/internal/services"
 	"net/http"
@@ -65,24 +66,31 @@ func (h *PurchaseOrderHandler) ListPurchaseOrders(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "10")
 	offsetStr := c.DefaultQuery("offset", "0")
 
+	fmt.Printf("ListPurchaseOrders handler called with limit=%s, offset=%s\n", limitStr, offsetStr)
+
 	limit, err := strconv.ParseInt(limitStr, 10, 32)
 	if err != nil {
+		fmt.Printf("Invalid limit parameter: %s\n", limitStr)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
 		return
 	}
 
 	offset, err := strconv.ParseInt(offsetStr, 10, 32)
 	if err != nil {
+		fmt.Printf("Invalid offset parameter: %s\n", offsetStr)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offset parameter"})
 		return
 	}
 
+	fmt.Printf("Calling service with limit=%d, offset=%d\n", limit, offset)
 	purchaseOrders, err := h.purchaseOrderService.ListPurchaseOrders(int32(limit), int32(offset))
 	if err != nil {
+		fmt.Printf("Service error: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve purchase orders"})
 		return
 	}
 
+	fmt.Printf("Handler returning %d purchase orders\n", len(purchaseOrders))
 	c.JSON(http.StatusOK, purchaseOrders)
 }
 
