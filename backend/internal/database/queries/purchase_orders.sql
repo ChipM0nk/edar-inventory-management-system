@@ -7,7 +7,7 @@ RETURNING *;
 SELECT po.*, u.first_name, u.last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
-WHERE po.id = $1;
+WHERE po.id = $1 AND po.status != 'cancelled';
 
 -- name: ListPurchaseOrders :many
 SELECT po.*, u.first_name, u.last_name

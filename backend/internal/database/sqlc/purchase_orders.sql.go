@@ -128,7 +128,7 @@ const GetPurchaseOrder = `-- name: GetPurchaseOrder :one
 SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, u.first_name, u.last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
-WHERE po.id = $1
+WHERE po.id = $1 AND po.status != 'cancelled'
 `
 
 type GetPurchaseOrderRow struct {
