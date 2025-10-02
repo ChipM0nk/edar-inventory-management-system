@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, FileText, Hash, AlertTriangle } from 'lucide-react'
+import { Plus, Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, FileText, Hash, AlertTriangle, Upload, X, File } from 'lucide-react'
 import api from '@/lib/api'
 
 interface Product {
@@ -89,10 +89,20 @@ export default function AdjustmentsPage() {
   const [adjustmentCostPrice, setAdjustmentCostPrice] = useState('')
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract'>('add')
   const [adjustmentReason, setAdjustmentReason] = useState('')
+  const [adjustmentReasonOther, setAdjustmentReasonOther] = useState('')
   const [adjustmentDate, setAdjustmentDate] = useState(new Date().toISOString().split('T')[0])
   const [currentStockLevel, setCurrentStockLevel] = useState<number | null>(null)
   const [isCheckingStock, setIsCheckingStock] = useState(false)
   const [generatedReferenceNumber, setGeneratedReferenceNumber] = useState<string | null>(null)
+  
+  // Product search state
+  const [productSearchTerm, setProductSearchTerm] = useState('')
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
+  const [showProductDropdown, setShowProductDropdown] = useState(false)
+  
+  // Document upload state
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
   
   // Reference fields for PO/SO connections
   const [referenceType, setReferenceType] = useState<string>('')
@@ -118,6 +128,19 @@ export default function AdjustmentsPage() {
       loadSalesOrders()
     }
   }, [user])
+
+  // Filter products based on search term
+  useEffect(() => {
+    if (productSearchTerm.trim() === '') {
+      setFilteredProducts(products)
+    } else {
+      const filtered = products.filter(product =>
+        product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+        product.sku.toLowerCase().includes(productSearchTerm.toLowerCase())
+      )
+      setFilteredProducts(filtered)
+    }
+  }, [productSearchTerm, products])
 
   // Fetch current stock when both product and warehouse are selected
   useEffect(() => {
@@ -293,6 +316,7 @@ export default function AdjustmentsPage() {
     setAdjustmentCostPrice('')
     setAdjustmentType('add')
     setAdjustmentReason('')
+    setAdjustmentReasonOther('')
     setAdjustmentDate(new Date().toISOString().split('T')[0])
     setSelectedProduct(null)
     setSelectedWarehouse(null)
@@ -303,6 +327,12 @@ export default function AdjustmentsPage() {
     setReferenceId('')
     setReferenceNumber('')
     setAdjustmentReasonType('')
+    // Reset product search
+    setProductSearchTerm('')
+    setShowProductDropdown(false)
+    // Reset document upload
+    setUploadedFiles([])
+    setIsUploadingDocuments(false)
   }
 
   const handleAdjustmentClick = (adjustment: Adjustment) => {
@@ -331,7 +361,9 @@ export default function AdjustmentsPage() {
   const handleAddItem = async () => {
     const quantity = parseInt(adjustmentQuantity)
     const costPrice = parseFloat(adjustmentCostPrice)
-    if (!selectedProduct || !selectedWarehouse || !adjustmentQuantity.trim() || quantity <= 0 || !adjustmentCostPrice.trim() || costPrice < 0 || !adjustmentReason.trim()) {
+    const finalReason = adjustmentReason === 'Other' ? adjustmentReasonOther.trim() : adjustmentReason
+    
+    if (!selectedProduct || !selectedWarehouse || !adjustmentQuantity.trim() || quantity <= 0 || !adjustmentCostPrice.trim() || costPrice < 0 || !finalReason) {
       alert('Please fill in all required fields with valid values')
       return
     }
@@ -367,7 +399,7 @@ export default function AdjustmentsPage() {
       warehouse_name: selectedWarehouse.name,
       quantity: finalQuantity,
       cost_price: costPrice,
-      reason: adjustmentReason
+      reason: finalReason
     }
 
     setAdjustmentItems([...adjustmentItems, newItem])
@@ -379,11 +411,34 @@ export default function AdjustmentsPage() {
     setAdjustmentCostPrice('')
     setAdjustmentType('add')
     setAdjustmentReason('')
+    setAdjustmentReasonOther('')
     setCurrentStockLevel(null)
+    setProductSearchTerm('')
+    setShowProductDropdown(false)
   }
 
   const handleRemoveItem = (index: number) => {
     setAdjustmentItems(adjustmentItems.filter((_, i) => i !== index))
+  }
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      const newFiles = Array.from(files)
+      setUploadedFiles(prev => [...prev, ...newFiles])
+    }
+  }
+
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
   const handleCreateAdjustment = async () => {
@@ -433,7 +488,36 @@ export default function AdjustmentsPage() {
 
       console.log('Sending adjustment payload:', adjustmentPayload)
       
-      await api.post('/adjustments', adjustmentPayload)
+      const adjustmentResponse = await api.post('/adjustments', adjustmentPayload)
+      const createdAdjustmentId = adjustmentResponse.data?.id
+
+      // Upload documents if any
+      if (uploadedFiles.length > 0 && createdAdjustmentId) {
+        try {
+          setIsUploadingDocuments(true)
+          
+          const formData = new FormData()
+          uploadedFiles.forEach((file) => {
+            formData.append('documents', file)
+          })
+          formData.append('reference_type', 'adjustment')
+          formData.append('reference_id', createdAdjustmentId)
+
+          await api.post('/documents/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          })
+          
+          console.log('Documents uploaded successfully')
+        } catch (documentError) {
+          console.error('Error uploading documents:', documentError)
+          // Don't fail the entire adjustment creation if document upload fails
+          alert('Adjustment created successfully, but some documents failed to upload. You can try uploading them later.')
+        } finally {
+          setIsUploadingDocuments(false)
+        }
+      }
 
       // Reset form and close modal
       resetForm()
@@ -442,7 +526,7 @@ export default function AdjustmentsPage() {
       // Reload adjustments
       await loadAdjustments()
       
-      alert(`Adjustment created successfully!\nReference Number: ${referenceNumber}`)
+      alert(`Adjustment created successfully!\nReference Number: ${referenceNumber}${uploadedFiles.length > 0 ? `\nDocuments uploaded: ${uploadedFiles.length}` : ''}`)
     } catch (error: any) {
       console.error('Error creating adjustment:', error)
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
@@ -812,114 +896,6 @@ export default function AdjustmentsPage() {
               </div>
             </div>
 
-            {/* Reference Fields for PO/SO Connections */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Reference Information (Optional)</CardTitle>
-                <CardDescription>
-                  Link this adjustment to a Purchase Order or Sales Order for better tracking
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="reference-type">Reference Type</Label>
-                    <Select value={referenceType} onValueChange={setReferenceType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select reference type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="purchase_order">Purchase Order</SelectItem>
-                        <SelectItem value="sales_order">Sales Order</SelectItem>
-                        <SelectItem value="cycle_count">Cycle Count</SelectItem>
-                        <SelectItem value="damage">Damage</SelectItem>
-                        <SelectItem value="theft">Theft</SelectItem>
-                        <SelectItem value="expired">Expired</SelectItem>
-                        <SelectItem value="transfer">Transfer</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="adjustment-reason">Adjustment Reason</Label>
-                    <Select value={adjustmentReasonType} onValueChange={setAdjustmentReasonType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select reason" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="receiving_discrepancy">Receiving Discrepancy</SelectItem>
-                        <SelectItem value="damaged_goods">Damaged Goods</SelectItem>
-                        <SelectItem value="quality_issue">Quality Issue</SelectItem>
-                        <SelectItem value="short_shipment">Short Shipment</SelectItem>
-                        <SelectItem value="over_shipment">Over Shipment</SelectItem>
-                        <SelectItem value="customer_return">Customer Return</SelectItem>
-                        <SelectItem value="defective_return">Defective Return</SelectItem>
-                        <SelectItem value="exchange">Exchange</SelectItem>
-                        <SelectItem value="warranty_replacement">Warranty Replacement</SelectItem>
-                        <SelectItem value="cycle_count_correction">Cycle Count Correction</SelectItem>
-                        <SelectItem value="theft_loss">Theft Loss</SelectItem>
-                        <SelectItem value="expired_product">Expired Product</SelectItem>
-                        <SelectItem value="storage_damage">Storage Damage</SelectItem>
-                        <SelectItem value="transfer_correction">Transfer Correction</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {referenceType === 'purchase_order' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="purchase-order">Purchase Order</Label>
-                    <Select value={referenceId} onValueChange={(value) => {
-                      setReferenceId(value)
-                      const po = purchaseOrders.find(po => po.id === value)
-                      setReferenceNumber(po?.po_number || '')
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Purchase Order" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {purchaseOrders.length > 0 ? (
-                          purchaseOrders.map((po) => (
-                            <SelectItem key={po.id} value={po.id}>
-                              {po.po_number} - {po.supplier_name} ({po.status})
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-orders" disabled>
-                            No purchase orders available
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {referenceType === 'sales_order' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="sales-order">Sales Order</Label>
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <p className="text-sm text-yellow-800">
-                        Sales Order integration coming soon. Please use "Other" reference type for now.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {referenceType && referenceType !== 'purchase_order' && referenceType !== 'sales_order' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="reference-number">Reference Number</Label>
-                    <Input
-                      id="reference-number"
-                      value={referenceNumber}
-                      onChange={(e) => setReferenceNumber(e.target.value)}
-                      placeholder="Enter reference number"
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             {/* Add Item Form */}
             <Card>
@@ -927,6 +903,17 @@ export default function AdjustmentsPage() {
                 <CardTitle className="text-lg">Add Adjustment Item</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reference">Reference</Label>
+                  <Input
+                    id="reference"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    placeholder="PO, Sales, Transfer, etc."
+                  />
+                  <p className="text-xs text-gray-500">Link to related document or transaction for tracking purposes</p>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Warehouse *</Label>
@@ -951,26 +938,60 @@ export default function AdjustmentsPage() {
                   
                   <div className="space-y-2">
                     <Label>Product *</Label>
-                    <Select 
-                      value={selectedProduct?.id || ''} 
-                      onValueChange={(value) => {
-                        const product = products.find(p => p.id === value)
-                        setSelectedProduct(product || null)
-                        // Stock will be fetched automatically by useEffect when both product and warehouse are selected
-                      }}
-                      disabled={!selectedWarehouse}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={selectedWarehouse ? "Select a product" : "Select warehouse first"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} ({product.sku})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <Input
+                        value={selectedProduct ? `${selectedProduct.name} (${selectedProduct.sku})` : productSearchTerm}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setProductSearchTerm(value)
+                          setSelectedProduct(null)
+                          setShowProductDropdown(true)
+                          setCurrentStockLevel(null)
+                        }}
+                        onFocus={() => {
+                          if (selectedWarehouse) {
+                            setShowProductDropdown(true)
+                          }
+                        }}
+                        onBlur={() => {
+                          // Delay hiding dropdown to allow for selection
+                          setTimeout(() => setShowProductDropdown(false), 200)
+                        }}
+                        placeholder={selectedWarehouse ? "Search products by name or SKU..." : "Select warehouse first"}
+                        disabled={!selectedWarehouse}
+                        className="pr-8"
+                      />
+                      <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      
+                      {/* Dropdown with filtered products */}
+                      {showProductDropdown && selectedWarehouse && filteredProducts.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          {filteredProducts.map((product) => (
+                            <div
+                              key={product.id}
+                              className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onClick={() => {
+                                setSelectedProduct(product)
+                                setProductSearchTerm('')
+                                setShowProductDropdown(false)
+                              }}
+                            >
+                              <div className="font-medium text-gray-900">{product.name}</div>
+                              <div className="text-sm text-gray-500">SKU: {product.sku}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* No results message */}
+                      {showProductDropdown && selectedWarehouse && productSearchTerm && filteredProducts.length === 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                          <div className="text-sm text-gray-500 text-center">
+                            No products found matching "{productSearchTerm}"
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     {!selectedWarehouse && (
                       <p className="text-sm text-gray-500">Please select a warehouse first</p>
                     )}
@@ -1069,12 +1090,37 @@ export default function AdjustmentsPage() {
                     
                     <div className="space-y-2">
                       <Label htmlFor="reason">Reason *</Label>
-                      <Input
-                        id="reason"
-                        value={adjustmentReason}
-                        onChange={(e) => setAdjustmentReason(e.target.value)}
-                        placeholder="Reason for adjustment"
-                      />
+                      <Select value={adjustmentReason} onValueChange={setAdjustmentReason}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select reason" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Damaged Goods">Damaged Goods</SelectItem>
+                          <SelectItem value="Expired Products">Expired Products</SelectItem>
+                          <SelectItem value="Lost Inventory">Lost Inventory</SelectItem>
+                          <SelectItem value="Found Inventory">Found Inventory</SelectItem>
+                          <SelectItem value="Supplier Return">Supplier Return</SelectItem>
+                          <SelectItem value="Customer Return">Customer Return</SelectItem>
+                          <SelectItem value="Quality Issues">Quality Issues</SelectItem>
+                          <SelectItem value="Theft">Theft</SelectItem>
+                          <SelectItem value="Cycle Count Adjustment">Cycle Count Adjustment</SelectItem>
+                          <SelectItem value="Transfer Error">Transfer Error</SelectItem>
+                          <SelectItem value="System Error">System Error</SelectItem>
+                          <SelectItem value="Receiving Discrepancy">Receiving Discrepancy</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {/* Other reason text field */}
+                      {adjustmentReason === 'Other' && (
+                        <div className="mt-2">
+                          <Input
+                            value={adjustmentReasonOther}
+                            onChange={(e) => setAdjustmentReasonOther(e.target.value)}
+                            placeholder="Please specify the reason"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1189,6 +1235,66 @@ export default function AdjustmentsPage() {
               </Card>
             )}
 
+            {/* Document Upload Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Supporting Documents (Optional)
+                </CardTitle>
+                <CardDescription>
+                  Upload receipts, invoices, or other supporting documents for this adjustment
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="document-upload"
+                  />
+                  <label htmlFor="document-upload" className="cursor-pointer">
+                    <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm font-medium text-gray-600">Click to upload documents</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Supports PDF, Images, Word, Excel files (Max 10MB each)
+                    </p>
+                  </label>
+                </div>
+
+                {/* Uploaded Files List */}
+                {uploadedFiles.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Uploaded Files ({uploadedFiles.length})</Label>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {uploadedFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                              <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveFile(index)}
+                            className="text-red-600 hover:text-red-800 h-8 w-8 p-0 flex-shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Action Buttons */}
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => {
@@ -1199,10 +1305,10 @@ export default function AdjustmentsPage() {
               </Button>
               <Button 
                 onClick={handleCreateAdjustment}
-                disabled={adjustmentItems.length === 0}
+                disabled={adjustmentItems.length === 0 || isUploadingDocuments}
                 className="bg-[#52a852] hover:bg-[#4a964a] text-white"
               >
-                Create Adjustment
+                {isUploadingDocuments ? 'Uploading Documents...' : 'Create Adjustment'}
               </Button>
             </div>
           </div>

@@ -169,6 +169,7 @@ func main() {
 			{
 				documents.POST("/upload", documentHandler.UploadDocuments)
 				documents.GET("/purchase-order/:purchase_order_id", documentHandler.GetDocuments)
+				documents.GET("/by-reference/:reference_type/:reference_id", documentHandler.GetDocumentsByReference)
 				documents.GET("/:id/download", documentHandler.DownloadDocument)
 				documents.POST("/:id/validate", documentHandler.ValidateDocument)
 				documents.GET("/:id/validation-status", documentHandler.GetDocumentValidationStatus)

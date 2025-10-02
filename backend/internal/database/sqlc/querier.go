@@ -62,6 +62,7 @@ type Querier interface {
 	GetCategoryByName(ctx context.Context, name string) (*Category, error)
 	GetDocumentByID(ctx context.Context, id pgtype.UUID) (*Document, error)
 	GetDocumentsByPurchaseOrder(ctx context.Context, purchaseOrderID pgtype.UUID) ([]*Document, error)
+	GetDocumentsByReference(ctx context.Context, arg *GetDocumentsByReferenceParams) ([]*Document, error)
 	GetLowStockItems(ctx context.Context) ([]*GetLowStockItemsRow, error)
 	GetProduct(ctx context.Context, id pgtype.UUID) (*Product, error)
 	GetProductBySKU(ctx context.Context, sku string) (*Product, error)

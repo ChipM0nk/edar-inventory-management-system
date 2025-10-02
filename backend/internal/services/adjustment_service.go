@@ -38,13 +38,11 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 		AdjustmentDate:   utils.TimeToPgxDate(req.AdjustmentDate),
 		TotalQuantity:    int32(req.TotalQuantity),
 		Reason:           req.Reason,
-		Notes:            req.Notes,
 		Status:           "completed", // Auto-complete adjustments
 		CreatedBy:        utils.UUIDToPgxUUID(req.CreatedBy),
 		ProcessedBy:      utils.UUIDToPgxUUID(req.CreatedBy), // Set processed by to creator
-		ReferenceType:    req.ReferenceType,
-		ReferenceID:      utils.UUIDToPgxUUIDPtr(req.ReferenceID),
-		AdjustmentReason: req.AdjustmentReason,
+		ProcessedDate:    utils.TimeToPgxTimestamptz(req.AdjustmentDate),
+		Notes:            req.Notes,
 	}
 
 	adjustment, err := s.db.Queries.WithTx(tx).CreateAdjustment(ctx, &adjustmentParams)
@@ -59,14 +57,7 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 			ProductID:        utils.UUIDToPgxUUID(item.ProductID),
 			WarehouseID:      utils.UUIDToPgxUUID(item.WarehouseID),
 			Quantity:         int32(item.Quantity),
-			CostPrice:        utils.Float64ToPgxNumeric(item.CostPrice),
 			Reason:           item.Reason,
-			ReferenceType:    item.ReferenceType,
-			ReferenceID:      utils.UUIDToPgxUUIDPtr(item.ReferenceID),
-			ReferenceNumber:  item.ReferenceNumber,
-			AdjustmentReason: item.AdjustmentReason,
-			ExpectedQuantity: utils.OptionalIntToInt32Ptr(item.ExpectedQuantity),
-			ActualQuantity:   utils.OptionalIntToInt32Ptr(item.ActualQuantity),
 		}
 
 		_, err := s.db.Queries.WithTx(tx).CreateAdjustmentItem(ctx, &itemParams)
@@ -84,7 +75,7 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 	return s.convertToAdjustmentModelFromAdjustment(adjustment), nil
 }
 
-// GetAdjustment retrieves an adjustment by ID
+// GetAdjustment retrieves an adjustment by ID with its items
 func (s *AdjustmentService) GetAdjustment(id uuid.UUID) (*models.Adjustment, error) {
 	ctx := context.Background()
 	adjustment, err := s.db.Queries.GetAdjustment(ctx, utils.UUIDToPgxUUID(id))
@@ -92,7 +83,33 @@ func (s *AdjustmentService) GetAdjustment(id uuid.UUID) (*models.Adjustment, err
 		return nil, err
 	}
 
-	return s.convertToAdjustmentModel(*adjustment), nil
+	// Get adjustment items
+	items, err := s.db.Queries.GetAdjustmentItems(ctx, utils.UUIDToPgxUUID(id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get adjustment items: %w", err)
+	}
+
+	adjustmentModel := s.convertToAdjustmentModel(*adjustment)
+	
+	// Convert items to models
+	adjustmentItems := make([]models.AdjustmentItem, len(items))
+	for i, item := range items {
+		adjustmentItems[i] = models.AdjustmentItem{
+			ID:            utils.PgxUUIDToUUID(item.ID),
+			AdjustmentID:  utils.PgxUUIDToUUID(item.AdjustmentID),
+			ProductID:     utils.PgxUUIDToUUID(item.ProductID),
+			WarehouseID:   utils.PgxUUIDToUUID(item.WarehouseID),
+			Quantity:      int(item.Quantity),
+			Reason:        item.Reason,
+			CreatedAt:     utils.PgxTimestamptzToTime(item.CreatedAt),
+			ProductName:   &item.ProductName,
+			ProductSKU:    &item.ProductSku,
+			WarehouseName: &item.WarehouseName,
+		}
+	}
+	
+	adjustmentModel.Items = adjustmentItems
+	return adjustmentModel, nil
 }
 
 // ListAdjustments retrieves adjustments with pagination

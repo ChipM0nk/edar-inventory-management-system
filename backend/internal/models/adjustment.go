@@ -28,6 +28,8 @@ type Adjustment struct {
 	CreatedByLastName   *string `json:"created_by_last_name,omitempty" db:"created_by_last_name"`
 	ProcessedByFirstName *string `json:"processed_by_first_name,omitempty" db:"processed_by_first_name"`
 	ProcessedByLastName  *string `json:"processed_by_last_name,omitempty" db:"processed_by_last_name"`
+	// Items
+	Items               []AdjustmentItem `json:"items,omitempty"`
 }
 
 type AdjustmentItem struct {

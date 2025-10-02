@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Helper function to safely get string value from pointer
@@ -31,10 +32,18 @@ func NewDocumentService(db *database.DB) *DocumentService {
 	}
 }
 
-func (s *DocumentService) CreateDocument(purchaseOrderID, fileName, filePath string, fileSize int64, fileType string) (*models.Document, error) {
+func (s *DocumentService) CreateDocument(referenceType, referenceID, fileName, filePath string, fileSize int64, fileType string) (*models.Document, error) {
 	ctx := context.Background()
+	
+	var purchaseOrderIDPgx pgtype.UUID
+	if referenceType == "purchase_order" {
+		purchaseOrderIDPgx = utils.UUIDToPgxUUID(uuid.MustParse(referenceID))
+	}
+	
 	doc, err := s.db.CreateDocument(ctx, &sqlc.CreateDocumentParams{
-		PurchaseOrderID: utils.UUIDToPgxUUID(uuid.MustParse(purchaseOrderID)),
+		PurchaseOrderID: purchaseOrderIDPgx,
+		ReferenceType:   &referenceType,
+		ReferenceID:     utils.UUIDToPgxUUID(uuid.MustParse(referenceID)),
 		FileName:        fileName,
 		FilePath:        filePath,
 		FileSize:        fileSize,
@@ -59,6 +68,38 @@ func (s *DocumentService) CreateDocument(purchaseOrderID, fileName, filePath str
 		ValidationStatus: getStringValue(doc.ValidationStatus),
 		ValidationNotes:  doc.ValidationNotes,
 	}, nil
+}
+
+func (s *DocumentService) GetDocumentsByReference(referenceType, referenceID string) ([]models.Document, error) {
+	ctx := context.Background()
+	docs, err := s.db.GetDocumentsByReference(ctx, &sqlc.GetDocumentsByReferenceParams{
+		ReferenceType: &referenceType,
+		ReferenceID:   utils.UUIDToPgxUUID(uuid.MustParse(referenceID)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]models.Document, len(docs))
+	for i, doc := range docs {
+		result[i] = models.Document{
+			ID:              utils.PgxUUIDToUUID(doc.ID).String(),
+			PurchaseOrderID: utils.PgxUUIDToUUID(doc.PurchaseOrderID).String(),
+			FileName:        doc.FileName,
+			FilePath:        doc.FilePath,
+			FileSize:        doc.FileSize,
+			FileType:        doc.FileType,
+			UploadedAt:      utils.PgxTimestamptzToTime(doc.UploadedAt),
+			CreatedAt:       utils.PgxTimestamptzToTime(doc.CreatedAt),
+			UpdatedAt:       utils.PgxTimestamptzToTime(doc.UpdatedAt),
+			HasPOReference:  doc.HasPoReference,
+			HasMatchingDate: doc.HasMatchingDate,
+			ValidationStatus: getStringValue(doc.ValidationStatus),
+			ValidationNotes:  doc.ValidationNotes,
+		}
+	}
+
+	return result, nil
 }
 
 func (s *DocumentService) GetDocumentsByPurchaseOrder(purchaseOrderID string) ([]models.Document, error) {

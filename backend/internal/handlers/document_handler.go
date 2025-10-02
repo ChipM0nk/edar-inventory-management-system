@@ -48,11 +48,36 @@ func NewDocumentHandler(documentService *services.DocumentService) *DocumentHand
 	}
 }
 
-// UploadDocuments handles document upload for a purchase order
+// UploadDocuments handles document upload for purchase orders or adjustments
 func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
-	purchaseOrderID := c.PostForm("purchase_order_id")
-	if purchaseOrderID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Purchase order ID is required"})
+	referenceType := c.PostForm("reference_type")
+	referenceID := c.PostForm("reference_id")
+	
+	// Support legacy purchase_order_id parameter for backward compatibility
+	if referenceType == "" && referenceID == "" {
+		purchaseOrderID := c.PostForm("purchase_order_id")
+		if purchaseOrderID != "" {
+			referenceType = "purchase_order"
+			referenceID = purchaseOrderID
+		}
+	}
+	
+	if referenceType == "" || referenceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reference type and ID are required"})
+		return
+	}
+	
+	// Validate reference type
+	validTypes := []string{"purchase_order", "adjustment"}
+	isValidType := false
+	for _, validType := range validTypes {
+		if referenceType == validType {
+			isValidType = true
+			break
+		}
+	}
+	if !isValidType {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reference type. Must be 'purchase_order' or 'adjustment'"})
 		return
 	}
 
@@ -76,7 +101,7 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		year := now.Format("2006")
 		month := now.Format("01")
 		
-		// Create directory structure: /po/year/month/
+		// Create directory structure based on reference type: /{reference_type}/year/month/
 		// Get current working directory and build path to project root
 		wd, err := os.Getwd()
 		if err != nil {
@@ -87,8 +112,20 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		if filepath.Base(wd) == "backend" {
 			wd = filepath.Dir(wd)
 		}
+		
+		// Use appropriate subdirectory based on reference type
+		var subDir string
+		switch referenceType {
+		case "purchase_order":
+			subDir = "po"
+		case "adjustment":
+			subDir = "adjustments"
+		default:
+			subDir = "misc"
+		}
+		
 		// Use backend/documents directory
-		dirPath := filepath.Join(wd, "backend", "documents", "po", year, month)
+		dirPath := filepath.Join(wd, "backend", "documents", subDir, year, month)
 		if err := os.MkdirAll(dirPath, 0755); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create directory"})
 			return
@@ -110,9 +147,10 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		fmt.Printf("File saved successfully to: %s\n", filePath)
 
 		// Save document record to database
-		relativePath := filepath.Join("po", year, month, fileName)
+		relativePath := filepath.Join(subDir, year, month, fileName)
 		doc, err := h.documentService.CreateDocument(
-			purchaseOrderID,
+			referenceType,
+			referenceID,
 			file.Filename,
 			relativePath,
 			file.Size,
@@ -132,7 +170,7 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 	})
 }
 
-// GetDocuments retrieves documents for a purchase order
+// GetDocuments retrieves documents for a purchase order (legacy endpoint)
 func (h *DocumentHandler) GetDocuments(c *gin.Context) {
 	purchaseOrderID := c.Param("purchase_order_id")
 	if purchaseOrderID == "" {
@@ -141,6 +179,25 @@ func (h *DocumentHandler) GetDocuments(c *gin.Context) {
 	}
 
 	documents, err := h.documentService.GetDocumentsByPurchaseOrder(purchaseOrderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
+		return
+	}
+
+	c.JSON(http.StatusOK, documents)
+}
+
+// GetDocumentsByReference retrieves documents by reference type and ID
+func (h *DocumentHandler) GetDocumentsByReference(c *gin.Context) {
+	referenceType := c.Param("reference_type")
+	referenceID := c.Param("reference_id")
+	
+	if referenceType == "" || referenceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reference type and ID are required"})
+		return
+	}
+
+	documents, err := h.documentService.GetDocumentsByReference(referenceType, referenceID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
 		return
