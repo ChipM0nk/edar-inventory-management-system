@@ -6,21 +6,25 @@ import (
 )
 
 type PurchaseOrder struct {
-	ID                   string     `json:"id"`
-	PoNumber             string     `json:"po_number" validate:"required"`
-	SupplierName         string     `json:"supplier_name"`
-	SupplierContact      *string    `json:"supplier_contact"`
-	TotalAmount          float64    `json:"total_amount"`
-	Status               string     `json:"status"`
-	OrderDate            time.Time  `json:"order_date"`
-	ExpectedDeliveryDate *time.Time `json:"expected_delivery_date"`
-	ReceivedDate         *time.Time `json:"received_date"`
-	Notes                *string    `json:"notes"`
-	CreatedBy            string     `json:"created_by"`
-	CreatedByFirstName   *string    `json:"created_by_first_name"`
-	CreatedByLastName    *string    `json:"created_by_last_name"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
+	ID                     string     `json:"id"`
+	PoNumber               string     `json:"po_number" validate:"required"`
+	SupplierName           string     `json:"supplier_name"`
+	SupplierContact        *string    `json:"supplier_contact"`
+	TotalAmount            float64    `json:"total_amount"`
+	Status                 string     `json:"status"`
+	OrderDate              time.Time  `json:"order_date"`
+	ExpectedDeliveryDate   *time.Time `json:"expected_delivery_date"`
+	ReceivedDate           *time.Time `json:"received_date"`
+	Notes                  *string    `json:"notes"`
+	CreatedBy              string     `json:"created_by"`
+	CreatedByFirstName     *string    `json:"created_by_first_name"`
+	CreatedByLastName      *string    `json:"created_by_last_name"`
+	CancelledBy            *string    `json:"cancelled_by"`
+	CancelledByFirstName   *string    `json:"cancelled_by_first_name"`
+	CancelledByLastName    *string    `json:"cancelled_by_last_name"`
+	CancellationReason     *string    `json:"cancellation_reason"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 type CreatePurchaseOrderRequest struct {

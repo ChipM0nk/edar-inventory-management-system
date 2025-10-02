@@ -39,6 +39,10 @@ interface PurchaseOrder {
   processed_date: string
   created_at: string
   supplier_name?: string
+  cancelled_by?: string
+  cancelled_by_first_name?: string
+  cancelled_by_last_name?: string
+  cancellation_reason?: string
   products: {
     product_id: string
     product_name: string
@@ -226,13 +230,28 @@ export default function PurchasePage() {
       
       const orders = Array.from(ordersMap.values())
       
-      // Check the actual status of each purchase order
+      // Check the actual status of each purchase order and get cancellation details
       for (const order of orders) {
         try {
           const response = await api.get(`/purchase-orders/${order.reference_id}`)
           console.log(`Status for PO ${order.reference_id}:`, response.data?.status)
-          if (response.data && response.data.status) {
-            order.status = response.data.status
+          if (response.data) {
+            // Update status and cancellation fields
+            if (response.data.status) {
+              order.status = response.data.status
+            }
+            if (response.data.cancelled_by) {
+              order.cancelled_by = response.data.cancelled_by
+            }
+            if (response.data.cancelled_by_first_name) {
+              order.cancelled_by_first_name = response.data.cancelled_by_first_name
+            }
+            if (response.data.cancelled_by_last_name) {
+              order.cancelled_by_last_name = response.data.cancelled_by_last_name
+            }
+            if (response.data.cancellation_reason) {
+              order.cancellation_reason = response.data.cancellation_reason
+            }
           }
         } catch (error) {
           // If we can't get the purchase order, keep the default status
@@ -816,15 +835,39 @@ export default function PurchasePage() {
           {/* Status Warning - Moved into header */}
           {selectedOrder?.status === 'cancelled' && (
             <div className="mt-3 bg-red-50 border-l-4 border-red-400 p-3 rounded-r">
-              <div className="flex items-center">
+              <div className="flex items-start">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <div className="ml-3">
+                <div className="ml-3 flex-1">
                   <p className="text-sm text-red-700 font-medium">This purchase order has been cancelled</p>
                   <p className="text-xs text-red-600 mt-1">No further actions can be taken on this order</p>
+                  
+                  {/* Show cancellation details if available */}
+                  {(selectedOrder.cancelled_by_first_name || selectedOrder.cancelled_by_last_name || selectedOrder.cancellation_reason) && (
+                    <div className="mt-3 pt-3 border-t border-red-200">
+                      {(selectedOrder.cancelled_by_first_name || selectedOrder.cancelled_by_last_name) && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <User className="h-4 w-4 text-red-500" />
+                          <span className="text-xs text-red-600">
+                            <span className="font-medium">Cancelled by:</span>{' '}
+                            {selectedOrder.cancelled_by_first_name || ''} {selectedOrder.cancelled_by_last_name || ''}
+                          </span>
+                        </div>
+                      )}
+                      {selectedOrder.cancellation_reason && (
+                        <div className="flex items-start gap-2">
+                          <FileText className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                          <span className="text-xs text-red-600">
+                            <span className="font-medium">Reason:</span>{' '}
+                            <span className="italic">{selectedOrder.cancellation_reason}</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

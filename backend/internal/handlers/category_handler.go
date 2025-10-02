@@ -20,6 +20,18 @@ func NewCategoryHandler(categoryService *services.CategoryService) *CategoryHand
 	}
 }
 
+// CreateCategory godoc
+// @Summary Create a new category
+// @Description Create a new product category
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body models.CreateCategoryRequest true "Category details"
+// @Success 201 {object} models.Category "Category created successfully"
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Router /categories [post]
 func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 	var req models.CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -53,6 +65,22 @@ func (h *CategoryHandler) GetCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, category)
 }
 
+// ListCategories godoc
+// @Summary List categories
+// @Description Get a paginated list of categories with optional filters
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param name query string false "Filter by category name"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Param sort_by query string false "Sort by field" default(name)
+// @Param sort_order query string false "Sort order" Enums(asc, desc) default(asc)
+// @Success 200 {object} map[string]interface{} "Categories list with pagination"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /categories [get]
 func (h *CategoryHandler) ListCategories(c *gin.Context) {
 	// Parse query parameters
 	name := c.Query("name")
@@ -73,18 +101,12 @@ func (h *CategoryHandler) ListCategories(c *gin.Context) {
 		limit = 10
 	}
 
-	// Validate sort parameters
-	if sortBy != "name" && sortBy != "created_at" {
-		sortBy = "name"
-	}
-	if sortOrder != "asc" && sortOrder != "desc" {
-		sortOrder = "asc"
-	}
-
 	var isActive *bool
 	if isActiveStr != "" {
-		active := isActiveStr == "true"
-		isActive = &active
+		isActiveBool, err := strconv.ParseBool(isActiveStr)
+		if err == nil {
+			isActive = &isActiveBool
+		}
 	}
 
 	filter := models.CategoryFilter{
@@ -97,24 +119,17 @@ func (h *CategoryHandler) ListCategories(c *gin.Context) {
 		SortOrder:   sortOrder,
 	}
 
-	// If no filters, get all categories
-	if name == "" && description == "" && isActiveStr == "" {
-		categories, err := h.categoryService.ListCategories(c.Request.Context())
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"categories": categories,
-			"total":      len(categories),
-		})
-		return
+	// Remove nil pointers if empty
+	if name == "" {
+		filter.Name = nil
+	}
+	if description == "" {
+		filter.Description = nil
 	}
 
 	categories, total, err := h.categoryService.ListCategoriesWithFilter(c.Request.Context(), filter)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -162,7 +177,7 @@ func (h *CategoryHandler) DeleteCategory(c *gin.Context) {
 
 	err = h.categoryService.DeleteCategory(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete category"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

@@ -66,22 +66,41 @@ func (s *PurchaseOrderService) GetPurchaseOrder(id string) (*models.PurchaseOrde
 		return nil, err
 	}
 
+	var cancelledBy *string
+	var cancelledByFirstName *string
+	var cancelledByLastName *string
+	
+	if po.CancelledBy.Valid {
+		cancelledByStr := utils.PgxUUIDToUUID(po.CancelledBy).String()
+		cancelledBy = &cancelledByStr
+		if po.CancelledByFirstName != nil {
+			cancelledByFirstName = po.CancelledByFirstName
+		}
+		if po.CancelledByLastName != nil {
+			cancelledByLastName = po.CancelledByLastName
+		}
+	}
+
 	return &models.PurchaseOrder{
-		ID:                   utils.PgxUUIDToUUID(po.ID).String(),
-		PoNumber:             po.PoNumber,
-		SupplierName:         po.SupplierName,
-		SupplierContact:      po.SupplierContact,
-		TotalAmount:          utils.PgxNumericToFloat64(po.TotalAmount),
-		Status:               po.Status, // Return actual status from database
-		OrderDate:            utils.PgxDateToTime(po.OrderDate),
-		ExpectedDeliveryDate: utils.PgxDateToTimePtr(po.ExpectedDeliveryDate),
-		ReceivedDate:         utils.PgxDateToTimePtr(po.ReceivedDate),
-		Notes:                po.Notes,
-		CreatedBy:            utils.PgxUUIDToUUID(po.CreatedBy).String(),
-		CreatedByFirstName:   &po.FirstName,
-		CreatedByLastName:    &po.LastName,
-		CreatedAt:            utils.PgxTimestamptzToTime(po.CreatedAt),
-		UpdatedAt:            utils.PgxTimestamptzToTime(po.UpdatedAt),
+		ID:                     utils.PgxUUIDToUUID(po.ID).String(),
+		PoNumber:               po.PoNumber,
+		SupplierName:           po.SupplierName,
+		SupplierContact:        po.SupplierContact,
+		TotalAmount:            utils.PgxNumericToFloat64(po.TotalAmount),
+		Status:                 po.Status, // Return actual status from database
+		OrderDate:              utils.PgxDateToTime(po.OrderDate),
+		ExpectedDeliveryDate:   utils.PgxDateToTimePtr(po.ExpectedDeliveryDate),
+		ReceivedDate:           utils.PgxDateToTimePtr(po.ReceivedDate),
+		Notes:                  po.Notes,
+		CreatedBy:              utils.PgxUUIDToUUID(po.CreatedBy).String(),
+		CreatedByFirstName:     &po.FirstName,
+		CreatedByLastName:      &po.LastName,
+		CancelledBy:            cancelledBy,
+		CancelledByFirstName:   cancelledByFirstName,
+		CancelledByLastName:    cancelledByLastName,
+		CancellationReason:     po.CancellationReason,
+		CreatedAt:              utils.PgxTimestamptzToTime(po.CreatedAt),
+		UpdatedAt:              utils.PgxTimestamptzToTime(po.UpdatedAt),
 	}, nil
 }
 

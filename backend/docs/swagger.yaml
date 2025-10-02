@@ -1,0 +1,895 @@
+basePath: /api/v1
+definitions:
+  models.Category:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.CreateCategoryRequest:
+    properties:
+      description:
+        maxLength: 500
+        type: string
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - name
+    type: object
+  models.CreateProductRequest:
+    properties:
+      category_id:
+        type: string
+      description:
+        type: string
+      min_stock_level:
+        minimum: 0
+        type: integer
+      name:
+        type: string
+      sku:
+        type: string
+      supplier_id:
+        type: string
+      unit_price:
+        minimum: 0
+        type: number
+    required:
+    - category_id
+    - name
+    - sku
+    - supplier_id
+    - unit_price
+    type: object
+  models.CreatePurchaseOrderRequest:
+    properties:
+      created_by:
+        type: string
+      expected_delivery_date:
+        type: string
+      notes:
+        type: string
+      order_date:
+        type: string
+      po_number:
+        type: string
+      supplier_contact:
+        type: string
+      supplier_name:
+        type: string
+    required:
+    - po_number
+    type: object
+  models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+    type: object
+  models.Product:
+    properties:
+      category:
+        type: string
+      category_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      min_stock_level:
+        type: integer
+      name:
+        type: string
+      sku:
+        type: string
+      supplier:
+        type: string
+      supplier_id:
+        type: string
+      unit_price:
+        type: number
+      updated_at:
+        type: string
+    type: object
+  models.PurchaseOrder:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      created_by_first_name:
+        type: string
+      created_by_last_name:
+        type: string
+      expected_delivery_date:
+        type: string
+      id:
+        type: string
+      notes:
+        type: string
+      order_date:
+        type: string
+      po_number:
+        type: string
+      received_date:
+        type: string
+      status:
+        type: string
+      supplier_contact:
+        type: string
+      supplier_name:
+        type: string
+      total_amount:
+        type: number
+      updated_at:
+        type: string
+    required:
+    - po_number
+    type: object
+  models.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  models.UpdateProductRequest:
+    properties:
+      category_id:
+        type: string
+      description:
+        type: string
+      min_stock_level:
+        minimum: 0
+        type: integer
+      name:
+        type: string
+      sku:
+        type: string
+      supplier_id:
+        type: string
+      unit_price:
+        minimum: 0
+        type: number
+    required:
+    - category_id
+    - name
+    - sku
+    - supplier_id
+    - unit_price
+    type: object
+  models.UpdatePurchaseOrderRequest:
+    properties:
+      expected_delivery_date:
+        type: string
+      notes:
+        type: string
+      received_date:
+        type: string
+      status:
+        type: string
+      supplier_contact:
+        type: string
+      supplier_name:
+        type: string
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_name:
+        type: string
+      role:
+        type: string
+      updated_at:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is an inventory management system API with authentication
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Inventory Management System API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid credentials
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User login
+      tags:
+      - Authentication
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Get new access token using refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: New access token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid refresh token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Refresh access token
+      tags:
+      - Authentication
+  /categories:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of categories with optional filters
+      parameters:
+      - description: Filter by category name
+        in: query
+        name: name
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - default: name
+        description: Sort by field
+        in: query
+        name: sort_by
+        type: string
+      - default: asc
+        description: Sort order
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sort_order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Categories list with pagination
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List categories
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      description: Create a new product category
+      parameters:
+      - description: Category details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Category created successfully
+          schema:
+            $ref: '#/definitions/models.Category'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new category
+      tags:
+      - Categories
+  /products:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of products with optional filters
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by product name
+        in: query
+        name: name
+        type: string
+      - description: Filter by category ID
+        in: query
+        name: category_id
+        type: string
+      - description: Filter by supplier ID
+        in: query
+        name: supplier_id
+        type: string
+      - default: name
+        description: Sort by field
+        enum:
+        - name
+        - unit_price
+        - created_at
+        in: query
+        name: sort_by
+        type: string
+      - default: asc
+        description: Sort order
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sort_order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Products list with pagination
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List products
+      tags:
+      - Products
+    post:
+      consumes:
+      - application/json
+      description: Create a new product with the provided details
+      parameters:
+      - description: Product details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Product created successfully
+          schema:
+            $ref: '#/definitions/models.Product'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new product
+      tags:
+      - Products
+  /products/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a product by ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid product ID
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete product
+      tags:
+      - Products
+    get:
+      consumes:
+      - application/json
+      description: Get a specific product by its ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product details
+          schema:
+            $ref: '#/definitions/models.Product'
+        "400":
+          description: Invalid product ID
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Product not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get product by ID
+      tags:
+      - Products
+    put:
+      consumes:
+      - application/json
+      description: Update an existing product by ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated product details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product updated successfully
+          schema:
+            $ref: '#/definitions/models.Product'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update product
+      tags:
+      - Products
+  /profile:
+    get:
+      consumes:
+      - application/json
+      description: Get current user profile information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User profile
+          schema:
+            $ref: '#/definitions/models.User'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: User not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - Authentication
+  /purchase-orders:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of purchase orders
+      parameters:
+      - default: 10
+        description: Number of items to return
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of purchase orders
+          schema:
+            items:
+              $ref: '#/definitions/models.PurchaseOrder'
+            type: array
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List purchase orders
+      tags:
+      - Purchase Orders
+    post:
+      consumes:
+      - application/json
+      description: Create a new purchase order with the provided details
+      parameters:
+      - description: Purchase order details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreatePurchaseOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Purchase order created successfully
+          schema:
+            $ref: '#/definitions/models.PurchaseOrder'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new purchase order
+      tags:
+      - Purchase Orders
+  /purchase-orders/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a specific purchase order by its ID
+      parameters:
+      - description: Purchase Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Purchase order details
+          schema:
+            $ref: '#/definitions/models.PurchaseOrder'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Purchase order not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get purchase order by ID
+      tags:
+      - Purchase Orders
+    put:
+      consumes:
+      - application/json
+      description: Update an existing purchase order by ID
+      parameters:
+      - description: Purchase Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated purchase order details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdatePurchaseOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Purchase order updated successfully
+          schema:
+            $ref: '#/definitions/models.PurchaseOrder'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update purchase order
+      tags:
+      - Purchase Orders
+  /purchase-orders/{id}/cancel:
+    post:
+      consumes:
+      - application/json
+      description: Cancel a purchase order by ID with a reason
+      parameters:
+      - description: Purchase Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Cancellation reason
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            reason:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Purchase order cancelled successfully
+          schema:
+            $ref: '#/definitions/models.PurchaseOrder'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cancel purchase order
+      tags:
+      - Purchase Orders
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

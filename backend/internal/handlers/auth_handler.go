@@ -22,6 +22,18 @@ func NewAuthHandler(userService *services.UserService, jwtService *auth.JWTServi
 	}
 }
 
+// Login godoc
+// @Summary User login
+// @Description Authenticate user with email and password
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body models.LoginRequest true "Login credentials"
+// @Success 200 {object} models.LoginResponse "Login successful"
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 401 {object} map[string]string "Invalid credentials"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -62,6 +74,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
+// RefreshToken godoc
+// @Summary Refresh access token
+// @Description Get new access token using refresh token
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body models.RefreshTokenRequest true "Refresh token"
+// @Success 200 {object} map[string]string "New access token"
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 401 {object} map[string]string "Invalid refresh token"
+// @Router /auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req models.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -80,6 +103,17 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	})
 }
 
+// GetProfile godoc
+// @Summary Get user profile
+// @Description Get current user profile information
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.User "User profile"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 404 {object} map[string]string "User not found"
+// @Router /profile [get]
 func (h *AuthHandler) GetProfile(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -95,12 +129,3 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, user)
 }
-
-
-
-
-
-
-
-
-

@@ -124,28 +124,33 @@ func (q *Queries) CreatePurchaseOrder(ctx context.Context, arg *CreatePurchaseOr
 }
 
 const GetPurchaseOrder = `-- name: GetPurchaseOrder :one
-SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, u.first_name, u.last_name
+SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancellation_reason, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
+LEFT JOIN users cu ON po.cancelled_by = cu.id
 WHERE po.id = $1
 `
 
 type GetPurchaseOrderRow struct {
-	ID                   pgtype.UUID        `json:"id"`
-	PoNumber             string             `json:"po_number"`
-	SupplierName         string             `json:"supplier_name"`
-	SupplierContact      *string            `json:"supplier_contact"`
-	TotalAmount          pgtype.Numeric     `json:"total_amount"`
-	Status               string             `json:"status"`
-	OrderDate            pgtype.Date        `json:"order_date"`
-	ExpectedDeliveryDate pgtype.Date        `json:"expected_delivery_date"`
-	ReceivedDate         pgtype.Date        `json:"received_date"`
-	Notes                *string            `json:"notes"`
-	CreatedBy            pgtype.UUID        `json:"created_by"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
-	FirstName            string             `json:"first_name"`
-	LastName             string             `json:"last_name"`
+	ID                     pgtype.UUID        `json:"id"`
+	PoNumber               string             `json:"po_number"`
+	SupplierName           string             `json:"supplier_name"`
+	SupplierContact        *string            `json:"supplier_contact"`
+	TotalAmount            pgtype.Numeric     `json:"total_amount"`
+	Status                 string             `json:"status"`
+	OrderDate              pgtype.Date        `json:"order_date"`
+	ExpectedDeliveryDate   pgtype.Date        `json:"expected_delivery_date"`
+	ReceivedDate           pgtype.Date        `json:"received_date"`
+	Notes                  *string            `json:"notes"`
+	CreatedBy              pgtype.UUID        `json:"created_by"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	CancelledBy            pgtype.UUID        `json:"cancelled_by"`
+	CancellationReason     *string            `json:"cancellation_reason"`
+	FirstName              string             `json:"first_name"`
+	LastName               string             `json:"last_name"`
+	CancelledByFirstName   *string            `json:"cancelled_by_first_name"`
+	CancelledByLastName    *string            `json:"cancelled_by_last_name"`
 }
 
 func (q *Queries) GetPurchaseOrder(ctx context.Context, id pgtype.UUID) (*GetPurchaseOrderRow, error) {
@@ -165,8 +170,12 @@ func (q *Queries) GetPurchaseOrder(ctx context.Context, id pgtype.UUID) (*GetPur
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CancelledBy,
+		&i.CancellationReason,
 		&i.FirstName,
 		&i.LastName,
+		&i.CancelledByFirstName,
+		&i.CancelledByLastName,
 	)
 	return &i, err
 }

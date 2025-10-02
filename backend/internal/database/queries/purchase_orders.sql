@@ -4,9 +4,10 @@ VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: GetPurchaseOrder :one
-SELECT po.*, u.first_name, u.last_name
+SELECT po.*, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
+LEFT JOIN users cu ON po.cancelled_by = cu.id
 WHERE po.id = $1;
 
 -- name: ListPurchaseOrders :many
