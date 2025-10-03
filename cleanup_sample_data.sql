@@ -22,3 +22,4 @@ SELECT 'Remaining stock movements' as summary;
 SELECT COUNT(*) as count FROM stock_movements;
 
 
+

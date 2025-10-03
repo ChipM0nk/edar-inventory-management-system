@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"inventory-system/docs"
 	"inventory-system/internal/auth"
 	"inventory-system/internal/config"
 	"inventory-system/internal/database"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	swaggerFiles "github.com/swaggo/files"
 )
 
 func main() {
@@ -17,6 +20,13 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
+
+	// Initialize Swagger docs
+	docs.SwaggerInfo.Title = "Inventory Management System API"
+	docs.SwaggerInfo.Description = "This is an inventory management system API with authentication"
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = "localhost:8080"
+	docs.SwaggerInfo.BasePath = "/api/v1"
 
 	// Load configuration
 	cfg := config.Load()
@@ -79,6 +89,9 @@ func main() {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	// Swagger UI
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// API routes
 	api := router.Group("/api/v1")

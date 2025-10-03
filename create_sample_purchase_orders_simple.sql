@@ -367,3 +367,4 @@ JOIN warehouses w ON sl.warehouse_id = w.id
 ORDER BY p.name, w.name;
 
 
+

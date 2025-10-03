@@ -77,3 +77,4 @@ ORDER BY sl.available_quantity ASC;
 
 
 
+
