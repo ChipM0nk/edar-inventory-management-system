@@ -22,6 +22,19 @@ func NewProductHandler(productService *services.ProductService) *ProductHandler 
 	}
 }
 
+// CreateProduct creates a new product
+// @Summary Create a new product
+// @Description Create a new product with the provided details
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param request body models.CreateProductRequest true "Product details"
+// @Success 201 {object} models.Product
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /products [post]
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	var req models.CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -53,6 +66,19 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, product)
 }
 
+// GetProduct gets a product by ID
+// @Summary Get product by ID
+// @Description Get a specific product by its ID
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param id path string true "Product ID"
+// @Success 200 {object} models.Product
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /products/{id} [get]
 func (h *ProductHandler) GetProduct(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -70,6 +96,24 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// ListProducts gets a paginated list of products
+// @Summary List products
+// @Description Get a paginated list of products with optional filters
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Param name query string false "Filter by product name"
+// @Param category_id query string false "Filter by category ID"
+// @Param supplier_id query string false "Filter by supplier ID"
+// @Param sort_by query string false "Sort by field" default(name)
+// @Param sort_order query string false "Sort order" default(asc)
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /products [get]
 func (h *ProductHandler) ListProducts(c *gin.Context) {
 	// Parse query parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -141,6 +185,24 @@ func (h *ProductHandler) ListProducts(c *gin.Context) {
 	})
 }
 
+// ListProductsWithStock gets a paginated list of products with stock information
+// @Summary List products with stock
+// @Description Get a paginated list of products with current stock levels
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Param name query string false "Filter by product name"
+// @Param category_id query string false "Filter by category ID"
+// @Param supplier_id query string false "Filter by supplier ID"
+// @Param sort_by query string false "Sort by field" default(name)
+// @Param sort_order query string false "Sort order" default(asc)
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /products/stock [get]
 func (h *ProductHandler) ListProductsWithStock(c *gin.Context) {
 	// Parse query parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -201,6 +263,20 @@ func (h *ProductHandler) ListProductsWithStock(c *gin.Context) {
 	})
 }
 
+// UpdateProduct updates an existing product
+// @Summary Update product
+// @Description Update an existing product by ID
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param id path string true "Product ID"
+// @Param request body models.UpdateProductRequest true "Updated product details"
+// @Success 200 {object} models.Product
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /products/{id} [put]
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -241,6 +317,19 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// DeleteProduct deletes a product by ID
+// @Summary Delete product
+// @Description Delete a product by ID
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param id path string true "Product ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)

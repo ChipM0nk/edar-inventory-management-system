@@ -22,6 +22,18 @@ func NewPurchaseOrderHandler(purchaseOrderService *services.PurchaseOrderService
 }
 
 // CreatePurchaseOrder creates a new purchase order
+// @Summary Create a new purchase order
+// @Description Create a new purchase order with the provided details
+// @Tags Purchase Orders
+// @Accept json
+// @Produce json
+// @Param request body models.CreatePurchaseOrderRequest true "Purchase order details"
+// @Success 201 {object} models.PurchaseOrder
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /purchase-orders [post]
 func (h *PurchaseOrderHandler) CreatePurchaseOrder(c *gin.Context) {
 	var req models.CreatePurchaseOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -45,6 +57,18 @@ func (h *PurchaseOrderHandler) CreatePurchaseOrder(c *gin.Context) {
 }
 
 // GetPurchaseOrder retrieves a purchase order by ID
+// @Summary Get purchase order by ID
+// @Description Get a specific purchase order by its ID
+// @Tags Purchase Orders
+// @Accept json
+// @Produce json
+// @Param id path string true "Purchase Order ID"
+// @Success 200 {object} models.PurchaseOrder
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /purchase-orders/{id} [get]
 func (h *PurchaseOrderHandler) GetPurchaseOrder(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
@@ -62,6 +86,19 @@ func (h *PurchaseOrderHandler) GetPurchaseOrder(c *gin.Context) {
 }
 
 // ListPurchaseOrders retrieves a list of purchase orders
+// @Summary List purchase orders
+// @Description Get a paginated list of purchase orders
+// @Tags Purchase Orders
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of items to return" default(10)
+// @Param offset query int false "Number of items to skip" default(0)
+// @Success 200 {array} models.PurchaseOrder
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /purchase-orders [get]
 func (h *PurchaseOrderHandler) ListPurchaseOrders(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "10")
 	offsetStr := c.DefaultQuery("offset", "0")
@@ -95,6 +132,19 @@ func (h *PurchaseOrderHandler) ListPurchaseOrders(c *gin.Context) {
 }
 
 // UpdatePurchaseOrder updates a purchase order
+// @Summary Update purchase order
+// @Description Update an existing purchase order by ID
+// @Tags Purchase Orders
+// @Accept json
+// @Produce json
+// @Param id path string true "Purchase Order ID"
+// @Param request body models.UpdatePurchaseOrderRequest true "Updated purchase order details"
+// @Success 200 {object} models.PurchaseOrder
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /purchase-orders/{id} [put]
 func (h *PurchaseOrderHandler) UpdatePurchaseOrder(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
@@ -121,6 +171,19 @@ func (h *PurchaseOrderHandler) UpdatePurchaseOrder(c *gin.Context) {
 
 
 // CancelPurchaseOrder cancels a purchase order
+// @Summary Cancel purchase order
+// @Description Cancel a purchase order by ID with a reason
+// @Tags Purchase Orders
+// @Accept json
+// @Produce json
+// @Param id path string true "Purchase Order ID"
+// @Param request body object{reason=string} true "Cancellation reason"
+// @Success 200 {object} models.PurchaseOrder
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /purchase-orders/{id}/cancel [post]
 func (h *PurchaseOrderHandler) CancelPurchaseOrder(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {

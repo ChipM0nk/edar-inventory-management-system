@@ -48,6 +48,19 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 	c.JSON(http.StatusCreated, category)
 }
 
+// GetCategory gets a category by ID
+// @Summary Get category by ID
+// @Description Get a specific category by its ID
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param id path string true "Category ID"
+// @Success 200 {object} models.Category
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /categories/{id} [get]
 func (h *CategoryHandler) GetCategory(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -144,6 +157,20 @@ func (h *CategoryHandler) ListCategories(c *gin.Context) {
 	})
 }
 
+// UpdateCategory updates an existing category
+// @Summary Update category
+// @Description Update an existing category by ID
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param id path string true "Category ID"
+// @Param request body models.UpdateCategoryRequest true "Updated category details"
+// @Success 200 {object} models.Category
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /categories/{id} [put]
 func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -167,6 +194,19 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, category)
 }
 
+// DeleteCategory deletes a category by ID
+// @Summary Delete category
+// @Description Delete a category by ID
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param id path string true "Category ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /categories/{id} [delete]
 func (h *CategoryHandler) DeleteCategory(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)

@@ -1,5 +1,148 @@
 basePath: /api/v1
 definitions:
+  models.Adjustment:
+    properties:
+      adjustment_date:
+        type: string
+      adjustment_reason:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      created_by_first_name:
+        description: Joined fields
+        type: string
+      created_by_last_name:
+        type: string
+      id:
+        type: string
+      items:
+        description: Items
+        items:
+          $ref: '#/definitions/models.AdjustmentItem'
+        type: array
+      notes:
+        type: string
+      processed_by:
+        type: string
+      processed_by_first_name:
+        type: string
+      processed_by_last_name:
+        type: string
+      processed_date:
+        type: string
+      reason:
+        type: string
+      reference_id:
+        type: string
+      reference_number:
+        type: string
+      reference_type:
+        description: Reference fields for PO/SO connections
+        type: string
+      status:
+        type: string
+      total_quantity:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  models.AdjustmentItem:
+    properties:
+      actual_quantity:
+        type: integer
+      adjustment_id:
+        type: string
+      adjustment_reason:
+        type: string
+      cost_price:
+        type: number
+      created_at:
+        type: string
+      expected_quantity:
+        type: integer
+      id:
+        type: string
+      product_id:
+        type: string
+      product_name:
+        description: Joined fields
+        type: string
+      product_sku:
+        type: string
+      quantity:
+        description: Can be positive (add) or negative (subtract)
+        type: integer
+      reason:
+        type: string
+      reference_id:
+        type: string
+      reference_number:
+        type: string
+      reference_type:
+        description: Reference fields for item-level tracking
+        type: string
+      variance_quantity:
+        type: integer
+      warehouse_id:
+        type: string
+      warehouse_name:
+        type: string
+    type: object
+  models.AdjustmentListResponse:
+    properties:
+      adjustments:
+        items:
+          $ref: '#/definitions/models.Adjustment'
+        type: array
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  models.BulkStockMovementItem:
+    properties:
+      cost_price:
+        minimum: 0
+        type: number
+      product_id:
+        type: string
+      quantity:
+        minimum: 1
+        type: integer
+      warehouse_id:
+        type: string
+    required:
+    - product_id
+    - quantity
+    - warehouse_id
+    type: object
+  models.BulkStockMovementRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.BulkStockMovementItem'
+        minItems: 1
+        type: array
+      processed_by:
+        type: string
+      processed_date:
+        type: string
+      purchase_order_id:
+        type: string
+      reference_number:
+        type: string
+      supplier_id:
+        type: string
+    required:
+    - items
+    - supplier_id
+    type: object
   models.Category:
     properties:
       created_at:
@@ -14,6 +157,128 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  models.CreateAdjustmentItemRequest:
+    properties:
+      actual_quantity:
+        type: integer
+      adjustment_reason:
+        enum:
+        - receiving_discrepancy
+        - damaged_goods
+        - quality_issue
+        - short_shipment
+        - over_shipment
+        - customer_return
+        - defective_return
+        - exchange
+        - warranty_replacement
+        - cycle_count_correction
+        - theft_loss
+        - expired_product
+        - storage_damage
+        - transfer_correction
+        - other
+        type: string
+      cost_price:
+        minimum: 0
+        type: number
+      expected_quantity:
+        type: integer
+      product_id:
+        type: string
+      quantity:
+        type: integer
+      reason:
+        type: string
+      reference_id:
+        type: string
+      reference_number:
+        type: string
+      reference_type:
+        description: Reference fields for item-level tracking
+        enum:
+        - purchase_order
+        - sales_order
+        - cycle_count
+        - damage
+        - theft
+        - expired
+        - transfer
+        - other
+        type: string
+      warehouse_id:
+        type: string
+    required:
+    - cost_price
+    - product_id
+    - quantity
+    - warehouse_id
+    type: object
+  models.CreateAdjustmentRequest:
+    properties:
+      adjustment_date:
+        type: string
+      adjustment_reason:
+        enum:
+        - receiving_discrepancy
+        - damaged_goods
+        - quality_issue
+        - short_shipment
+        - over_shipment
+        - customer_return
+        - defective_return
+        - exchange
+        - warranty_replacement
+        - cycle_count_correction
+        - theft_loss
+        - expired_product
+        - storage_damage
+        - transfer_correction
+        - other
+        type: string
+      created_by:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/models.CreateAdjustmentItemRequest'
+        minItems: 1
+        type: array
+      notes:
+        type: string
+      reason:
+        type: string
+      reference_id:
+        type: string
+      reference_number:
+        type: string
+      reference_type:
+        description: Reference fields for PO/SO connections
+        enum:
+        - purchase_order
+        - sales_order
+        - cycle_count
+        - damage
+        - theft
+        - expired
+        - transfer
+        - other
+        type: string
+      status:
+        enum:
+        - pending
+        - approved
+        - completed
+        - cancelled
+        type: string
+      total_quantity:
+        minimum: 0
+        type: integer
+    required:
+    - adjustment_date
+    - created_by
+    - items
+    - reference_number
     type: object
   models.CreateCategoryRequest:
     properties:
@@ -71,6 +336,82 @@ definitions:
     required:
     - po_number
     type: object
+  models.CreateStockMovementRequest:
+    properties:
+      cost_price:
+        minimum: 0
+        type: number
+      movement_type:
+        enum:
+        - in
+        - out
+        - transfer
+        - adjustment
+        type: string
+      product_id:
+        type: string
+      quantity:
+        type: integer
+      reference_id:
+        type: string
+      reference_type:
+        type: string
+      warehouse_id:
+        type: string
+    required:
+    - movement_type
+    - product_id
+    - quantity
+    - warehouse_id
+    type: object
+  models.CreateSupplierRequest:
+    properties:
+      address:
+        maxLength: 500
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      contact_person:
+        maxLength: 255
+        type: string
+      country:
+        maxLength: 100
+        type: string
+      email:
+        type: string
+      name:
+        maxLength: 255
+        minLength: 2
+        type: string
+      phone:
+        maxLength: 50
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      state:
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  models.CreateWarehouseRequest:
+    properties:
+      address:
+        type: string
+      contact_person:
+        type: string
+      contact_phone:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+    required:
+    - location
+    - name
+    type: object
   models.LoginRequest:
     properties:
       email:
@@ -121,6 +462,14 @@ definitions:
     type: object
   models.PurchaseOrder:
     properties:
+      cancellation_reason:
+        type: string
+      cancelled_by:
+        type: string
+      cancelled_by_first_name:
+        type: string
+      cancelled_by_last_name:
+        type: string
       created_at:
         type: string
       created_by:
@@ -160,6 +509,180 @@ definitions:
         type: string
     required:
     - refresh_token
+    type: object
+  models.StockLevel:
+    properties:
+      available_quantity:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      last_updated:
+        type: string
+      max_stock_level:
+        type: integer
+      min_stock_level:
+        type: integer
+      product_id:
+        type: string
+      product_name:
+        description: Joined fields
+        type: string
+      product_sku:
+        type: string
+      quantity:
+        type: integer
+      reserved_quantity:
+        type: integer
+      updated_at:
+        type: string
+      warehouse_id:
+        type: string
+      warehouse_name:
+        type: string
+    type: object
+  models.StockLevelListResponse:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      pages:
+        type: integer
+      stock_levels:
+        items:
+          $ref: '#/definitions/models.StockLevel'
+        type: array
+      total:
+        type: integer
+    type: object
+  models.StockMovement:
+    properties:
+      cost_price:
+        type: number
+      created_at:
+        type: string
+      id:
+        type: string
+      movement_type:
+        type: string
+      processed_by:
+        type: string
+      processed_by_first_name:
+        type: string
+      processed_by_last_name:
+        type: string
+      processed_date:
+        type: string
+      product_id:
+        type: string
+      product_name:
+        description: Joined fields
+        type: string
+      product_sku:
+        type: string
+      quantity:
+        type: integer
+      reference_id:
+        type: string
+      reference_number:
+        type: string
+      reference_type:
+        type: string
+      supplier_name:
+        type: string
+      total_amount:
+        type: number
+      user_first_name:
+        type: string
+      user_id:
+        type: string
+      user_last_name:
+        type: string
+      warehouse_id:
+        type: string
+      warehouse_name:
+        type: string
+    type: object
+  models.StockMovementListResponse:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      pages:
+        type: integer
+      stock_movements:
+        items:
+          $ref: '#/definitions/models.StockMovement'
+        type: array
+      total:
+        type: integer
+    type: object
+  models.Supplier:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      contact_person:
+        type: string
+      country:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      phone:
+        type: string
+      postal_code:
+        type: string
+      state:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.UpdateAdjustmentRequest:
+    properties:
+      adjustment_date:
+        type: string
+      notes:
+        type: string
+      processed_by:
+        type: string
+      processed_date:
+        type: string
+      reason:
+        type: string
+      reference_number:
+        type: string
+      status:
+        enum:
+        - pending
+        - approved
+        - completed
+        - cancelled
+        type: string
+      total_quantity:
+        minimum: 0
+        type: integer
+    type: object
+  models.UpdateCategoryRequest:
+    properties:
+      description:
+        maxLength: 500
+        type: string
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
     type: object
   models.UpdateProductRequest:
     properties:
@@ -201,6 +724,54 @@ definitions:
       supplier_name:
         type: string
     type: object
+  models.UpdateSupplierRequest:
+    properties:
+      address:
+        maxLength: 500
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      contact_person:
+        maxLength: 255
+        type: string
+      country:
+        maxLength: 100
+        type: string
+      email:
+        type: string
+      name:
+        maxLength: 255
+        minLength: 2
+        type: string
+      phone:
+        maxLength: 50
+        type: string
+      postal_code:
+        maxLength: 20
+        type: string
+      state:
+        maxLength: 100
+        type: string
+    type: object
+  models.UpdateWarehouseRequest:
+    properties:
+      address:
+        type: string
+      contact_person:
+        type: string
+      contact_phone:
+        type: string
+      is_active:
+        type: boolean
+      location:
+        type: string
+      name:
+        type: string
+    required:
+    - location
+    - name
+    type: object
   models.User:
     properties:
       created_at:
@@ -220,6 +791,27 @@ definitions:
       updated_at:
         type: string
     type: object
+  models.Warehouse:
+    properties:
+      address:
+        type: string
+      contact_person:
+        type: string
+      contact_phone:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      location:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -234,6 +826,224 @@ info:
   title: Inventory Management System API
   version: "1.0"
 paths:
+  /adjustments:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of adjustments with optional filters
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by reference number
+        in: query
+        name: reference_number
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AdjustmentListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List adjustments
+      tags:
+      - Adjustments
+    post:
+      consumes:
+      - application/json
+      description: Create a new adjustment with the provided details
+      parameters:
+      - description: Adjustment details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateAdjustmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Adjustment'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new adjustment
+      tags:
+      - Adjustments
+  /adjustments/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete an adjustment by ID
+      parameters:
+      - description: Adjustment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete adjustment
+      tags:
+      - Adjustments
+    get:
+      consumes:
+      - application/json
+      description: Get a specific adjustment by its ID
+      parameters:
+      - description: Adjustment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Adjustment'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get adjustment by ID
+      tags:
+      - Adjustments
+    put:
+      consumes:
+      - application/json
+      description: Update an existing adjustment by ID
+      parameters:
+      - description: Adjustment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated adjustment details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateAdjustmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Adjustment'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update adjustment
+      tags:
+      - Adjustments
   /auth/login:
     post:
       consumes:
@@ -403,6 +1213,135 @@ paths:
       summary: Create a new category
       tags:
       - Categories
+  /categories/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete category
+      tags:
+      - Categories
+    get:
+      consumes:
+      - application/json
+      description: Get a specific category by its ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Category'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get category by ID
+      tags:
+      - Categories
+    put:
+      consumes:
+      - application/json
+      description: Update an existing category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated category details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Category'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update category
+      tags:
+      - Categories
   /products:
     get:
       consumes:
@@ -433,18 +1372,11 @@ paths:
         type: string
       - default: name
         description: Sort by field
-        enum:
-        - name
-        - unit_price
-        - created_at
         in: query
         name: sort_by
         type: string
       - default: asc
         description: Sort order
-        enum:
-        - asc
-        - desc
         in: query
         name: sort_order
         type: string
@@ -452,7 +1384,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Products list with pagination
+          description: OK
           schema:
             additionalProperties: true
             type: object
@@ -463,7 +1395,7 @@ paths:
               type: string
             type: object
         "500":
-          description: Internal server error
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -488,17 +1420,23 @@ paths:
       - application/json
       responses:
         "201":
-          description: Product created successfully
+          description: Created
           schema:
             $ref: '#/definitions/models.Product'
         "400":
-          description: Bad request
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
             type: object
         "401":
           description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -523,13 +1461,13 @@ paths:
       - application/json
       responses:
         "200":
-          description: Product deleted successfully
+          description: OK
           schema:
             additionalProperties:
               type: string
             type: object
         "400":
-          description: Invalid product ID
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
@@ -541,7 +1479,7 @@ paths:
               type: string
             type: object
         "500":
-          description: Internal server error
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -565,11 +1503,11 @@ paths:
       - application/json
       responses:
         "200":
-          description: Product details
+          description: OK
           schema:
             $ref: '#/definitions/models.Product'
         "400":
-          description: Invalid product ID
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
@@ -581,7 +1519,7 @@ paths:
               type: string
             type: object
         "404":
-          description: Product not found
+          description: Not Found
           schema:
             additionalProperties:
               type: string
@@ -611,11 +1549,11 @@ paths:
       - application/json
       responses:
         "200":
-          description: Product updated successfully
+          description: OK
           schema:
             $ref: '#/definitions/models.Product'
         "400":
-          description: Bad request
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
@@ -626,9 +1564,78 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       security:
       - BearerAuth: []
       summary: Update product
+      tags:
+      - Products
+  /products/stock:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of products with current stock levels
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by product name
+        in: query
+        name: name
+        type: string
+      - description: Filter by category ID
+        in: query
+        name: category_id
+        type: string
+      - description: Filter by supplier ID
+        in: query
+        name: supplier_id
+        type: string
+      - default: name
+        description: Sort by field
+        in: query
+        name: sort_by
+        type: string
+      - default: asc
+        description: Sort order
+        in: query
+        name: sort_order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List products with stock
       tags:
       - Products
   /profile:
@@ -680,13 +1687,13 @@ paths:
       - application/json
       responses:
         "200":
-          description: List of purchase orders
+          description: OK
           schema:
             items:
               $ref: '#/definitions/models.PurchaseOrder'
             type: array
         "400":
-          description: Bad request
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
@@ -698,7 +1705,7 @@ paths:
               type: string
             type: object
         "500":
-          description: Internal server error
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -723,11 +1730,11 @@ paths:
       - application/json
       responses:
         "201":
-          description: Purchase order created successfully
+          description: Created
           schema:
             $ref: '#/definitions/models.PurchaseOrder'
         "400":
-          description: Bad request
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
@@ -739,7 +1746,7 @@ paths:
               type: string
             type: object
         "500":
-          description: Internal server error
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
@@ -753,7 +1760,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Retrieve a specific purchase order by its ID
+      description: Get a specific purchase order by its ID
       parameters:
       - description: Purchase Order ID
         in: path
@@ -764,11 +1771,11 @@ paths:
       - application/json
       responses:
         "200":
-          description: Purchase order details
+          description: OK
           schema:
             $ref: '#/definitions/models.PurchaseOrder'
         "400":
-          description: Bad request
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
@@ -780,7 +1787,7 @@ paths:
               type: string
             type: object
         "404":
-          description: Purchase order not found
+          description: Not Found
           schema:
             additionalProperties:
               type: string
@@ -810,11 +1817,11 @@ paths:
       - application/json
       responses:
         "200":
-          description: Purchase order updated successfully
+          description: OK
           schema:
             $ref: '#/definitions/models.PurchaseOrder'
         "400":
-          description: Bad request
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
@@ -825,8 +1832,8 @@ paths:
             additionalProperties:
               type: string
             type: object
-        "500":
-          description: Internal server error
+        "404":
+          description: Not Found
           schema:
             additionalProperties:
               type: string
@@ -860,11 +1867,214 @@ paths:
       - application/json
       responses:
         "200":
-          description: Purchase order cancelled successfully
+          description: OK
           schema:
             $ref: '#/definitions/models.PurchaseOrder'
         "400":
-          description: Bad request
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cancel purchase order
+      tags:
+      - Purchase Orders
+  /stock/levels:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of stock levels with optional filters
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by product ID
+        in: query
+        name: product_id
+        type: string
+      - description: Filter by warehouse ID
+        in: query
+        name: warehouse_id
+        type: string
+      - description: Filter by product name
+        in: query
+        name: product_name
+        type: string
+      - description: Filter by product SKU
+        in: query
+        name: product_sku
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StockLevelListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List stock levels
+      tags:
+      - Stock
+  /stock/levels/{product_id}/{warehouse_id}:
+    get:
+      consumes:
+      - application/json
+      description: Get current stock level for a product in a specific warehouse
+      parameters:
+      - description: Product ID
+        in: path
+        name: product_id
+        required: true
+        type: string
+      - description: Warehouse ID
+        in: path
+        name: warehouse_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StockLevel'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get stock level
+      tags:
+      - Stock
+  /stock/movements:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of stock movements with optional filters
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by product ID
+        in: query
+        name: product_id
+        type: string
+      - description: Filter by warehouse ID
+        in: query
+        name: warehouse_id
+        type: string
+      - description: Filter by movement type
+        in: query
+        name: movement_type
+        type: string
+      - description: Filter from date (YYYY-MM-DD)
+        in: query
+        name: date_from
+        type: string
+      - description: Filter to date (YYYY-MM-DD)
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StockMovementListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List stock movements
+      tags:
+      - Stock
+    post:
+      consumes:
+      - application/json
+      description: Create a new stock movement with the provided details
+      parameters:
+      - description: Stock movement details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateStockMovementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.StockMovement'
+        "400":
+          description: Bad Request
           schema:
             additionalProperties:
               type: string
@@ -876,16 +2086,591 @@ paths:
               type: string
             type: object
         "500":
-          description: Internal server error
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
             type: object
       security:
       - BearerAuth: []
-      summary: Cancel purchase order
+      summary: Create stock movement
       tags:
-      - Purchase Orders
+      - Stock
+  /stock/movements/bulk:
+    post:
+      consumes:
+      - application/json
+      description: Create multiple stock movements in a single operation
+      parameters:
+      - description: Bulk stock movement details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.BulkStockMovementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create bulk stock movements
+      tags:
+      - Stock
+  /stock/products/supplier/{supplier_id}:
+    get:
+      consumes:
+      - application/json
+      description: Get all products supplied by a specific supplier
+      parameters:
+      - description: Supplier ID
+        in: path
+        name: supplier_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get products by supplier
+      tags:
+      - Stock
+  /stock/reports/soh:
+    get:
+      consumes:
+      - application/json
+      description: Get a comprehensive stock on hand report
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get stock on hand report
+      tags:
+      - Stock
+  /suppliers:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of suppliers with optional filters
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by supplier name
+        in: query
+        name: name
+        type: string
+      - description: Filter by contact person
+        in: query
+        name: contact_person
+        type: string
+      - description: Filter by email
+        in: query
+        name: email
+        type: string
+      - description: Filter by city
+        in: query
+        name: city
+        type: string
+      - description: Filter by active status
+        in: query
+        name: is_active
+        type: boolean
+      - default: name
+        description: Sort by field
+        in: query
+        name: sort_by
+        type: string
+      - default: asc
+        description: Sort order
+        in: query
+        name: sort_order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List suppliers
+      tags:
+      - Suppliers
+    post:
+      consumes:
+      - application/json
+      description: Create a new supplier with the provided details
+      parameters:
+      - description: Supplier details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateSupplierRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Supplier'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new supplier
+      tags:
+      - Suppliers
+  /suppliers/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a supplier by ID
+      parameters:
+      - description: Supplier ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete supplier
+      tags:
+      - Suppliers
+    get:
+      consumes:
+      - application/json
+      description: Get a specific supplier by its ID
+      parameters:
+      - description: Supplier ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Supplier'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get supplier by ID
+      tags:
+      - Suppliers
+    put:
+      consumes:
+      - application/json
+      description: Update an existing supplier by ID
+      parameters:
+      - description: Supplier ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated supplier details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateSupplierRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Supplier'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update supplier
+      tags:
+      - Suppliers
+  /warehouses:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of warehouses with optional filters
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by warehouse name
+        in: query
+        name: search
+        type: string
+      - description: Filter by active status
+        in: query
+        name: is_active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List warehouses
+      tags:
+      - Warehouses
+    post:
+      consumes:
+      - application/json
+      description: Create a new warehouse with the provided details
+      parameters:
+      - description: Warehouse details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateWarehouseRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Warehouse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new warehouse
+      tags:
+      - Warehouses
+  /warehouses/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a warehouse by ID
+      parameters:
+      - description: Warehouse ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete warehouse
+      tags:
+      - Warehouses
+    get:
+      consumes:
+      - application/json
+      description: Get a specific warehouse by its ID
+      parameters:
+      - description: Warehouse ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Warehouse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get warehouse by ID
+      tags:
+      - Warehouses
+    put:
+      consumes:
+      - application/json
+      description: Update an existing warehouse by ID
+      parameters:
+      - description: Warehouse ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated warehouse details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateWarehouseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Warehouse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update warehouse
+      tags:
+      - Warehouses
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

@@ -22,6 +22,21 @@ func NewWarehouseHandler(warehouseService *services.WarehouseService) *Warehouse
 }
 
 
+// ListWarehouses gets a paginated list of warehouses
+// @Summary List warehouses
+// @Description Get a paginated list of warehouses with optional filters
+// @Tags Warehouses
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Param search query string false "Search by warehouse name"
+// @Param is_active query bool false "Filter by active status"
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /warehouses [get]
 func (h *WarehouseHandler) ListWarehouses(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -61,6 +76,19 @@ func (h *WarehouseHandler) ListWarehouses(c *gin.Context) {
 	})
 }
 
+// CreateWarehouse creates a new warehouse
+// @Summary Create a new warehouse
+// @Description Create a new warehouse with the provided details
+// @Tags Warehouses
+// @Accept json
+// @Produce json
+// @Param request body models.CreateWarehouseRequest true "Warehouse details"
+// @Success 201 {object} models.Warehouse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /warehouses [post]
 func (h *WarehouseHandler) CreateWarehouse(c *gin.Context) {
 	var req models.CreateWarehouseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -77,6 +105,19 @@ func (h *WarehouseHandler) CreateWarehouse(c *gin.Context) {
 	c.JSON(http.StatusCreated, warehouse)
 }
 
+// GetWarehouse gets a warehouse by ID
+// @Summary Get warehouse by ID
+// @Description Get a specific warehouse by its ID
+// @Tags Warehouses
+// @Accept json
+// @Produce json
+// @Param id path string true "Warehouse ID"
+// @Success 200 {object} models.Warehouse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /warehouses/{id} [get]
 func (h *WarehouseHandler) GetWarehouse(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -94,6 +135,20 @@ func (h *WarehouseHandler) GetWarehouse(c *gin.Context) {
 	c.JSON(http.StatusOK, warehouse)
 }
 
+// UpdateWarehouse updates an existing warehouse
+// @Summary Update warehouse
+// @Description Update an existing warehouse by ID
+// @Tags Warehouses
+// @Accept json
+// @Produce json
+// @Param id path string true "Warehouse ID"
+// @Param request body models.UpdateWarehouseRequest true "Updated warehouse details"
+// @Success 200 {object} models.Warehouse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /warehouses/{id} [put]
 func (h *WarehouseHandler) UpdateWarehouse(c *gin.Context) {
 	utils.DebugLog("UpdateWarehouseHandler", "Handler called", map[string]interface{}{
 		"method": c.Request.Method,
@@ -151,6 +206,19 @@ func (h *WarehouseHandler) UpdateWarehouse(c *gin.Context) {
 	c.JSON(http.StatusOK, warehouse)
 }
 
+// DeleteWarehouse deletes a warehouse by ID
+// @Summary Delete warehouse
+// @Description Delete a warehouse by ID
+// @Tags Warehouses
+// @Accept json
+// @Produce json
+// @Param id path string true "Warehouse ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /warehouses/{id} [delete]
 func (h *WarehouseHandler) DeleteWarehouse(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
