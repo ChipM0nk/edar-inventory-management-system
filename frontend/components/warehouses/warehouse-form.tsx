@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Warehouse } from '@/lib/types'
 
 const warehouseSchema = z.object({
@@ -76,75 +77,91 @@ export function WarehouseForm({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                {...form.register('name')}
-                placeholder="Warehouse name"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Warehouse name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.name.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="location">Location *</Label>
-              <Input
-                id="location"
-                {...form.register('location')}
-                placeholder="City, State"
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="City, State" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {form.formState.errors.location && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.location.message}
-                </p>
-              )}
             </div>
-          </div>
-          <div>
-            <Label htmlFor="address">Address</Label>
-            <Textarea
-              id="address"
-              {...form.register('address')}
-              placeholder="Full address"
-              rows={2}
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Full address" rows={2} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="contact_person">Contact Person</Label>
-              <Input
-                id="contact_person"
-                {...form.register('contact_person')}
-                placeholder="Contact person name"
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="contact_person"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Person</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Contact person name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="contact_phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Phone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Phone number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-            <div>
-              <Label htmlFor="contact_phone">Contact Phone</Label>
-              <Input
-                id="contact_phone"
-                {...form.register('contact_phone')}
-                placeholder="Phone number"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-            >
-              Cancel
-            </Button>
-            <Button type="submit">
-              {submitText}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">
+                {submitText}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

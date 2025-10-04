@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Category, Supplier } from '@/lib/types'
 
 const productSchema = z.object({
@@ -90,136 +91,152 @@ export function ProductForm({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="sku">SKU *</Label>
-              <Input
-                id="sku"
-                {...form.register('sku')}
-                placeholder="Product SKU"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="sku"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SKU *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Product SKU" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {form.formState.errors.sku && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.sku.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                {...form.register('name')}
-                placeholder="Product name"
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Product name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.name.message}
-                </p>
-              )}
             </div>
-          </div>
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              {...form.register('description')}
-              placeholder="Product description"
-              rows={2}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Product description" rows={2} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="category_id">Category *</Label>
-              <Select 
-                value={form.watch('category_id')} 
-                onValueChange={(value) => form.setValue('category_id', value)}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="supplier_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select supplier" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {suppliers.map((supplier) => (
+                          <SelectItem key={supplier.id} value={supplier.id}>
+                            {supplier.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="unit_price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unit Price (₱) *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="min_stock_level"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Minimum Stock Level *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.category_id && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.category_id.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="supplier_id">Supplier *</Label>
-              <Select 
-                value={form.watch('supplier_id')} 
-                onValueChange={(value) => form.setValue('supplier_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select supplier" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.supplier_id && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.supplier_id.message}
-                </p>
-              )}
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="unit_price">Unit Price (₱) *</Label>
-            <Input
-              id="unit_price"
-              type="number"
-              step="0.01"
-              min="0"
-              {...form.register('unit_price', { valueAsNumber: true })}
-              placeholder="0.00"
-            />
-            {form.formState.errors.unit_price && (
-              <p className="text-sm text-red-600 mt-1">
-                {form.formState.errors.unit_price.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="min_stock_level">Minimum Stock Level *</Label>
-            <Input
-              id="min_stock_level"
-              type="number"
-              min="0"
-              {...form.register('min_stock_level', { valueAsNumber: true })}
-              placeholder="0"
-            />
-            {form.formState.errors.min_stock_level && (
-              <p className="text-sm text-red-600 mt-1">
-                {form.formState.errors.min_stock_level.message}
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-            >
-              Cancel
-            </Button>
-            <Button type="submit">
-              {submitText}
-            </Button>
-          </DialogFooter>
-        </form>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {submitText}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

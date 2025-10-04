@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Plus, Package, Search, X } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
@@ -503,120 +504,148 @@ export default function NewStockMovementPage() {
               <p className="mt-2 text-gray-600">Add new purchase order to your inventory</p>
             </div>
 
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-              {/* Basic Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Purchase Order Information</CardTitle>
-                  <CardDescription>
-                    Enter the basic information for this purchase order
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="supplier_id">Supplier *</Label>
-                      <Select
-                        value={form.watch('supplier_id')}
-                        onValueChange={(value) => {
-                          form.setValue('supplier_id', value)
-                          handleSupplierChange(value)
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a supplier" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {suppliers.map((supplier) => (
-                            <SelectItem key={supplier.id} value={supplier.id}>
-                              {supplier.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {form.formState.errors.supplier_id && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {form.formState.errors.supplier_id.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="warehouse_id">Warehouse *</Label>
-                      <Select
-                        value={form.watch('warehouse_id')}
-                        onValueChange={(value) => {
-                          form.setValue('warehouse_id', value)
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a warehouse" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {warehouses.map((warehouse) => (
-                            <SelectItem key={warehouse.id} value={warehouse.id}>
-                              {warehouse.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {form.formState.errors.warehouse_id && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {form.formState.errors.warehouse_id.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="received_date">Received Date *</Label>
-                      <Input
-                        type="date"
-                        {...form.register('received_date')}
-                        className={form.formState.errors.received_date ? 'border-red-500' : ''}
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                {/* Basic Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Purchase Order Information</CardTitle>
+                    <CardDescription>
+                      Enter the basic information for this purchase order
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="supplier_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Supplier *</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={(value) => {
+                                field.onChange(value)
+                                handleSupplierChange(value)
+                              }}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a supplier" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {suppliers.map((supplier) => (
+                                  <SelectItem key={supplier.id} value={supplier.id}>
+                                    {supplier.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      {form.formState.errors.received_date && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {form.formState.errors.received_date.message}
-                        </p>
-                      )}
-                    </div>
 
-                    <div>
-                      <Label htmlFor="processed_by">Processed By *</Label>
-                      <Input
-                        {...form.register('processed_by')}
-                        placeholder="Enter processor name"
-                        value={user ? `${user.first_name} ${user.last_name}` : ''}
-                        readOnly
-                        className={form.formState.errors.processed_by ? 'border-red-500' : ''}
+                      <FormField
+                        control={form.control}
+                        name="warehouse_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Warehouse *</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a warehouse" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {warehouses.map((warehouse) => (
+                                  <SelectItem key={warehouse.id} value={warehouse.id}>
+                                    {warehouse.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      {form.formState.errors.processed_by && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {form.formState.errors.processed_by.message}
-                        </p>
-                      )}
-                    </div>
 
-                    <div>
-                      <Label htmlFor="reference_number">PO Reference Number *</Label>
-                      <Input
-                        {...form.register('reference_number')}
-                        placeholder="PO-12345"
-                        onChange={(e) => {
-                          const upperValue = e.target.value.toUpperCase()
-                          form.setValue('reference_number', upperValue)
-                        }}
+                      <FormField
+                        control={form.control}
+                        name="received_date"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Received Date *</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
 
-                    <div className="md:col-span-2">
-                      <Label htmlFor="notes">Notes</Label>
-                      <Textarea
-                        {...form.register('notes')}
-                        placeholder="Additional notes..."
-                        rows={3}
+                      <FormField
+                        control={form.control}
+                        name="processed_by"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Processed By *</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter processor name"
+                                readOnly
+                                {...field}
+                                value={user ? `${user.first_name} ${user.last_name}` : field.value}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
+
+                      <FormField
+                        control={form.control}
+                        name="reference_number"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>PO Reference Number *</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="PO-12345"
+                                {...field}
+                                onChange={(e) => {
+                                  const upperValue = e.target.value.toUpperCase()
+                                  field.onChange(upperValue)
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Additional notes..."
+                                rows={3}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                   </div>
                 </CardContent>
               </Card>
@@ -1040,7 +1069,8 @@ export default function NewStockMovementPage() {
                   {isSubmitting ? 'Creating...' : 'Create Stock Movement'}
                 </Button>
               </div>
-            </form>
+              </form>
+            </Form>
           </div>
         </div>
       </div>

@@ -58,6 +58,21 @@
   }
 }
 
+@layer utilities {
+  /* Ensure error focus rings have higher specificity */
+  input[aria-invalid="true"]:focus-visible {
+    --tw-ring-color: hsl(var(--destructive)) !important;
+  }
+  
+  select[aria-invalid="true"]:focus {
+    --tw-ring-color: hsl(var(--destructive)) !important;
+  }
+  
+  textarea[aria-invalid="true"]:focus-visible {
+    --tw-ring-color: hsl(var(--destructive)) !important;
+  }
+}
+
 
 
 

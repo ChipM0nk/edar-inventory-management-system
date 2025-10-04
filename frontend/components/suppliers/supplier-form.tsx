@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Supplier } from '@/lib/types'
 
 const supplierSchema = z.object({
@@ -96,121 +97,165 @@ export function SupplierForm({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                {...form.register('name')}
-                placeholder="Supplier name"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Supplier name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.name.message}
-                </p>
+              <FormField
+                control={form.control}
+                name="contact_person"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Person</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Contact person name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="supplier@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Phone number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Full address" rows={2} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
-            <div>
-              <Label htmlFor="contact_person">Contact Person</Label>
-              <Input
-                id="contact_person"
-                {...form.register('contact_person')}
-                placeholder="Contact person name"
+            />
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <Input placeholder="City" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State</FormLabel>
+                    <FormControl>
+                      <Input placeholder="State" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Country" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                {...form.register('email')}
-                placeholder="supplier@example.com"
-              />
-              {form.formState.errors.email && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.email.message}
-                </p>
+            <FormField
+              control={form.control}
+              name="postal_code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Postal Code</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Postal code" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                {...form.register('phone')}
-                placeholder="Phone number"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="address">Address</Label>
-            <Textarea
-              id="address"
-              {...form.register('address')}
-              placeholder="Full address"
-              rows={2}
             />
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                {...form.register('city')}
-                placeholder="City"
+            {showActiveToggle && (
+              <FormField
+                control={form.control}
+                name="is_active"
+                render={({ field }) => (
+                  <FormItem className="flex items-center space-x-2">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="rounded"
+                      />
+                    </FormControl>
+                    <FormLabel className="!mt-0">Active</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div>
-              <Label htmlFor="state">State</Label>
-              <Input
-                id="state"
-                {...form.register('state')}
-                placeholder="State"
-              />
-            </div>
-            <div>
-              <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
-                {...form.register('country')}
-                placeholder="Country"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="postal_code">Postal Code</Label>
-            <Input
-              id="postal_code"
-              {...form.register('postal_code')}
-              placeholder="Postal code"
-            />
-          </div>
-          {showActiveToggle && (
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="is_active"
-                {...form.register('is_active')}
-                className="rounded"
-              />
-              <Label htmlFor="is_active">Active</Label>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Processing...' : submitText}
-            </Button>
-          </DialogFooter>
-        </form>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Processing...' : submitText}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )
