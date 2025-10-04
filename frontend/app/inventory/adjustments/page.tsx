@@ -77,6 +77,8 @@ export default function AdjustmentsPage() {
   const [filteredAdjustments, setFilteredAdjustments] = useState<Adjustment[]>([])
   const [selectedAdjustment, setSelectedAdjustment] = useState<Adjustment | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isLoadingAdjustmentDetails, setIsLoadingAdjustmentDetails] = useState(false)
+  const [adjustmentDetailsError, setAdjustmentDetailsError] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
@@ -335,14 +337,56 @@ export default function AdjustmentsPage() {
     setIsUploadingDocuments(false)
   }
 
-  const handleAdjustmentClick = (adjustment: Adjustment) => {
+  const handleAdjustmentClick = async (adjustment: Adjustment) => {
     setSelectedAdjustment(adjustment)
     setIsModalOpen(true)
+    setIsLoadingAdjustmentDetails(true)
+    setAdjustmentDetailsError(null)
+    
+    // Fetch detailed adjustment data including items
+    try {
+      const response = await api.get(`/adjustments/${adjustment.id}`)
+      const detailedAdjustment = response.data
+      
+      // Convert backend adjustment to frontend format with items
+      const convertedAdjustment: Adjustment = {
+        id: detailedAdjustment.id,
+        reference_id: detailedAdjustment.reference_number,
+        total_quantity: detailedAdjustment.total_quantity,
+        processed_by: detailedAdjustment.processed_by_first_name && detailedAdjustment.processed_by_last_name 
+          ? `${detailedAdjustment.processed_by_first_name} ${detailedAdjustment.processed_by_last_name}`
+          : detailedAdjustment.created_by_first_name && detailedAdjustment.created_by_last_name
+          ? `${detailedAdjustment.created_by_first_name} ${detailedAdjustment.created_by_last_name}`
+          : 'Unknown',
+        processed_date: detailedAdjustment.processed_date || detailedAdjustment.created_at,
+        created_at: detailedAdjustment.created_at,
+        items: detailedAdjustment.items?.map((item: any) => ({
+          product_id: item.product_id,
+          product_name: item.product_name || 'Unknown Product',
+          product_sku: item.product_sku || 'N/A',
+          warehouse_id: item.warehouse_id,
+          warehouse_name: item.warehouse_name || 'Unknown Warehouse',
+          quantity: item.quantity,
+          cost_price: item.cost_price || 0,
+          reason: item.reason || 'N/A'
+        })) || []
+      }
+      
+      setSelectedAdjustment(convertedAdjustment)
+    } catch (error: any) {
+      console.error('Error fetching adjustment details:', error)
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to load adjustment details'
+      setAdjustmentDetailsError(errorMessage)
+      // Keep the original adjustment data if fetch fails
+    } finally {
+      setIsLoadingAdjustmentDetails(false)
+    }
   }
 
   const closeModal = () => {
     setIsModalOpen(false)
     setSelectedAdjustment(null)
+    setAdjustmentDetailsError(null)
   }
 
   const checkStockLevel = async (productId: string, warehouseId: string): Promise<number> => {
@@ -788,40 +832,73 @@ export default function AdjustmentsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Warehouse</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Reason</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedAdjustment.items.map((item, index) => (
-                          <TableRow key={`${item.product_id}-${index}`}>
-                            <TableCell className="font-medium">
-                              {item.product_name}
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {item.product_sku}
-                            </TableCell>
-                            <TableCell>
-                              {item.warehouse_name}
-                            </TableCell>
-                            <TableCell className={`font-medium ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {item.quantity > 0 ? '+' : ''}{item.quantity}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {item.reason}
-                            </TableCell>
+                  {isLoadingAdjustmentDetails ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                      <p className="mt-2 text-gray-600">Loading adjustment details...</p>
+                    </div>
+                  ) : adjustmentDetailsError ? (
+                    <div className="text-center py-8">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <AlertTriangle className="h-5 w-5 text-red-500" />
+                          <h3 className="text-sm font-medium text-red-800">Error Loading Details</h3>
+                        </div>
+                        <p className="text-sm text-red-700">{adjustmentDetailsError}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAdjustmentClick(selectedAdjustment!)}
+                          className="mt-3 text-red-600 border-red-300 hover:bg-red-50"
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    </div>
+                  ) : selectedAdjustment.items.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No items found for this adjustment</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead>SKU</TableHead>
+                            <TableHead>Warehouse</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Cost Price</TableHead>
+                            <TableHead>Reason</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedAdjustment.items.map((item, index) => (
+                            <TableRow key={`${item.product_id}-${index}`}>
+                              <TableCell className="font-medium">
+                                {item.product_name}
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">
+                                {item.product_sku}
+                              </TableCell>
+                              <TableCell>
+                                {item.warehouse_name}
+                              </TableCell>
+                              <TableCell className={`font-medium ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {item.quantity > 0 ? '+' : ''}{item.quantity}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                ₱{item.cost_price.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {item.reason}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
