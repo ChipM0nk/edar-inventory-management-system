@@ -124,6 +124,11 @@ export default function AdjustmentsPage() {
   const [documentViewerUrl, setDocumentViewerUrl] = useState<string | null>(null)
   const [documentUrl, setDocumentUrl] = useState<string | null>(null)
   
+  // Document upload state for details modal
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
+  const [uploadedFilesDetails, setUploadedFilesDetails] = useState<File[]>([])
+  const [isUploadingDocumentsDetails, setIsUploadingDocumentsDetails] = useState(false)
+  
   // Reference fields for PO/SO connections
   const [referenceType, setReferenceType] = useState<string>('')
   const [referenceId, setReferenceId] = useState<string>('')
@@ -421,6 +426,8 @@ export default function AdjustmentsPage() {
     setAdjustmentDetailsError(null)
     setDocuments([])
     setDocumentUrl(null)
+    setShowDocumentUpload(false)
+    setUploadedFilesDetails([])
   }
 
   const checkStockLevel = async (productId: string, warehouseId: string): Promise<number> => {
@@ -619,6 +626,69 @@ export default function AdjustmentsPage() {
       }
     } finally {
       setViewingDocument(null)
+    }
+  }
+
+  // Delete document
+  const deleteDocument = async (document: Document) => {
+    if (!confirm(`Are you sure you want to delete "${document.file_name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/documents/${document.id}`)
+      
+      // Remove the document from the current documents list
+      setDocuments(prev => prev.filter(doc => doc.id !== document.id))
+      
+      // Show success message
+      alert('Document deleted successfully')
+    } catch (error) {
+      console.error('Error deleting document:', error)
+      alert('Failed to delete document. Please try again.')
+    }
+  }
+
+  // Document upload functions for details modal
+  const handleFileSelectDetails = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    setUploadedFilesDetails(prev => [...prev, ...files])
+  }
+
+  const removeFileDetails = (index: number) => {
+    setUploadedFilesDetails(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const uploadDocumentsDetails = async () => {
+    if (!selectedAdjustment || uploadedFilesDetails.length === 0) return
+
+    try {
+      setIsUploadingDocumentsDetails(true)
+      const formData = new FormData()
+      
+      uploadedFilesDetails.forEach((file) => {
+        formData.append('documents', file)
+      })
+      formData.append('reference_type', 'adjustment')
+      formData.append('reference_id', selectedAdjustment.id)
+
+      await api.post('/documents/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      
+      // Reload documents and clear upload files
+      await loadDocuments(selectedAdjustment.id)
+      setUploadedFilesDetails([])
+      setShowDocumentUpload(false)
+      
+      alert('Documents uploaded successfully!')
+    } catch (error) {
+      console.error('Error uploading documents:', error)
+      alert('Error uploading documents. Please try again.')
+    } finally {
+      setIsUploadingDocumentsDetails(false)
     }
   }
 
@@ -1030,6 +1100,78 @@ export default function AdjustmentsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/* Upload Documents */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Button
+                        onClick={() => setShowDocumentUpload(!showDocumentUpload)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Add Documents
+                      </Button>
+                    </div>
+                    
+                    {showDocumentUpload && (
+                      <div className="border rounded-lg p-4 bg-gray-50">
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Select documents to upload
+                            </label>
+                            <input
+                              type="file"
+                              multiple
+                              accept=".pdf,.png,.jpg,.jpeg"
+                              onChange={handleFileSelectDetails}
+                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                          </div>
+                          
+                          {uploadedFilesDetails.length > 0 && (
+                            <div>
+                              <p className="text-sm font-medium text-gray-700 mb-2">Selected files:</p>
+                              <ul className="space-y-1">
+                                {uploadedFilesDetails.map((file, index) => (
+                                  <li key={index} className="flex items-center justify-between text-sm text-gray-600 bg-white p-2 rounded">
+                                    <span>{file.name} ({formatFileSize(file.size)})</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeFileDetails(index)}
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={uploadDocumentsDetails}
+                              disabled={uploadedFilesDetails.length === 0 || isUploadingDocumentsDetails}
+                              size="sm"
+                            >
+                              {isUploadingDocumentsDetails ? 'Uploading...' : 'Upload'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setShowDocumentUpload(false)
+                                setUploadedFilesDetails([])
+                              }}
+                              size="sm"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {isLoadingDocuments ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -1067,6 +1209,15 @@ export default function AdjustmentsPage() {
                               className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
                             >
                               Download
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => deleteDocument(doc)}
+                              className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Delete
                             </Button>
                           </div>
                         </div>
