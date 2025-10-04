@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"inventory-system/internal/models"
 	"inventory-system/internal/services"
 	"io"
 	"net/http"
@@ -48,27 +49,31 @@ func NewDocumentHandler(documentService *services.DocumentService) *DocumentHand
 	}
 }
 
-// UploadDocuments handles document upload for purchase orders or adjustments
+// UploadDocuments handles document upload for all stock movement types
 func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 	referenceType := c.PostForm("reference_type")
 	referenceID := c.PostForm("reference_id")
+	purchaseOrderID := c.PostForm("purchase_order_id")
+	
+	fmt.Printf("Document upload parameters - reference_type: '%s', reference_id: '%s', purchase_order_id: '%s'\n", 
+		referenceType, referenceID, purchaseOrderID)
 	
 	// Support legacy purchase_order_id parameter for backward compatibility
 	if referenceType == "" && referenceID == "" {
-		purchaseOrderID := c.PostForm("purchase_order_id")
 		if purchaseOrderID != "" {
 			referenceType = "purchase_order"
 			referenceID = purchaseOrderID
+			fmt.Printf("Using legacy purchase_order_id parameter: %s\n", purchaseOrderID)
 		}
 	}
 	
 	if referenceType == "" || referenceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reference type and ID are required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reference type and ID are required (or purchase_order_id for legacy support)"})
 		return
 	}
 	
 	// Validate reference type
-	validTypes := []string{"purchase_order", "adjustment"}
+	validTypes := []string{"purchase_order", "adjustment", "transfer", "sales_order"}
 	isValidType := false
 	for _, validType := range validTypes {
 		if referenceType == validType {
@@ -77,7 +82,7 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		}
 	}
 	if !isValidType {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reference type. Must be 'purchase_order' or 'adjustment'"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reference type. Must be one of: purchase_order, adjustment, transfer, sales_order"})
 		return
 	}
 
@@ -120,6 +125,10 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 			subDir = "po"
 		case "adjustment":
 			subDir = "adjustments"
+		case "transfer":
+			subDir = "transfers"
+		case "sales_order":
+			subDir = "sales"
 		default:
 			subDir = "misc"
 		}
@@ -148,14 +157,14 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 
 		// Save document record to database
 		relativePath := filepath.Join(subDir, year, month, fileName)
-		doc, err := h.documentService.CreateDocument(
-			referenceType,
-			referenceID,
-			file.Filename,
-			relativePath,
-			file.Size,
-			file.Header.Get("Content-Type"),
-		)
+		doc, err := h.documentService.CreateDocument(models.CreateDocumentRequest{
+			ReferenceType: referenceType,
+			ReferenceID:   referenceID,
+			FileName:      file.Filename,
+			FilePath:      relativePath,
+			FileSize:      file.Size,
+			FileType:      file.Header.Get("Content-Type"),
+		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save document record"})
 			return
@@ -311,62 +320,65 @@ func (h *DocumentHandler) DeleteDocument(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Document deleted successfully"})
 }
 
-// ValidateDocument validates a document using OCR
-func (h *DocumentHandler) ValidateDocument(c *gin.Context) {
-	documentID := c.Param("id")
-	if documentID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Document ID is required"})
+
+// GetDocumentsByType retrieves all documents of a specific type
+func (h *DocumentHandler) GetDocumentsByType(c *gin.Context) {
+	referenceType := c.Param("type")
+	if referenceType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reference type is required"})
 		return
 	}
 
-	// Get document info to verify it exists
-	_, err := h.documentService.GetDocumentByID(documentID)
+	// Validate reference type
+	validTypes := []string{"purchase_order", "adjustment", "transfer", "sales_order"}
+	isValidType := false
+	for _, validType := range validTypes {
+		if referenceType == validType {
+			isValidType = true
+			break
+		}
+	}
+	if !isValidType {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reference type. Must be one of: purchase_order, adjustment, transfer, sales_order"})
+		return
+	}
+
+	documents, err := h.documentService.GetDocumentsByType(referenceType)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Document not found"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
 		return
 	}
 
-	// Get purchase order info
-	poNumber := c.Query("po_number")
-	orderDateStr := c.Query("order_date")
-	
-	if poNumber == "" || orderDateStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "PO number and order date are required for validation"})
+	c.JSON(http.StatusOK, documents)
+}
+
+// ListAllDocuments retrieves all documents with pagination
+func (h *DocumentHandler) ListAllDocuments(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, err := strconv.ParseInt(limitStr, 10, 32)
+	if err != nil || limit <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
 		return
 	}
 
-	orderDate, err := time.Parse("2006-01-02", orderDateStr)
+	offset, err := strconv.ParseInt(offsetStr, 10, 32)
+	if err != nil || offset < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offset parameter"})
+		return
+	}
+
+	documents, err := h.documentService.ListDocuments(int32(limit), int32(offset))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order date format. Use YYYY-MM-DD"})
-		return
-	}
-
-	// Perform validation
-	result, err := h.documentService.ValidateDocument(documentID, poNumber, orderDate)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate document"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"document_id": documentID,
-		"validation_result": result,
+		"documents": documents,
+		"limit":     limit,
+		"offset":    offset,
+		"count":     len(documents),
 	})
-}
-
-// GetDocumentValidationStatus returns the validation status of a document
-func (h *DocumentHandler) GetDocumentValidationStatus(c *gin.Context) {
-	documentID := c.Param("id")
-	if documentID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Document ID is required"})
-		return
-	}
-
-	document, err := h.documentService.GetDocumentValidationStatus(documentID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Document not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, document)
 }

@@ -13,32 +13,28 @@ import (
 
 const CreateDocument = `-- name: CreateDocument :one
 INSERT INTO documents (
-    purchase_order_id,
     reference_type,
     reference_id,
     file_name,
     file_path,
     file_size,
-    file_type,
-    validation_status
+    file_type
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, 'pending'
-) RETURNING id, purchase_order_id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, has_po_reference, has_matching_date, validation_status, validation_notes, reference_type, reference_id
+    $1, $2, $3, $4, $5, $6
+) RETURNING id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, reference_type, reference_id
 `
 
 type CreateDocumentParams struct {
-	PurchaseOrderID pgtype.UUID `json:"purchase_order_id"`
-	ReferenceType   *string     `json:"reference_type"`
-	ReferenceID     pgtype.UUID `json:"reference_id"`
-	FileName        string      `json:"file_name"`
-	FilePath        string      `json:"file_path"`
-	FileSize        int64       `json:"file_size"`
-	FileType        string      `json:"file_type"`
+	ReferenceType string      `json:"reference_type"`
+	ReferenceID   pgtype.UUID `json:"reference_id"`
+	FileName      string      `json:"file_name"`
+	FilePath      string      `json:"file_path"`
+	FileSize      int64       `json:"file_size"`
+	FileType      string      `json:"file_type"`
 }
 
 func (q *Queries) CreateDocument(ctx context.Context, arg *CreateDocumentParams) (*Document, error) {
 	row := q.db.QueryRow(ctx, CreateDocument,
-		arg.PurchaseOrderID,
 		arg.ReferenceType,
 		arg.ReferenceID,
 		arg.FileName,
@@ -49,7 +45,6 @@ func (q *Queries) CreateDocument(ctx context.Context, arg *CreateDocumentParams)
 	var i Document
 	err := row.Scan(
 		&i.ID,
-		&i.PurchaseOrderID,
 		&i.FileName,
 		&i.FilePath,
 		&i.FileSize,
@@ -57,10 +52,6 @@ func (q *Queries) CreateDocument(ctx context.Context, arg *CreateDocumentParams)
 		&i.UploadedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.HasPoReference,
-		&i.HasMatchingDate,
-		&i.ValidationStatus,
-		&i.ValidationNotes,
 		&i.ReferenceType,
 		&i.ReferenceID,
 	)
@@ -77,7 +68,7 @@ func (q *Queries) DeleteDocument(ctx context.Context, id pgtype.UUID) error {
 }
 
 const GetDocumentByID = `-- name: GetDocumentByID :one
-SELECT id, purchase_order_id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, has_po_reference, has_matching_date, validation_status, validation_notes, reference_type, reference_id FROM documents WHERE id = $1
+SELECT id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, reference_type, reference_id FROM documents WHERE id = $1
 `
 
 func (q *Queries) GetDocumentByID(ctx context.Context, id pgtype.UUID) (*Document, error) {
@@ -85,7 +76,6 @@ func (q *Queries) GetDocumentByID(ctx context.Context, id pgtype.UUID) (*Documen
 	var i Document
 	err := row.Scan(
 		&i.ID,
-		&i.PurchaseOrderID,
 		&i.FileName,
 		&i.FilePath,
 		&i.FileSize,
@@ -93,10 +83,6 @@ func (q *Queries) GetDocumentByID(ctx context.Context, id pgtype.UUID) (*Documen
 		&i.UploadedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.HasPoReference,
-		&i.HasMatchingDate,
-		&i.ValidationStatus,
-		&i.ValidationNotes,
 		&i.ReferenceType,
 		&i.ReferenceID,
 	)
@@ -104,13 +90,13 @@ func (q *Queries) GetDocumentByID(ctx context.Context, id pgtype.UUID) (*Documen
 }
 
 const GetDocumentsByPurchaseOrder = `-- name: GetDocumentsByPurchaseOrder :many
-SELECT id, purchase_order_id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, has_po_reference, has_matching_date, validation_status, validation_notes, reference_type, reference_id FROM documents 
-WHERE purchase_order_id = $1 
+SELECT id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, reference_type, reference_id FROM documents 
+WHERE reference_type = 'purchase_order' AND reference_id = $1 
 ORDER BY uploaded_at DESC
 `
 
-func (q *Queries) GetDocumentsByPurchaseOrder(ctx context.Context, purchaseOrderID pgtype.UUID) ([]*Document, error) {
-	rows, err := q.db.Query(ctx, GetDocumentsByPurchaseOrder, purchaseOrderID)
+func (q *Queries) GetDocumentsByPurchaseOrder(ctx context.Context, referenceID pgtype.UUID) ([]*Document, error) {
+	rows, err := q.db.Query(ctx, GetDocumentsByPurchaseOrder, referenceID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +106,6 @@ func (q *Queries) GetDocumentsByPurchaseOrder(ctx context.Context, purchaseOrder
 		var i Document
 		if err := rows.Scan(
 			&i.ID,
-			&i.PurchaseOrderID,
 			&i.FileName,
 			&i.FilePath,
 			&i.FileSize,
@@ -128,10 +113,6 @@ func (q *Queries) GetDocumentsByPurchaseOrder(ctx context.Context, purchaseOrder
 			&i.UploadedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.HasPoReference,
-			&i.HasMatchingDate,
-			&i.ValidationStatus,
-			&i.ValidationNotes,
 			&i.ReferenceType,
 			&i.ReferenceID,
 		); err != nil {
@@ -146,13 +127,13 @@ func (q *Queries) GetDocumentsByPurchaseOrder(ctx context.Context, purchaseOrder
 }
 
 const GetDocumentsByReference = `-- name: GetDocumentsByReference :many
-SELECT id, purchase_order_id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, has_po_reference, has_matching_date, validation_status, validation_notes, reference_type, reference_id FROM documents 
+SELECT id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, reference_type, reference_id FROM documents 
 WHERE reference_type = $1 AND reference_id = $2 
 ORDER BY uploaded_at DESC
 `
 
 type GetDocumentsByReferenceParams struct {
-	ReferenceType *string     `json:"reference_type"`
+	ReferenceType string      `json:"reference_type"`
 	ReferenceID   pgtype.UUID `json:"reference_id"`
 }
 
@@ -167,7 +148,6 @@ func (q *Queries) GetDocumentsByReference(ctx context.Context, arg *GetDocuments
 		var i Document
 		if err := rows.Scan(
 			&i.ID,
-			&i.PurchaseOrderID,
 			&i.FileName,
 			&i.FilePath,
 			&i.FileSize,
@@ -175,10 +155,6 @@ func (q *Queries) GetDocumentsByReference(ctx context.Context, arg *GetDocuments
 			&i.UploadedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.HasPoReference,
-			&i.HasMatchingDate,
-			&i.ValidationStatus,
-			&i.ValidationNotes,
 			&i.ReferenceType,
 			&i.ReferenceID,
 		); err != nil {
@@ -192,50 +168,81 @@ func (q *Queries) GetDocumentsByReference(ctx context.Context, arg *GetDocuments
 	return items, nil
 }
 
-const UpdateDocumentValidation = `-- name: UpdateDocumentValidation :one
-UPDATE documents 
-SET has_po_reference = $2, 
-    has_matching_date = $3, 
-    validation_status = $4, 
-    validation_notes = $5,
-    updated_at = NOW()
-WHERE id = $1
-RETURNING id, purchase_order_id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, has_po_reference, has_matching_date, validation_status, validation_notes, reference_type, reference_id
+const GetDocumentsByTypeOnly = `-- name: GetDocumentsByTypeOnly :many
+SELECT id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, reference_type, reference_id FROM documents 
+WHERE reference_type = $1
+ORDER BY uploaded_at DESC
 `
 
-type UpdateDocumentValidationParams struct {
-	ID               pgtype.UUID `json:"id"`
-	HasPoReference   *bool       `json:"has_po_reference"`
-	HasMatchingDate  *bool       `json:"has_matching_date"`
-	ValidationStatus *string     `json:"validation_status"`
-	ValidationNotes  *string     `json:"validation_notes"`
+func (q *Queries) GetDocumentsByTypeOnly(ctx context.Context, referenceType string) ([]*Document, error) {
+	rows, err := q.db.Query(ctx, GetDocumentsByTypeOnly, referenceType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*Document{}
+	for rows.Next() {
+		var i Document
+		if err := rows.Scan(
+			&i.ID,
+			&i.FileName,
+			&i.FilePath,
+			&i.FileSize,
+			&i.FileType,
+			&i.UploadedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ReferenceType,
+			&i.ReferenceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-func (q *Queries) UpdateDocumentValidation(ctx context.Context, arg *UpdateDocumentValidationParams) (*Document, error) {
-	row := q.db.QueryRow(ctx, UpdateDocumentValidation,
-		arg.ID,
-		arg.HasPoReference,
-		arg.HasMatchingDate,
-		arg.ValidationStatus,
-		arg.ValidationNotes,
-	)
-	var i Document
-	err := row.Scan(
-		&i.ID,
-		&i.PurchaseOrderID,
-		&i.FileName,
-		&i.FilePath,
-		&i.FileSize,
-		&i.FileType,
-		&i.UploadedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.HasPoReference,
-		&i.HasMatchingDate,
-		&i.ValidationStatus,
-		&i.ValidationNotes,
-		&i.ReferenceType,
-		&i.ReferenceID,
-	)
-	return &i, err
+const ListAllDocuments = `-- name: ListAllDocuments :many
+SELECT id, file_name, file_path, file_size, file_type, uploaded_at, created_at, updated_at, reference_type, reference_id FROM documents 
+ORDER BY uploaded_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListAllDocumentsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListAllDocuments(ctx context.Context, arg *ListAllDocumentsParams) ([]*Document, error) {
+	rows, err := q.db.Query(ctx, ListAllDocuments, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*Document{}
+	for rows.Next() {
+		var i Document
+		if err := rows.Scan(
+			&i.ID,
+			&i.FileName,
+			&i.FilePath,
+			&i.FileSize,
+			&i.FileType,
+			&i.UploadedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ReferenceType,
+			&i.ReferenceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

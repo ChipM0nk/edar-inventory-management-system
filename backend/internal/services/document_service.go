@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Helper function to safely get string value from pointer
@@ -20,42 +19,12 @@ func getStringValue(s *string) string {
 	return *s
 }
 
-type DocumentService struct {
-	db *database.DB
-	validationService *DocumentValidationService
-}
-
-func NewDocumentService(db *database.DB) *DocumentService {
-	return &DocumentService{
-		db: db,
-		validationService: NewDocumentValidationService(db),
-	}
-}
-
-func (s *DocumentService) CreateDocument(referenceType, referenceID, fileName, filePath string, fileSize int64, fileType string) (*models.Document, error) {
-	ctx := context.Background()
-	
-	var purchaseOrderIDPgx pgtype.UUID
-	if referenceType == "purchase_order" {
-		purchaseOrderIDPgx = utils.UUIDToPgxUUID(uuid.MustParse(referenceID))
-	}
-	
-	doc, err := s.db.CreateDocument(ctx, &sqlc.CreateDocumentParams{
-		PurchaseOrderID: purchaseOrderIDPgx,
-		ReferenceType:   &referenceType,
-		ReferenceID:     utils.UUIDToPgxUUID(uuid.MustParse(referenceID)),
-		FileName:        fileName,
-		FilePath:        filePath,
-		FileSize:        fileSize,
-		FileType:        fileType,
-	})
-	if err != nil {
-		return nil, err
-	}
-
+// Helper function to convert database document to model
+func (s *DocumentService) convertToDocumentModel(doc *sqlc.Document) *models.Document {
 	return &models.Document{
 		ID:              utils.PgxUUIDToUUID(doc.ID).String(),
-		PurchaseOrderID: utils.PgxUUIDToUUID(doc.PurchaseOrderID).String(),
+		ReferenceType:   doc.ReferenceType,
+		ReferenceID:     utils.PgxUUIDToUUID(doc.ReferenceID).String(),
 		FileName:        doc.FileName,
 		FilePath:        doc.FilePath,
 		FileSize:        doc.FileSize,
@@ -63,17 +32,54 @@ func (s *DocumentService) CreateDocument(referenceType, referenceID, fileName, f
 		UploadedAt:      utils.PgxTimestamptzToTime(doc.UploadedAt),
 		CreatedAt:       utils.PgxTimestamptzToTime(doc.CreatedAt),
 		UpdatedAt:       utils.PgxTimestamptzToTime(doc.UpdatedAt),
-		HasPOReference:  doc.HasPoReference,
-		HasMatchingDate: doc.HasMatchingDate,
-		ValidationStatus: getStringValue(doc.ValidationStatus),
-		ValidationNotes:  doc.ValidationNotes,
-	}, nil
+	}
+}
+
+type DocumentService struct {
+	db *database.DB
+}
+
+func NewDocumentService(db *database.DB) *DocumentService {
+	return &DocumentService{
+		db: db,
+	}
+}
+
+func (s *DocumentService) CreateDocument(req models.CreateDocumentRequest) (*models.Document, error) {
+	ctx := context.Background()
+	
+	doc, err := s.db.CreateDocument(ctx, &sqlc.CreateDocumentParams{
+		ReferenceType:   req.ReferenceType,
+		ReferenceID:     utils.UUIDToPgxUUID(uuid.MustParse(req.ReferenceID)),
+		FileName:        req.FileName,
+		FilePath:        req.FilePath,
+		FileSize:        req.FileSize,
+		FileType:        req.FileType,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s.convertToDocumentModel(doc), nil
+}
+
+// Legacy method for backward compatibility
+func (s *DocumentService) CreateDocumentLegacy(referenceType, referenceID, fileName, filePath string, fileSize int64, fileType string) (*models.Document, error) {
+	req := models.CreateDocumentRequest{
+		ReferenceType: referenceType,
+		ReferenceID:   referenceID,
+		FileName:      fileName,
+		FilePath:      filePath,
+		FileSize:      fileSize,
+		FileType:      fileType,
+	}
+	return s.CreateDocument(req)
 }
 
 func (s *DocumentService) GetDocumentsByReference(referenceType, referenceID string) ([]models.Document, error) {
 	ctx := context.Background()
 	docs, err := s.db.GetDocumentsByReference(ctx, &sqlc.GetDocumentsByReferenceParams{
-		ReferenceType: &referenceType,
+		ReferenceType: referenceType,
 		ReferenceID:   utils.UUIDToPgxUUID(uuid.MustParse(referenceID)),
 	})
 	if err != nil {
@@ -82,21 +88,7 @@ func (s *DocumentService) GetDocumentsByReference(referenceType, referenceID str
 
 	result := make([]models.Document, len(docs))
 	for i, doc := range docs {
-		result[i] = models.Document{
-			ID:              utils.PgxUUIDToUUID(doc.ID).String(),
-			PurchaseOrderID: utils.PgxUUIDToUUID(doc.PurchaseOrderID).String(),
-			FileName:        doc.FileName,
-			FilePath:        doc.FilePath,
-			FileSize:        doc.FileSize,
-			FileType:        doc.FileType,
-			UploadedAt:      utils.PgxTimestamptzToTime(doc.UploadedAt),
-			CreatedAt:       utils.PgxTimestamptzToTime(doc.CreatedAt),
-			UpdatedAt:       utils.PgxTimestamptzToTime(doc.UpdatedAt),
-			HasPOReference:  doc.HasPoReference,
-			HasMatchingDate: doc.HasMatchingDate,
-			ValidationStatus: getStringValue(doc.ValidationStatus),
-			ValidationNotes:  doc.ValidationNotes,
-		}
+		result[i] = *s.convertToDocumentModel(doc)
 	}
 
 	return result, nil
@@ -111,21 +103,7 @@ func (s *DocumentService) GetDocumentsByPurchaseOrder(purchaseOrderID string) ([
 
 	result := make([]models.Document, len(docs))
 	for i, doc := range docs {
-		result[i] = models.Document{
-			ID:              utils.PgxUUIDToUUID(doc.ID).String(),
-			PurchaseOrderID: utils.PgxUUIDToUUID(doc.PurchaseOrderID).String(),
-			FileName:        doc.FileName,
-			FilePath:        doc.FilePath,
-			FileSize:        doc.FileSize,
-			FileType:        doc.FileType,
-			UploadedAt:      utils.PgxTimestamptzToTime(doc.UploadedAt),
-			CreatedAt:       utils.PgxTimestamptzToTime(doc.CreatedAt),
-			UpdatedAt:       utils.PgxTimestamptzToTime(doc.UpdatedAt),
-			HasPOReference:  doc.HasPoReference,
-			HasMatchingDate: doc.HasMatchingDate,
-			ValidationStatus: getStringValue(doc.ValidationStatus),
-			ValidationNotes:  doc.ValidationNotes,
-		}
+		result[i] = *s.convertToDocumentModel(doc)
 	}
 
 	return result, nil
@@ -143,36 +121,53 @@ func (s *DocumentService) GetDocumentByID(documentID string) (*models.Document, 
 		return nil, err
 	}
 
-	return &models.Document{
-		ID:              utils.PgxUUIDToUUID(doc.ID).String(),
-		PurchaseOrderID: utils.PgxUUIDToUUID(doc.PurchaseOrderID).String(),
-		FileName:        doc.FileName,
-		FilePath:        doc.FilePath,
-		FileSize:        doc.FileSize,
-		FileType:        doc.FileType,
-		UploadedAt:      utils.PgxTimestamptzToTime(doc.UploadedAt),
-		CreatedAt:       utils.PgxTimestamptzToTime(doc.CreatedAt),
-		UpdatedAt:       utils.PgxTimestamptzToTime(doc.UpdatedAt),
-		HasPOReference:  doc.HasPoReference,
-		HasMatchingDate: doc.HasMatchingDate,
-		ValidationStatus: getStringValue(doc.ValidationStatus),
-		ValidationNotes:  doc.ValidationNotes,
-	}, nil
+	return s.convertToDocumentModel(doc), nil
 }
 
-// ValidateDocument performs OCR validation on a document
-func (s *DocumentService) ValidateDocument(documentID string, poNumber string, orderDate time.Time) (*ValidationResult, error) {
-	return s.validationService.ValidateDocument(documentID, poNumber, orderDate)
+
+// GetDocumentsByType retrieves all documents of a specific type
+func (s *DocumentService) GetDocumentsByType(referenceType string) ([]models.Document, error) {
+	ctx := context.Background()
+	docs, err := s.db.GetDocumentsByTypeOnly(ctx, referenceType)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]models.Document, len(docs))
+	for i, doc := range docs {
+		result[i] = *s.convertToDocumentModel(doc)
+	}
+
+	return result, nil
 }
 
-// GetDocumentValidationStatus returns the validation status of a document
-func (s *DocumentService) GetDocumentValidationStatus(documentID string) (*models.Document, error) {
-	return s.validationService.GetDocumentValidationStatus(documentID)
+// ListDocuments retrieves all documents with optional filtering
+func (s *DocumentService) ListDocuments(limit, offset int32) ([]models.Document, error) {
+	ctx := context.Background()
+	docs, err := s.db.ListAllDocuments(ctx, &sqlc.ListAllDocumentsParams{
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]models.Document, len(docs))
+	for i, doc := range docs {
+		result[i] = *s.convertToDocumentModel(doc)
+	}
+
+	return result, nil
 }
 
-// GenerateDocumentPath creates a file path based on purchase order date
-func GenerateDocumentPath(purchaseOrderDate time.Time, fileName string) string {
-	year := purchaseOrderDate.Format("2006")
-	month := purchaseOrderDate.Format("01")
-	return filepath.Join("po", year, month, fileName)
+// GenerateDocumentPath creates a file path based on document type and date
+func GenerateDocumentPath(referenceType string, documentDate time.Time, fileName string) string {
+	year := documentDate.Format("2006")
+	month := documentDate.Format("01")
+	return filepath.Join(referenceType, year, month, fileName)
+}
+
+// Legacy method for backward compatibility
+func GenerateDocumentPathLegacy(purchaseOrderDate time.Time, fileName string) string {
+	return GenerateDocumentPath("purchase_order", purchaseOrderDate, fileName)
 }

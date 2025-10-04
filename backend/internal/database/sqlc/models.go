@@ -29,7 +29,7 @@ type Adjustment struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
-// Individual items within an adjustment
+// Individual items within an adjustment - normalized table with only necessary fields
 type AdjustmentItem struct {
 	ID           pgtype.UUID `json:"id"`
 	AdjustmentID pgtype.UUID `json:"adjustment_id"`
@@ -53,22 +53,18 @@ type Category struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Generic document storage for all stock movement types - uses reference_type and reference_id for linking
 type Document struct {
-	ID               pgtype.UUID        `json:"id"`
-	PurchaseOrderID  pgtype.UUID        `json:"purchase_order_id"`
-	FileName         string             `json:"file_name"`
-	FilePath         string             `json:"file_path"`
-	FileSize         int64              `json:"file_size"`
-	FileType         string             `json:"file_type"`
-	UploadedAt       pgtype.Timestamptz `json:"uploaded_at"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
-	HasPoReference   *bool              `json:"has_po_reference"`
-	HasMatchingDate  *bool              `json:"has_matching_date"`
-	ValidationStatus *string            `json:"validation_status"`
-	ValidationNotes  *string            `json:"validation_notes"`
-	ReferenceType    *string            `json:"reference_type"`
-	ReferenceID      pgtype.UUID        `json:"reference_id"`
+	ID            pgtype.UUID        `json:"id"`
+	FileName      string             `json:"file_name"`
+	FilePath      string             `json:"file_path"`
+	FileSize      int64              `json:"file_size"`
+	FileType      string             `json:"file_type"`
+	UploadedAt    pgtype.Timestamptz `json:"uploaded_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ReferenceType string             `json:"reference_type"`
+	ReferenceID   pgtype.UUID        `json:"reference_id"`
 }
 
 type Product struct {
