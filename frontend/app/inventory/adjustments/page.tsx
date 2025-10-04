@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, FileText, Hash, AlertTriangle, Upload, X, File } from 'lucide-react'
+import { Plus, Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, FileText, Hash, AlertTriangle, Upload, X, File, FileImage } from 'lucide-react'
 import api from '@/lib/api'
 
 interface Product {
@@ -52,6 +52,17 @@ interface AdjustmentItem {
   quantity: number
   cost_price: number
   reason: string
+}
+
+interface Document {
+  id: string
+  reference_type: string
+  reference_id: string
+  file_name: string
+  file_path: string
+  file_size: number
+  file_type: string
+  uploaded_at: string
 }
 
 interface Adjustment {
@@ -105,6 +116,13 @@ export default function AdjustmentsPage() {
   // Document upload state
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
+  
+  // Document display state
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
+  const [viewingDocument, setViewingDocument] = useState<string | null>(null)
+  const [documentViewerUrl, setDocumentViewerUrl] = useState<string | null>(null)
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null)
   
   // Reference fields for PO/SO connections
   const [referenceType, setReferenceType] = useState<string>('')
@@ -285,7 +303,7 @@ export default function AdjustmentsPage() {
       console.log('Number of purchase orders:', purchaseOrders.length)
       
       setPurchaseOrders(purchaseOrders)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading purchase orders:', error)
       console.error('Error details:', error.response?.data)
       console.error('Error status:', error.response?.status)
@@ -354,6 +372,9 @@ export default function AdjustmentsPage() {
     setIsLoadingAdjustmentDetails(true)
     setAdjustmentDetailsError(null)
     
+    // Load documents for this adjustment
+    loadDocuments(adjustment.id)
+    
     // Fetch detailed adjustment data including items
     try {
       const response = await api.get(`/adjustments/${adjustment.id}`)
@@ -398,6 +419,8 @@ export default function AdjustmentsPage() {
     setIsModalOpen(false)
     setSelectedAdjustment(null)
     setAdjustmentDetailsError(null)
+    setDocuments([])
+    setDocumentUrl(null)
   }
 
   const checkStockLevel = async (productId: string, warehouseId: string): Promise<number> => {
@@ -493,6 +516,110 @@ export default function AdjustmentsPage() {
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  // Document helper functions
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  // Get file type icon
+  const getFileIcon = (fileType: string) => {
+    const type = fileType.toLowerCase()
+    if (type.includes('image')) {
+      return <FileImage className="w-5 h-5 text-green-500" />
+    } else if (type.includes('pdf')) {
+      return <File className="w-5 h-5 text-red-500" />
+    } else {
+      return <FileText className="w-5 h-5 text-gray-400" />
+    }
+  }
+
+  // Check if file is viewable
+  const isViewable = (fileType: string) => {
+    const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/html', 'text/css', 'text/javascript']
+    return viewableTypes.includes(fileType.toLowerCase())
+  }
+
+  // Load documents for an adjustment
+  const loadDocuments = async (adjustmentId: string) => {
+    try {
+      setIsLoadingDocuments(true)
+      console.log('Loading documents for adjustment ID:', adjustmentId)
+      const response = await api.get(`/documents/by-reference/adjustment/${adjustmentId}`)
+      console.log('Documents response:', response.data)
+      setDocuments(response.data || [])
+    } catch (error) {
+      console.error('Error loading documents:', error)
+      console.error('Error details:', (error as any).response?.data)
+      setDocuments([])
+    } finally {
+      setIsLoadingDocuments(false)
+    }
+  }
+
+  // Download document
+  const downloadDocument = async (document: Document) => {
+    try {
+      const response = await api.get(`/documents/${document.id}/download`, {
+        responseType: 'blob'
+      })
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = window.document.createElement('a')
+      link.href = url
+      link.setAttribute('download', document.file_name)
+      window.document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error downloading document:', error)
+      alert('Error downloading document. Please try again.')
+    }
+  }
+
+  // View document in new tab
+  const viewDocument = async (document: Document) => {
+    try {
+      setViewingDocument(document.id)
+      
+      // Check if file type is viewable in browser
+      const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/html', 'text/css', 'text/javascript']
+      if (!viewableTypes.includes(document.file_type.toLowerCase())) {
+        alert(`This file type (${document.file_type}) cannot be viewed in the browser. Please download it instead.`)
+        return
+      }
+      
+      const response = await api.get(`/documents/${document.id}/download`, {
+        responseType: 'blob'
+      })
+      
+      // Create blob URL with the correct MIME type
+      const blob = new Blob([response.data], { type: document.file_type })
+      const url = window.URL.createObjectURL(blob)
+      
+      // Set the document URL for the viewer dialog
+      setDocumentUrl(url)
+      
+    } catch (error: any) {
+      console.error('Error viewing document:', error)
+      if (error.response?.status === 404) {
+        alert('Document not found. It may have been deleted.')
+      } else if (error.response?.status === 403) {
+        alert('You do not have permission to view this document.')
+      } else {
+        alert('Error viewing document. Please try again.')
+      }
+    } finally {
+      setViewingDocument(null)
+    }
   }
 
   const handleCreateAdjustment = async () => {
@@ -894,6 +1021,66 @@ export default function AdjustmentsPage() {
                 </CardContent>
               </Card>
 
+              {/* Documents Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Documents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingDocuments ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="mt-2 text-gray-600">Loading documents...</p>
+                    </div>
+                  ) : documents.length > 0 ? (
+                    <div className="space-y-3">
+                      {documents.map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                          <div className="flex items-center gap-3">
+                            {getFileIcon(doc.file_type)}
+                            <div>
+                              <p className="font-medium text-sm">{doc.file_name}</p>
+                              <p className="text-xs text-gray-500">
+                                {formatFileSize(doc.file_size)} • Uploaded {formatDateTime(doc.uploaded_at)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isViewable(doc.file_type) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => viewDocument(doc)}
+                                className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50"
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadDocument(doc)}
+                              className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
+                            >
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p>No documents attached to this adjustment</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Action Buttons */}
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={closeModal}>
@@ -989,7 +1176,7 @@ export default function AdjustmentsPage() {
                         setShowProductDropdown(false)
                       }
                     } else {
-                      setSelectedWarehouse(warehouse)
+                      setSelectedWarehouse(warehouse || null)
                       setSelectedProduct(null)
                       setCurrentStockLevel(null)
                       setProductSearchTerm('')
@@ -1240,7 +1427,7 @@ export default function AdjustmentsPage() {
                       {adjustmentType === 'subtract' && currentStockLevel !== null && (
                         <div className="text-xs text-gray-600 mt-1">
                           Current stock: {currentStockLevel}
-                          {currentStockLevel < adjustmentQuantity && (
+                          {currentStockLevel < parseFloat(adjustmentQuantity) && (
                             <span className="text-red-600 font-medium ml-2">⚠️ Insufficient stock!</span>
                           )}
                         </div>
@@ -1400,6 +1587,24 @@ export default function AdjustmentsPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Viewer Dialog */}
+      <Dialog open={!!documentUrl} onOpenChange={() => setDocumentUrl(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Document Viewer</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            {documentUrl && (
+              <iframe
+                src={documentUrl}
+                className="w-full h-[70vh] border-0"
+                title="Document Viewer"
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>
