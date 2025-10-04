@@ -75,7 +75,7 @@ func main() {
 	warehouseService := services.NewWarehouseService(db)
 	purchaseOrderService := services.NewPurchaseOrderService(db)
 	documentService := services.NewDocumentService(db)
-	adjustmentService := services.NewAdjustmentService(db)
+	adjustmentService := services.NewAdjustmentService(db, stockService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userService, jwtService)

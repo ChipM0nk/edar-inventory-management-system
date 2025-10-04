@@ -219,19 +219,30 @@ export default function AdjustmentsPage() {
       
       console.log('Adjustments from API:', adjustments)
       
-      // Convert backend adjustments to frontend format
-      const convertedAdjustments = adjustments.map((adj: any) => ({
-        id: adj.id,
-        reference_id: adj.reference_number,
-        total_quantity: adj.total_quantity,
-        processed_by: adj.processed_by_first_name && adj.processed_by_last_name 
-          ? `${adj.processed_by_first_name} ${adj.processed_by_last_name}`
-          : adj.created_by_first_name && adj.created_by_last_name
-          ? `${adj.created_by_first_name} ${adj.created_by_last_name}`
-          : 'Unknown',
-        processed_date: adj.processed_date || adj.created_at,
-        created_at: adj.created_at,
-        items: [] // Items will be loaded separately if needed
+      // Convert backend adjustments to frontend format and load item counts
+      const convertedAdjustments = await Promise.all(adjustments.map(async (adj: any) => {
+        // Load item count for each adjustment
+        let itemCount = 0
+        try {
+          const itemResponse = await api.get(`/adjustments/${adj.id}`)
+          itemCount = itemResponse.data.items ? itemResponse.data.items.length : 0
+        } catch (error) {
+          console.warn(`Failed to load items for adjustment ${adj.id}:`, error)
+        }
+
+        return {
+          id: adj.id,
+          reference_id: adj.reference_number,
+          total_quantity: adj.total_quantity,
+          processed_by: adj.processed_by_first_name && adj.processed_by_last_name 
+            ? `${adj.processed_by_first_name} ${adj.processed_by_last_name}`
+            : adj.created_by_first_name && adj.created_by_last_name
+            ? `${adj.created_by_first_name} ${adj.created_by_last_name}`
+            : 'Unknown',
+          processed_date: adj.processed_date || adj.created_at,
+          created_at: adj.created_at,
+          items: Array(itemCount).fill(null) // Create array with correct length for display
+        }
       }))
       
       console.log('Converted adjustments:', convertedAdjustments)
@@ -672,11 +683,9 @@ export default function AdjustmentsPage() {
                         <TableRow>
                           <TableHead>Reference Number</TableHead>
                           <TableHead>Type</TableHead>
-                          <TableHead>Total Quantity</TableHead>
                           <TableHead>Processed By</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Items</TableHead>
-                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -694,9 +703,6 @@ export default function AdjustmentsPage() {
                                 Adjustment
                               </span>
                             </TableCell>
-                            <TableCell className="font-medium">
-                              {adjustment.total_quantity}
-                            </TableCell>
                             <TableCell className="text-sm text-gray-600">
                               {adjustment.processed_by}
                             </TableCell>
@@ -704,20 +710,7 @@ export default function AdjustmentsPage() {
                               {formatDate(adjustment.processed_date)}
                             </TableCell>
                             <TableCell className="text-sm text-gray-500">
-                              {adjustment.items.length} item{adjustment.items.length !== 1 ? 's' : ''}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleAdjustmentClick(adjustment)
-                                }}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
+                              {adjustment.items ? adjustment.items.length : 0} item{(adjustment.items ? adjustment.items.length : 0) !== 1 ? 's' : ''}
                             </TableCell>
                           </TableRow>
                         ))}
