@@ -58,6 +58,7 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 			WarehouseID:      utils.UUIDToPgxUUID(item.WarehouseID),
 			Quantity:         int32(item.Quantity),
 			Reason:           item.Reason,
+			CostPrice:        utils.Float64ToPgxNumeric(item.CostPrice),
 		}
 
 		_, err := s.db.Queries.WithTx(tx).CreateAdjustmentItem(ctx, &itemParams)
@@ -101,6 +102,7 @@ func (s *AdjustmentService) GetAdjustment(id uuid.UUID) (*models.Adjustment, err
 			WarehouseID:   utils.PgxUUIDToUUID(item.WarehouseID),
 			Quantity:      int(item.Quantity),
 			Reason:        item.Reason,
+			CostPrice:     utils.PgxNumericToFloat64(item.CostPrice),
 			CreatedAt:     utils.PgxTimestamptzToTime(item.CreatedAt),
 			ProductName:   &item.ProductName,
 			ProductSKU:    &item.ProductSku,

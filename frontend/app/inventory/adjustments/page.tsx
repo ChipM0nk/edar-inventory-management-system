@@ -448,9 +448,8 @@ export default function AdjustmentsPage() {
 
     setAdjustmentItems([...adjustmentItems, newItem])
     
-    // Reset form
+    // Reset form (but keep warehouse selected)
     setSelectedProduct(null)
-    setSelectedWarehouse(null)
     setAdjustmentQuantity('')
     setAdjustmentCostPrice('')
     setAdjustmentType('add')
@@ -920,9 +919,9 @@ export default function AdjustmentsPage() {
           resetForm() // Clear form and success message when modal is closed
         }
       }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl">
               <Plus className="h-5 w-5" />
               Create New Adjustment
             </DialogTitle>
@@ -933,16 +932,16 @@ export default function AdjustmentsPage() {
           
           {/* Success Message with Reference Number */}
           {generatedReferenceNumber && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
               <div className="flex items-center gap-2">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-4 w-4 text-green-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-green-800">Adjustment Created Successfully!</h3>
-                  <p className="text-sm text-green-700 mt-1">
+                  <p className="text-sm text-green-700">
                     Reference Number: <span className="font-mono font-semibold">{generatedReferenceNumber}</span>
                   </p>
                 </div>
@@ -950,72 +949,99 @@ export default function AdjustmentsPage() {
             </div>
           )}
           
-          <div className="space-y-6">
-            {/* Adjustment Date and Processed By */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="adjustment-date">Adjustment Date *</Label>
-                <Input
-                  id="adjustment-date"
-                  type="date"
-                  value={adjustmentDate}
-                  onChange={(e) => setAdjustmentDate(e.target.value)}
-                />
+          <div className="space-y-4">
+            {/* Header Info - Compact */}
+            <div className="p-4 bg-gray-50 rounded-lg">
+              {/* Processed By - Small at top */}
+              <div className="flex items-center gap-2 mb-3 p-2 bg-white rounded border w-fit">
+                <User className="h-3 w-3 text-gray-500" />
+                <span className="text-xs text-gray-600">Processed by:</span>
+                <span className="text-xs font-medium text-gray-900">
+                  {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
+                </span>
               </div>
-              <div className="space-y-2">
-                <Label>Processed By</Label>
-                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-md border">
-                  <User className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium">
-                    {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
-                  </span>
+              
+              {/* Main form fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="adjustment-date" className="text-xs font-medium text-gray-600">Adjustment Date *</Label>
+                  <Input
+                    id="adjustment-date"
+                    type="date"
+                    value={adjustmentDate}
+                    onChange={(e) => setAdjustmentDate(e.target.value)}
+                    className="mt-1"
+                  />
                 </div>
-              </div>
-            </div>
-
-
-            {/* Add Item Form */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Add Adjustment Item</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="reference">Reference</Label>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600">Warehouse *</Label>
+                  <Select value={selectedWarehouse?.id || ''} onValueChange={(value) => {
+                    const warehouse = warehouses.find(w => w.id === value)
+                    if (warehouse && selectedWarehouse && warehouse.id !== selectedWarehouse.id) {
+                      // Show warning before switching warehouse
+                      if (adjustmentItems.length > 0) {
+                        if (confirm('Changing warehouse will clear all current adjustment items. Are you sure you want to continue?')) {
+                          setSelectedWarehouse(warehouse)
+                          setAdjustmentItems([]) // Clear all items
+                          setSelectedProduct(null)
+                          setCurrentStockLevel(null)
+                          setProductSearchTerm('')
+                          setShowProductDropdown(false)
+                        }
+                      } else {
+                        setSelectedWarehouse(warehouse)
+                        setSelectedProduct(null)
+                        setCurrentStockLevel(null)
+                        setProductSearchTerm('')
+                        setShowProductDropdown(false)
+                      }
+                    } else {
+                      setSelectedWarehouse(warehouse)
+                      setSelectedProduct(null)
+                      setCurrentStockLevel(null)
+                      setProductSearchTerm('')
+                      setShowProductDropdown(false)
+                    }
+                  }}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((warehouse) => (
+                        <SelectItem key={warehouse.id} value={warehouse.id}>
+                          {warehouse.name} - {warehouse.location}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="reference" className="text-xs font-medium text-gray-600">Reference</Label>
                   <Input
                     id="reference"
                     value={referenceNumber}
                     onChange={(e) => setReferenceNumber(e.target.value)}
                     placeholder="PO, Sales, Transfer, etc."
+                    className="mt-1"
                   />
-                  <p className="text-xs text-gray-500">Link to related document or transaction for tracking purposes</p>
                 </div>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Warehouse *</Label>
-                    <Select value={selectedWarehouse?.id || ''} onValueChange={(value) => {
-                      const warehouse = warehouses.find(w => w.id === value)
-                      setSelectedWarehouse(warehouse || null)
-                      setSelectedProduct(null) // Reset product when warehouse changes
-                      setCurrentStockLevel(null) // Reset current stock when warehouse changes
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a warehouse" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map((warehouse) => (
-                          <SelectItem key={warehouse.id} value={warehouse.id}>
-                            {warehouse.name} - {warehouse.location}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Product *</Label>
-                    <div className="relative">
+            {/* Add Item Form - Compact */}
+            {selectedWarehouse && (
+              <Card className="border-2 border-dashed border-gray-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Item to {selectedWarehouse.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Product Selection */}
+                  <div>
+                    <Label className="text-xs font-medium text-gray-600">Product *</Label>
+                    <div className="relative mt-1">
                       <Input
                         value={selectedProduct ? `${selectedProduct.name} (${selectedProduct.sku})` : productSearchTerm}
                         onChange={(e) => {
@@ -1026,23 +1052,20 @@ export default function AdjustmentsPage() {
                           setCurrentStockLevel(null)
                         }}
                         onFocus={() => {
-                          if (selectedWarehouse) {
-                            setShowProductDropdown(true)
-                          }
+                          setShowProductDropdown(true)
                         }}
                         onBlur={() => {
                           // Delay hiding dropdown to allow for selection
                           setTimeout(() => setShowProductDropdown(false), 200)
                         }}
-                        placeholder={selectedWarehouse ? "Search products by name or SKU..." : "Select warehouse first"}
-                        disabled={!selectedWarehouse}
+                        placeholder="Search products by name or SKU..."
                         className="pr-8"
                       />
                       <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       
                       {/* Dropdown with filtered products */}
-                      {showProductDropdown && selectedWarehouse && filteredProducts.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {showProductDropdown && filteredProducts.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
                           {filteredProducts.map((product) => (
                             <div
                               key={product.id}
@@ -1053,15 +1076,15 @@ export default function AdjustmentsPage() {
                                 setShowProductDropdown(false)
                               }}
                             >
-                              <div className="font-medium text-gray-900">{product.name}</div>
-                              <div className="text-sm text-gray-500">SKU: {product.sku}</div>
+                              <div className="font-medium text-gray-900 text-sm">{product.name}</div>
+                              <div className="text-xs text-gray-500">SKU: {product.sku}</div>
                             </div>
                           ))}
                         </div>
                       )}
                       
                       {/* No results message */}
-                      {showProductDropdown && selectedWarehouse && productSearchTerm && filteredProducts.length === 0 && (
+                      {showProductDropdown && productSearchTerm && filteredProducts.length === 0 && (
                         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
                           <div className="text-sm text-gray-500 text-center">
                             No products found matching "{productSearchTerm}"
@@ -1069,262 +1092,249 @@ export default function AdjustmentsPage() {
                         </div>
                       )}
                     </div>
-                    {!selectedWarehouse && (
-                      <p className="text-sm text-gray-500">Please select a warehouse first</p>
-                    )}
                   </div>
-                </div>
                 
-                {/* Current Stock Display */}
-                {selectedProduct && selectedWarehouse && (
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Current Stock:</span>
-                      {isCheckingStock ? (
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"></div>
-                          <span className="text-sm text-gray-500">Loading...</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm font-semibold text-gray-900">
-                          {currentStockLevel !== null ? currentStockLevel : 'N/A'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {selectedProduct.name} in {selectedWarehouse.name}
-                    </div>
-                  </div>
-                )}
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Adjustment Type *</Label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          name="adjustmentType"
-                          value="add"
-                          checked={adjustmentType === 'add'}
-                          onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'subtract')}
-                          className="text-green-600"
-                        />
-                        <span className="text-green-600 font-medium">Add to Inventory</span>
-                      </label>
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          name="adjustmentType"
-                          value="subtract"
-                          checked={adjustmentType === 'subtract'}
-                          onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'subtract')}
-                          className="text-red-600"
-                        />
-                        <span className="text-red-600 font-medium">Subtract from Inventory</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="quantity">Quantity *</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      min="1"
-                      value={adjustmentQuantity}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        // Remove leading zeros and prevent negative numbers
-                        const cleanValue = value.replace(/^0+/, '') || ''
-                        if (cleanValue === '' || (parseInt(cleanValue) > 0 && cleanValue === parseInt(cleanValue).toString())) {
-                          setAdjustmentQuantity(cleanValue)
-                        }
-                      }}
-                      placeholder="Enter quantity amount"
-                    />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="cost_price">Cost Price *</Label>
-                      <Input
-                        id="cost_price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={adjustmentCostPrice}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          // Allow decimal numbers and prevent negative numbers
-                          if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
-                            setAdjustmentCostPrice(value)
-                          }
-                        }}
-                        placeholder="Enter cost price"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="reason">Reason *</Label>
-                      <Select value={adjustmentReason} onValueChange={setAdjustmentReason}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select reason" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Damaged Goods">Damaged Goods</SelectItem>
-                          <SelectItem value="Expired Products">Expired Products</SelectItem>
-                          <SelectItem value="Lost Inventory">Lost Inventory</SelectItem>
-                          <SelectItem value="Found Inventory">Found Inventory</SelectItem>
-                          <SelectItem value="Supplier Return">Supplier Return</SelectItem>
-                          <SelectItem value="Customer Return">Customer Return</SelectItem>
-                          <SelectItem value="Quality Issues">Quality Issues</SelectItem>
-                          <SelectItem value="Theft">Theft</SelectItem>
-                          <SelectItem value="Cycle Count Adjustment">Cycle Count Adjustment</SelectItem>
-                          <SelectItem value="Transfer Error">Transfer Error</SelectItem>
-                          <SelectItem value="System Error">System Error</SelectItem>
-                          <SelectItem value="Receiving Discrepancy">Receiving Discrepancy</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  {/* Current Stock and Adjustment Type - Compact */}
+                  {selectedProduct && selectedWarehouse && (
+                    <div className="bg-blue-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Current Stock:</span>
+                        {isCheckingStock ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500"></div>
+                            <span className="text-xs text-gray-500">Loading...</span>
+                          </div>
+                        ) : (
+                          <span className="text-sm font-semibold text-gray-900">
+                            {currentStockLevel !== null ? currentStockLevel : 'N/A'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mb-3">
+                        {selectedProduct.name} in {selectedWarehouse.name}
+                      </div>
                       
-                      {/* Other reason text field */}
-                      {adjustmentReason === 'Other' && (
-                        <div className="mt-2">
+                      {/* Adjustment Type - Inline */}
+                      <div className="flex items-center gap-4">
+                        <span className="text-xs font-medium text-gray-600">Type:</span>
+                        <div className="flex gap-3">
+                          <label className="flex items-center space-x-1">
+                            <input
+                              type="radio"
+                              name="adjustmentType"
+                              value="add"
+                              checked={adjustmentType === 'add'}
+                              onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'subtract')}
+                              className="text-green-600"
+                            />
+                            <span className="text-green-600 text-sm font-medium">Add</span>
+                          </label>
+                          <label className="flex items-center space-x-1">
+                            <input
+                              type="radio"
+                              name="adjustmentType"
+                              value="subtract"
+                              checked={adjustmentType === 'subtract'}
+                              onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'subtract')}
+                              className="text-red-600"
+                            />
+                            <span className="text-red-600 text-sm font-medium">Subtract</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quantity, Cost Price, and Reason - Compact */}
+                  {selectedProduct && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <Label htmlFor="quantity" className="text-xs font-medium text-gray-600">Quantity *</Label>
+                        <Input
+                          id="quantity"
+                          type="number"
+                          min="1"
+                          value={adjustmentQuantity}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            // Remove leading zeros and prevent negative numbers
+                            const cleanValue = value.replace(/^0+/, '') || ''
+                            if (cleanValue === '' || (parseInt(cleanValue) > 0 && cleanValue === parseInt(cleanValue).toString())) {
+                              setAdjustmentQuantity(cleanValue)
+                            }
+                          }}
+                          placeholder="Enter quantity"
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="cost_price" className="text-xs font-medium text-gray-600">Cost Price *</Label>
+                        <Input
+                          id="cost_price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={adjustmentCostPrice}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            // Allow decimal numbers and prevent negative numbers
+                            if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
+                              setAdjustmentCostPrice(value)
+                            }
+                          }}
+                          placeholder="Enter cost price"
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="reason" className="text-xs font-medium text-gray-600">Reason *</Label>
+                        <Select value={adjustmentReason} onValueChange={setAdjustmentReason}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select reason" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Damaged Goods">Damaged Goods</SelectItem>
+                            <SelectItem value="Expired Products">Expired Products</SelectItem>
+                            <SelectItem value="Lost Inventory">Lost Inventory</SelectItem>
+                            <SelectItem value="Found Inventory">Found Inventory</SelectItem>
+                            <SelectItem value="Supplier Return">Supplier Return</SelectItem>
+                            <SelectItem value="Customer Return">Customer Return</SelectItem>
+                            <SelectItem value="Quality Issues">Quality Issues</SelectItem>
+                            <SelectItem value="Theft">Theft</SelectItem>
+                            <SelectItem value="Cycle Count Adjustment">Cycle Count Adjustment</SelectItem>
+                            <SelectItem value="Transfer Error">Transfer Error</SelectItem>
+                            <SelectItem value="System Error">System Error</SelectItem>
+                            <SelectItem value="Receiving Discrepancy">Receiving Discrepancy</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        {/* Other reason text field */}
+                        {adjustmentReason === 'Other' && (
                           <Input
                             value={adjustmentReasonOther}
                             onChange={(e) => setAdjustmentReasonOther(e.target.value)}
                             placeholder="Please specify the reason"
+                            className="mt-2"
                           />
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
 
-                {/* Preview */}
-                {adjustmentQuantity.trim() && parseInt(adjustmentQuantity) > 0 && (
-                  <div className="p-3 bg-gray-50 rounded-lg border">
-                    <p className="text-sm font-medium text-gray-700">Preview:</p>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      {adjustmentType === 'add' ? (
-                        <div>
-                          <span className="text-green-600">+{adjustmentQuantity} (Add to inventory)</span>
+                  {/* Preview and Add Button - Compact */}
+                  {adjustmentQuantity.trim() && parseInt(adjustmentQuantity) > 0 && (
+                    <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          {adjustmentType === 'add' ? (
+                            <span className="text-green-600 font-medium">+{adjustmentQuantity} (Add)</span>
+                          ) : (
+                            <span className="text-red-600 font-medium">-{adjustmentQuantity} (Subtract)</span>
+                          )}
                           {adjustmentCostPrice.trim() && (
-                            <span className="ml-2 text-gray-500">@ ${parseFloat(adjustmentCostPrice).toFixed(2)} each</span>
+                            <span className="ml-2 text-gray-600">@ ₱{parseFloat(adjustmentCostPrice).toFixed(2)} each</span>
                           )}
                         </div>
-                      ) : (
-                        <div className="space-y-1">
-                          <div>
-                            <span className="text-red-600">-{adjustmentQuantity} (Subtract from inventory)</span>
-                            {adjustmentCostPrice.trim() && (
-                              <span className="ml-2 text-gray-500">@ ${parseFloat(adjustmentCostPrice).toFixed(2)} each</span>
-                            )}
+                        {adjustmentCostPrice.trim() && adjustmentQuantity.trim() && (
+                          <div className="text-sm font-semibold text-gray-700">
+                            ₱{(parseFloat(adjustmentCostPrice) * parseInt(adjustmentQuantity)).toFixed(2)}
                           </div>
-                          {isCheckingStock ? (
-                            <div className="text-xs text-gray-500 flex items-center">
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500 mr-2"></div>
-                              Checking stock level...
-                            </div>
-                          ) : currentStockLevel !== null ? (
-                            <div className="text-xs text-gray-500">
-                              Current stock: {currentStockLevel}
-                              {currentStockLevel < adjustmentQuantity && (
-                                <span className="text-red-600 font-medium ml-2">⚠️ Insufficient stock!</span>
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-                      )}
-                      {adjustmentCostPrice.trim() && adjustmentQuantity.trim() && (
-                        <div className="text-xs text-gray-500">
-                          Total Value: ${(parseFloat(adjustmentCostPrice) * parseInt(adjustmentQuantity)).toFixed(2)}
+                        )}
+                      </div>
+                      {adjustmentType === 'subtract' && currentStockLevel !== null && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          Current stock: {currentStockLevel}
+                          {currentStockLevel < adjustmentQuantity && (
+                            <span className="text-red-600 font-medium ml-2">⚠️ Insufficient stock!</span>
+                          )}
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
-                
-                <Button 
-                  onClick={handleAddItem} 
-                  disabled={isCheckingStock || (adjustmentType === 'subtract' && currentStockLevel !== null && currentStockLevel < parseInt(adjustmentQuantity))}
-                  className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
-                >
-                  {isCheckingStock ? 'Checking Stock...' : 'Add Item'}
-                </Button>
-              </CardContent>
-            </Card>
+                  )}
+                  
+                  <Button 
+                    onClick={handleAddItem} 
+                    disabled={isCheckingStock || (adjustmentType === 'subtract' && currentStockLevel !== null && currentStockLevel < parseInt(adjustmentQuantity))}
+                    className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {isCheckingStock ? 'Checking Stock...' : 'Add Item'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Items List */}
+            {/* Items List - Compact */}
             {adjustmentItems.length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Adjustment Items ({adjustmentItems.length})</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                      {adjustmentItems.length}
+                    </span>
+                    Adjustment Items
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    Items to be adjusted in {selectedWarehouse?.name}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>Warehouse</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Cost Price</TableHead>
-                          <TableHead>Total Value</TableHead>
-                          <TableHead>Reason</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {adjustmentItems.map((item, index) => (
-                          <TableRow key={`${item.product_id}-${item.warehouse_id}-${index}`}>
-                            <TableCell className="font-medium">
-                              {item.product_name}
-                            </TableCell>
-                            <TableCell>{item.warehouse_name}</TableCell>
-                            <TableCell className={`font-medium ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {item.quantity > 0 ? '+' : ''}{item.quantity}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              ${item.cost_price.toFixed(2)}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              ${(Math.abs(item.quantity) * item.cost_price).toFixed(2)}
-                            </TableCell>
-                            <TableCell>{item.reason}</TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveItem(index)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                Remove
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    {adjustmentItems.map((item, index) => (
+                      <div key={`${item.product_id}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm text-gray-900 truncate">
+                                {item.product_name}
+                              </div>
+                              <div className="text-xs text-gray-500 font-mono">
+                                SKU: {item.product_sku}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <div className={`font-medium ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {item.quantity > 0 ? '+' : ''}{item.quantity}
+                              </div>
+                              <div className="text-gray-600">
+                                ₱{item.cost_price.toFixed(2)}
+                              </div>
+                              <div className="font-semibold text-gray-900">
+                                ₱{(Math.abs(item.quantity) * item.cost_price).toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            Reason: {item.reason}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(index)}
+                          className="text-red-600 hover:text-red-800 hover:bg-red-50 ml-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Document Upload Section */}
+            {/* Document Upload Section - Compact */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
                   Supporting Documents (Optional)
                 </CardTitle>
-                <CardDescription>
-                  Upload receipts, invoices, or other supporting documents for this adjustment
-                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+              <CardContent className="pt-0">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
                   <input
                     type="file"
                     multiple
@@ -1334,23 +1344,23 @@ export default function AdjustmentsPage() {
                     id="document-upload"
                   />
                   <label htmlFor="document-upload" className="cursor-pointer">
-                    <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <Upload className="h-6 w-6 mx-auto text-gray-400 mb-2" />
                     <p className="text-sm font-medium text-gray-600">Click to upload documents</p>
                     <p className="text-xs text-gray-500 mt-1">
-                      Supports PDF, Images, Word, Excel files (Max 10MB each)
+                      PDF, Images, Word, Excel (Max 10MB each)
                     </p>
                   </label>
                 </div>
 
                 {/* Uploaded Files List */}
                 {uploadedFiles.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Uploaded Files ({uploadedFiles.length})</Label>
-                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                  <div className="mt-3 space-y-1">
+                    <Label className="text-xs font-medium text-gray-600">Uploaded Files ({uploadedFiles.length})</Label>
+                    <div className="space-y-1 max-h-24 overflow-y-auto">
                       {uploadedFiles.map((file, index) => (
                         <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <File className="h-3 w-3 text-gray-500 flex-shrink-0" />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
                               <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
@@ -1360,9 +1370,9 @@ export default function AdjustmentsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveFile(index)}
-                            className="text-red-600 hover:text-red-800 h-8 w-8 p-0 flex-shrink-0"
+                            className="text-red-600 hover:text-red-800 h-6 w-6 p-0 flex-shrink-0"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-3 w-3" />
                           </Button>
                         </div>
                       ))}
@@ -1372,21 +1382,30 @@ export default function AdjustmentsPage() {
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => {
-                resetForm()
-                setIsCreateModalOpen(false)
-              }}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleCreateAdjustment}
-                disabled={adjustmentItems.length === 0 || isUploadingDocuments}
-                className="bg-[#52a852] hover:bg-[#4a964a] text-white"
-              >
-                {isUploadingDocuments ? 'Uploading Documents...' : 'Create Adjustment'}
-              </Button>
+            {/* Action Buttons - Compact */}
+            <div className="flex justify-between items-center pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                {adjustmentItems.length > 0 && (
+                  <span>
+                    {adjustmentItems.length} item{adjustmentItems.length !== 1 ? 's' : ''} ready to adjust
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => {
+                  resetForm()
+                  setIsCreateModalOpen(false)
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateAdjustment}
+                  disabled={adjustmentItems.length === 0 || isUploadingDocuments}
+                  className="bg-[#52a852] hover:bg-[#4a964a] text-white"
+                >
+                  {isUploadingDocuments ? 'Uploading...' : 'Create Adjustment'}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

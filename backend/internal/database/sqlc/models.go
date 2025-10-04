@@ -40,7 +40,7 @@ type AdjustmentItem struct {
 	// Reason for this specific item adjustment
 	Reason    *string            `json:"reason"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	// Cost price per unit for this adjustment item
+	// Cost price per unit for this adjustment item (must be >= 0)
 	CostPrice pgtype.Numeric `json:"cost_price"`
 }
 

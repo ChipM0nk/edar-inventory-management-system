@@ -102,17 +102,18 @@ func (q *Queries) CreateAdjustment(ctx context.Context, arg *CreateAdjustmentPar
 }
 
 const CreateAdjustmentItem = `-- name: CreateAdjustmentItem :one
-INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, reason)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, reason, cost_price)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id, adjustment_id, product_id, warehouse_id, quantity, reason, created_at, cost_price
 `
 
 type CreateAdjustmentItemParams struct {
-	AdjustmentID pgtype.UUID `json:"adjustment_id"`
-	ProductID    pgtype.UUID `json:"product_id"`
-	WarehouseID  pgtype.UUID `json:"warehouse_id"`
-	Quantity     int32       `json:"quantity"`
-	Reason       *string     `json:"reason"`
+	AdjustmentID pgtype.UUID    `json:"adjustment_id"`
+	ProductID    pgtype.UUID    `json:"product_id"`
+	WarehouseID  pgtype.UUID    `json:"warehouse_id"`
+	Quantity     int32          `json:"quantity"`
+	Reason       *string        `json:"reason"`
+	CostPrice    pgtype.Numeric `json:"cost_price"`
 }
 
 func (q *Queries) CreateAdjustmentItem(ctx context.Context, arg *CreateAdjustmentItemParams) (*AdjustmentItem, error) {
@@ -122,6 +123,7 @@ func (q *Queries) CreateAdjustmentItem(ctx context.Context, arg *CreateAdjustmen
 		arg.WarehouseID,
 		arg.Quantity,
 		arg.Reason,
+		arg.CostPrice,
 	)
 	var i AdjustmentItem
 	err := row.Scan(
@@ -541,17 +543,18 @@ func (q *Queries) UpdateAdjustment(ctx context.Context, arg *UpdateAdjustmentPar
 
 const UpdateAdjustmentItem = `-- name: UpdateAdjustmentItem :one
 UPDATE adjustment_items 
-SET product_id = $2, warehouse_id = $3, quantity = $4, reason = $5
+SET product_id = $2, warehouse_id = $3, quantity = $4, reason = $5, cost_price = $6
 WHERE id = $1
 RETURNING id, adjustment_id, product_id, warehouse_id, quantity, reason, created_at, cost_price
 `
 
 type UpdateAdjustmentItemParams struct {
-	ID          pgtype.UUID `json:"id"`
-	ProductID   pgtype.UUID `json:"product_id"`
-	WarehouseID pgtype.UUID `json:"warehouse_id"`
-	Quantity    int32       `json:"quantity"`
-	Reason      *string     `json:"reason"`
+	ID          pgtype.UUID    `json:"id"`
+	ProductID   pgtype.UUID    `json:"product_id"`
+	WarehouseID pgtype.UUID    `json:"warehouse_id"`
+	Quantity    int32          `json:"quantity"`
+	Reason      *string        `json:"reason"`
+	CostPrice   pgtype.Numeric `json:"cost_price"`
 }
 
 func (q *Queries) UpdateAdjustmentItem(ctx context.Context, arg *UpdateAdjustmentItemParams) (*AdjustmentItem, error) {
@@ -561,6 +564,7 @@ func (q *Queries) UpdateAdjustmentItem(ctx context.Context, arg *UpdateAdjustmen
 		arg.WarehouseID,
 		arg.Quantity,
 		arg.Reason,
+		arg.CostPrice,
 	)
 	var i AdjustmentItem
 	err := row.Scan(

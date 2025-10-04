@@ -40,14 +40,6 @@ type AdjustmentItem struct {
 	Quantity     int       `json:"quantity" db:"quantity"` // Can be positive (add) or negative (subtract)
 	Reason       *string   `json:"reason,omitempty" db:"reason"`
 	CostPrice    float64   `json:"cost_price" db:"cost_price"`
-	// Reference fields for item-level tracking
-	ReferenceType     *string `json:"reference_type,omitempty" db:"reference_type"`
-	ReferenceID       *uuid.UUID `json:"reference_id,omitempty" db:"reference_id"`
-	ReferenceNumber   *string `json:"reference_number,omitempty" db:"reference_number"`
-	AdjustmentReason  *string `json:"adjustment_reason,omitempty" db:"adjustment_reason"`
-	ExpectedQuantity  *int   `json:"expected_quantity,omitempty" db:"expected_quantity"`
-	ActualQuantity    *int   `json:"actual_quantity,omitempty" db:"actual_quantity"`
-	VarianceQuantity  *int   `json:"variance_quantity,omitempty" db:"variance_quantity"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	// Joined fields
 	ProductName   *string `json:"product_name,omitempty" db:"product_name"`
@@ -76,13 +68,6 @@ type CreateAdjustmentItemRequest struct {
 	Quantity    int       `json:"quantity" validate:"required"`
 	CostPrice   float64   `json:"cost_price" validate:"required,min=0"`
 	Reason      *string   `json:"reason,omitempty"`
-	// Reference fields for item-level tracking
-	ReferenceType     *string `json:"reference_type,omitempty" validate:"omitempty,oneof=purchase_order sales_order cycle_count damage theft expired transfer other"`
-	ReferenceID       *uuid.UUID `json:"reference_id,omitempty"`
-	ReferenceNumber   *string `json:"reference_number,omitempty"`
-	AdjustmentReason  *string `json:"adjustment_reason,omitempty" validate:"omitempty,oneof=receiving_discrepancy damaged_goods quality_issue short_shipment over_shipment customer_return defective_return exchange warranty_replacement cycle_count_correction theft_loss expired_product storage_damage transfer_correction other"`
-	ExpectedQuantity  *int   `json:"expected_quantity,omitempty"`
-	ActualQuantity    *int   `json:"actual_quantity,omitempty"`
 }
 
 type UpdateAdjustmentRequest struct {
