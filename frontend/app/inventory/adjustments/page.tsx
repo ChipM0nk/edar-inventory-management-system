@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, FileText, Hash, AlertTriangle, Upload, X, File, FileImage } from 'lucide-react'
 import api from '@/lib/api'
+import { useConfirm } from '@/hooks/use-confirm'
+import { useNotice } from '@/hooks/use-notice'
 
 interface Product {
   id: string
@@ -73,11 +75,15 @@ interface Adjustment {
   processed_date: string
   created_at: string
   items: AdjustmentItem[]
+  status?: string
+  notes?: string | null
 }
 
 export default function AdjustmentsPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
+  const [ConfirmDialog, confirm] = useConfirm()
+  const [NoticeDialog, notice] = useNotice()
   
   // State management
   const [adjustments, setAdjustments] = useState<Adjustment[]>([])
@@ -264,7 +270,9 @@ export default function AdjustmentsPage() {
             : 'Unknown',
           processed_date: adj.processed_date || adj.created_at,
           created_at: adj.created_at,
-          items: Array(itemCount).fill(null) // Create array with correct length for display
+          items: Array(itemCount).fill(null), // Create array with correct length for display
+          status: adj.status,
+          notes: adj.notes
         }
       }))
       
@@ -397,6 +405,8 @@ export default function AdjustmentsPage() {
           : 'Unknown',
         processed_date: detailedAdjustment.processed_date || detailedAdjustment.created_at,
         created_at: detailedAdjustment.created_at,
+        status: detailedAdjustment.status,
+        notes: detailedAdjustment.notes,
         items: detailedAdjustment.items?.map((item: any) => ({
           product_id: item.product_id,
           product_name: item.product_name || 'Unknown Product',
@@ -631,9 +641,14 @@ export default function AdjustmentsPage() {
 
   // Delete document
   const deleteDocument = async (document: Document) => {
-    if (!confirm(`Are you sure you want to delete "${document.file_name}"? This action cannot be undone.`)) {
-      return
-    }
+    const confirmed = await confirm({
+      title: 'Delete document?',
+      description: `"${document.file_name}" will be permanently deleted. This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    })
+    if (!confirmed) return
 
     try {
       await api.delete(`/documents/${document.id}`)
@@ -642,7 +657,12 @@ export default function AdjustmentsPage() {
       setDocuments(prev => prev.filter(doc => doc.id !== document.id))
       
       // Show success message
-      alert('Document deleted successfully')
+      await notice({
+        title: 'Document deleted',
+        description: 'Document deleted successfully.',
+        okText: 'OK',
+        variant: 'success',
+      })
     } catch (error) {
       console.error('Error deleting document:', error)
       alert('Failed to delete document. Please try again.')
@@ -880,6 +900,7 @@ export default function AdjustmentsPage() {
                         <TableRow>
                           <TableHead>Reference Number</TableHead>
                           <TableHead>Type</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead>Processed By</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Items</TableHead>
@@ -905,6 +926,13 @@ export default function AdjustmentsPage() {
                             </TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {formatDate(adjustment.processed_date)}
+                            </TableCell>
+                            <TableCell>
+                              {adjustment.status === 'cancelled' ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Cancelled</span>
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                              )}
                             </TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {adjustment.items ? adjustment.items.length : 0} item{(adjustment.items ? adjustment.items.length : 0) !== 1 ? 's' : ''}
@@ -967,6 +995,11 @@ export default function AdjustmentsPage() {
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               Adjustment Details
+              {selectedAdjustment?.status === 'cancelled' && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  Cancelled
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription>
               Complete information about this inventory adjustment
@@ -975,6 +1008,20 @@ export default function AdjustmentsPage() {
           
           {selectedAdjustment && (
             <div className="space-y-6">
+              {/* Cancelled Banner */}
+              {selectedAdjustment.status === 'cancelled' && (
+                <div className="border border-red-200 bg-red-50 text-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5">
+                      <svg className="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.721-1.36 3.486 0l6.518 11.59c.75 1.335-.213 2.986-1.742 2.986H3.48c-1.53 0-2.492-1.651-1.742-2.986l6.518-11.59zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V7a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold">This adjustment has been cancelled</p>
+                      <p className="text-sm opacity-90">No further actions can be taken on this adjustment.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Adjustment Overview */}
               <Card>
                 <CardHeader>
@@ -1011,6 +1058,28 @@ export default function AdjustmentsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Cancellation Info */}
+              {selectedAdjustment.status === 'cancelled' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Cancellation</CardTitle>
+                    <CardDescription>
+                      Details of the cancellation
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {selectedAdjustment.notes && (
+                      <div className="text-sm text-gray-700">
+                        <span className="font-medium">Reason: </span>
+                        {selectedAdjustment.notes}
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-500">Cancelled at: {formatDate(selectedAdjustment.processed_date)}</div>
+                    <div className="text-xs text-gray-500">Cancelled by: {selectedAdjustment.processed_by}</div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Adjustment Items */}
               <Card>
@@ -1237,6 +1306,39 @@ export default function AdjustmentsPage() {
                 <Button variant="outline" onClick={closeModal}>
                   Close
                 </Button>
+                {/* Cancel adjustment action */}
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    if (!selectedAdjustment) return
+                    const proceed = await confirm({
+                      title: 'Cancel adjustment?',
+                      description: 'This will reverse stock movements for all items. This action cannot be undone.',
+                      confirmText: 'Cancel Adjustment',
+                      cancelText: 'Keep Adjustment',
+                      variant: 'danger',
+                    })
+                    if (!proceed) return
+                    try {
+                      await api.post(`/adjustments/${selectedAdjustment.id}/cancel`, { reason: 'User cancelled from UI' })
+                      await notice({
+                        title: 'Adjustment cancelled',
+                        description: 'The adjustment was cancelled and stock was updated.',
+                        variant: 'success',
+                      })
+                      closeModal()
+                      await loadAdjustments()
+                    } catch (e: any) {
+                      await notice({
+                        title: 'Cancellation failed',
+                        description: e?.response?.data?.error || 'An error occurred while cancelling the adjustment.',
+                        variant: 'warning',
+                      })
+                    }
+                  }}
+                >
+                  Cancel Adjustment
+                </Button>
               </div>
             </div>
           )}
@@ -1250,6 +1352,8 @@ export default function AdjustmentsPage() {
           resetForm() // Clear form and success message when modal is closed
         }
       }}>
+        {ConfirmDialog}
+        {NoticeDialog}
         <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
           <DialogHeader className="pb-4">
             <DialogTitle className="flex items-center gap-2 text-xl">
@@ -1306,18 +1410,31 @@ export default function AdjustmentsPage() {
                 </div>
                 <div>
                   <Label className="text-xs font-medium text-gray-600">Warehouse *</Label>
-                  <Select value={selectedWarehouse?.id || ''} onValueChange={(value) => {
+                  <Select value={selectedWarehouse?.id || ''} onValueChange={async (value) => {
                     const warehouse = warehouses.find(w => w.id === value)
                     if (warehouse && selectedWarehouse && warehouse.id !== selectedWarehouse.id) {
                       // Show warning before switching warehouse
                       if (adjustmentItems.length > 0) {
-                        if (confirm('Changing warehouse will clear all current adjustment items. Are you sure you want to continue?')) {
+                        const confirmed = await confirm({
+                          title: 'Change warehouse?',
+                          description: 'Changing warehouse will clear all current adjustment items.',
+                          confirmText: 'Change Warehouse',
+                          cancelText: 'Keep Current',
+                          variant: 'warning',
+                        })
+                        if (confirmed) {
                           setSelectedWarehouse(warehouse)
                           setAdjustmentItems([]) // Clear all items
                           setSelectedProduct(null)
                           setCurrentStockLevel(null)
                           setProductSearchTerm('')
                           setShowProductDropdown(false)
+                          // Clear add-item inputs and preview state
+                          setAdjustmentQuantity('')
+                          setAdjustmentCostPrice('')
+                          setAdjustmentType('add')
+                          setAdjustmentReason('')
+                          setAdjustmentReasonOther('')
                         }
                       } else {
                         setSelectedWarehouse(warehouse)
@@ -1325,6 +1442,12 @@ export default function AdjustmentsPage() {
                         setCurrentStockLevel(null)
                         setProductSearchTerm('')
                         setShowProductDropdown(false)
+                        // Clear add-item inputs and preview state
+                        setAdjustmentQuantity('')
+                        setAdjustmentCostPrice('')
+                        setAdjustmentType('add')
+                        setAdjustmentReason('')
+                        setAdjustmentReasonOther('')
                       }
                     } else {
                       setSelectedWarehouse(warehouse || null)
@@ -1332,6 +1455,12 @@ export default function AdjustmentsPage() {
                       setCurrentStockLevel(null)
                       setProductSearchTerm('')
                       setShowProductDropdown(false)
+                      // Clear add-item inputs and preview state
+                      setAdjustmentQuantity('')
+                      setAdjustmentCostPrice('')
+                      setAdjustmentType('add')
+                      setAdjustmentReason('')
+                      setAdjustmentReasonOther('')
                     }
                   }}>
                     <SelectTrigger className="mt-1">

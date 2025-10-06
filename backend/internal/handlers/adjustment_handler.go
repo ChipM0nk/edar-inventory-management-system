@@ -194,3 +194,44 @@ func (h *AdjustmentHandler) DeleteAdjustment(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Adjustment deleted successfully"})
 }
+
+// CancelAdjustment cancels an adjustment and reverses its stock/movements
+// @Summary Cancel adjustment
+// @Description Cancel an adjustment by ID, record cancellation info, and reverse stock/movements
+// @Tags Adjustments
+// @Accept json
+// @Produce json
+// @Param id path string true "Adjustment ID"
+// @Param request body map[string]string true "Cancellation payload {reason}"
+// @Success 200 {object} models.Adjustment
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /adjustments/{id}/cancel [post]
+func (h *AdjustmentHandler) CancelAdjustment(c *gin.Context) {
+    id, err := uuid.Parse(c.Param("id"))
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid adjustment ID"})
+        return
+    }
+
+    // Get user id performing cancellation
+    userIDVal, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+        return
+    }
+    userID := userIDVal.(uuid.UUID)
+
+    var payload struct{ Reason string `json:"reason"` }
+    _ = c.ShouldBindJSON(&payload)
+
+    adj, err := h.adjustmentService.CancelAdjustment(id, userID, payload.Reason)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, adj)
+}

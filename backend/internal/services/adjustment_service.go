@@ -1,14 +1,15 @@
 package services
 
 import (
-	"context"
-	"fmt"
+    "context"
+    "fmt"
+    "time"
 
-	"github.com/google/uuid"
-	"inventory-system/internal/database"
-	sqlc "inventory-system/internal/database/sqlc"
-	"inventory-system/internal/models"
-	"inventory-system/internal/utils"
+    "github.com/google/uuid"
+    "inventory-system/internal/database"
+    sqlc "inventory-system/internal/database/sqlc"
+    "inventory-system/internal/models"
+    "inventory-system/internal/utils"
 )
 
 type AdjustmentService struct {
@@ -208,6 +209,76 @@ func (s *AdjustmentService) UpdateAdjustment(id uuid.UUID, req models.UpdateAdju
 func (s *AdjustmentService) DeleteAdjustment(id uuid.UUID) error {
 	ctx := context.Background()
 	return s.db.Queries.DeleteAdjustment(ctx, utils.UUIDToPgxUUID(id))
+}
+
+// CancelAdjustment sets an adjustment to cancelled, stores cancellation info, and reverses stock movements
+func (s *AdjustmentService) CancelAdjustment(adjustmentID uuid.UUID, cancelledBy uuid.UUID, reason string) (*models.Adjustment, error) {
+    ctx := context.Background()
+
+    // Load current adjustment and items
+    adjRow, err := s.db.Queries.GetAdjustment(ctx, utils.UUIDToPgxUUID(adjustmentID))
+    if err != nil {
+        return nil, fmt.Errorf("failed to load adjustment: %w", err)
+    }
+    if adjRow.Status == "cancelled" {
+        return nil, fmt.Errorf("adjustment is already cancelled")
+    }
+
+    items, err := s.db.Queries.GetAdjustmentItems(ctx, utils.UUIDToPgxUUID(adjustmentID))
+    if err != nil {
+        return nil, fmt.Errorf("failed to load adjustment items: %w", err)
+    }
+
+    // Build cancellation note appended to existing notes
+    notePrefix := "Cancelled"
+    if reason != "" {
+        notePrefix = notePrefix + ": " + reason
+    }
+    var updatedNotes *string
+    if adjRow.Notes != nil && *adjRow.Notes != "" {
+        combined := *adjRow.Notes + " | " + notePrefix
+        updatedNotes = &combined
+    } else {
+        updatedNotes = &notePrefix
+    }
+
+    // Update adjustment as cancelled
+    updated, err := s.db.Queries.UpdateAdjustment(ctx, &sqlc.UpdateAdjustmentParams{
+        ID:              adjRow.ID,
+        ReferenceNumber: adjRow.ReferenceNumber,
+        AdjustmentDate:  adjRow.AdjustmentDate,
+        TotalQuantity:   adjRow.TotalQuantity,
+        Reason:          adjRow.Reason,
+        Status:          "cancelled",
+        ProcessedBy:     utils.UUIDToPgxUUID(cancelledBy),
+        ProcessedDate:   utils.TimeToPgxTimestamptz(time.Now()),
+        Notes:           updatedNotes,
+    })
+    if err != nil {
+        return nil, fmt.Errorf("failed to cancel adjustment: %w", err)
+    }
+
+    // Reverse stock movements for all items
+    adjUUID := utils.PgxUUIDToUUID(updated.ID)
+    for _, it := range items {
+        // Reverse quantity
+        reverseQty := -int(it.Quantity)
+        stockReq := models.CreateStockMovementRequest{
+            ProductID:     utils.PgxUUIDToUUID(it.ProductID),
+            WarehouseID:   utils.PgxUUIDToUUID(it.WarehouseID),
+            MovementType:  "adjustment",
+            Quantity:      reverseQty,
+            CostPrice:     nil, // cost not required for reversal effect on quantity
+            ReferenceType: stringPtr("adjustment_cancellation"),
+            ReferenceID:   &adjUUID,
+        }
+
+        if _, err := s.stockService.CreateStockMovement(ctx, stockReq, &cancelledBy); err != nil {
+            return nil, fmt.Errorf("failed to create reversal stock movement: %w", err)
+        }
+    }
+
+    return s.convertToAdjustmentModelFromAdjustment(updated), nil
 }
 
 // convertToAdjustmentModel converts database model to API model

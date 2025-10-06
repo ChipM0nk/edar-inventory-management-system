@@ -217,6 +217,7 @@ func main() {
 				adjustments.GET("/:id", adjustmentHandler.GetAdjustment)
 				adjustments.PUT("/:id", adjustmentHandler.UpdateAdjustment)
 				adjustments.DELETE("/:id", adjustmentHandler.DeleteAdjustment)
+				adjustments.POST("/:id/cancel", adjustmentHandler.CancelAdjustment)
 			}
 
 			// Products by supplier
