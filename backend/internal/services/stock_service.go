@@ -158,16 +158,32 @@ func (s *StockService) GetStockLevel(ctx context.Context, productID, warehouseID
 		return nil, err
 	}
 
-	maxStockLevel := int(*stockLevel.MaxStockLevel)
-	return &models.StockLevel{
+    // Safely handle nullable numeric fields from the DB
+    var maxStockLevelPtr *int
+    if stockLevel.MaxStockLevel != nil {
+        tmp := int(*stockLevel.MaxStockLevel)
+        maxStockLevelPtr = &tmp
+    }
+
+    var availableQty int
+    if stockLevel.AvailableQuantity != nil {
+        availableQty = int(*stockLevel.AvailableQuantity)
+    }
+
+    var minLevel int
+    if stockLevel.MinStockLevel != nil {
+        minLevel = int(*stockLevel.MinStockLevel)
+    }
+
+    return &models.StockLevel{
 		ID:                utils.PgxUUIDToUUID(stockLevel.ID),
 		ProductID:         utils.PgxUUIDToUUID(stockLevel.ProductID),
 		WarehouseID:       utils.PgxUUIDToUUID(stockLevel.WarehouseID),
 		Quantity:          int(stockLevel.Quantity),
 		ReservedQuantity:  int(stockLevel.ReservedQuantity),
-		AvailableQuantity: int(*stockLevel.AvailableQuantity),
-		MinStockLevel:     int(*stockLevel.MinStockLevel),
-		MaxStockLevel:     &maxStockLevel,
+        AvailableQuantity: availableQty,
+        MinStockLevel:     minLevel,
+        MaxStockLevel:     maxStockLevelPtr,
 		LastUpdated:       utils.PgxTimestamptzToTime(stockLevel.LastUpdated),
 		CreatedAt:         utils.PgxTimestamptzToTime(stockLevel.CreatedAt),
 		UpdatedAt:         utils.PgxTimestamptzToTime(stockLevel.UpdatedAt),

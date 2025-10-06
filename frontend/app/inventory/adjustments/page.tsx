@@ -142,6 +142,8 @@ export default function AdjustmentsPage() {
   const [adjustmentReasonType, setAdjustmentReasonType] = useState<string>('')
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
   const [salesOrders, setSalesOrders] = useState<any[]>([])
+  // Review dialog state
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -444,7 +446,10 @@ export default function AdjustmentsPage() {
     try {
       setIsCheckingStock(true)
       const response = await api.get(`/stock-levels/${productId}/${warehouseId}`)
-      return response.data.quantity || 0
+      const data = response.data || {}
+      const qty = typeof data.quantity === 'number' ? data.quantity : (typeof data.available_quantity === 'number' ? data.available_quantity : 0)
+      console.log('checkStockLevel', { productId, warehouseId, data, qty })
+      return qty
     } catch (error) {
       console.error('Error checking stock level:', error)
       return 0
@@ -797,11 +802,20 @@ export default function AdjustmentsPage() {
       // Reload adjustments
       await loadAdjustments()
       
-      alert(`Adjustment created successfully!\nReference Number: ${referenceNumber}${uploadedFiles.length > 0 ? `\nDocuments uploaded: ${uploadedFiles.length}` : ''}`)
+      await notice({
+        title: 'Adjustment created',
+        description: `Reference Number: ${referenceNumber}${uploadedFiles.length > 0 ? `\nDocuments uploaded: ${uploadedFiles.length}` : ''}`,
+        variant: 'success',
+        okText: 'OK',
+      })
     } catch (error: any) {
       console.error('Error creating adjustment:', error)
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
-      alert(`Failed to create adjustment: ${errorMessage}`)
+      await notice({
+        title: 'Failed to create adjustment',
+        description: errorMessage,
+        variant: 'warning',
+      })
       setGeneratedReferenceNumber(null) // Reset reference number on error
     }
   }
@@ -1035,6 +1049,17 @@ export default function AdjustmentsPage() {
                         <p className="text-sm font-medium">Reference Number</p>
                         <p className="text-sm text-gray-600 font-mono">{selectedAdjustment.reference_id}</p>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {selectedAdjustment.status === 'cancelled' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          Cancelled
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Active
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
@@ -1307,38 +1332,40 @@ export default function AdjustmentsPage() {
                   Close
                 </Button>
                 {/* Cancel adjustment action */}
-                <Button
-                  variant="destructive"
-                  onClick={async () => {
-                    if (!selectedAdjustment) return
-                    const proceed = await confirm({
-                      title: 'Cancel adjustment?',
-                      description: 'This will reverse stock movements for all items. This action cannot be undone.',
-                      confirmText: 'Cancel Adjustment',
-                      cancelText: 'Keep Adjustment',
-                      variant: 'danger',
-                    })
-                    if (!proceed) return
-                    try {
-                      await api.post(`/adjustments/${selectedAdjustment.id}/cancel`, { reason: 'User cancelled from UI' })
-                      await notice({
-                        title: 'Adjustment cancelled',
-                        description: 'The adjustment was cancelled and stock was updated.',
-                        variant: 'success',
+                {selectedAdjustment.status !== 'cancelled' && (
+                  <Button
+                    variant="destructive"
+                    onClick={async () => {
+                      if (!selectedAdjustment) return
+                      const proceed = await confirm({
+                        title: 'Cancel adjustment?',
+                        description: 'This will reverse stock movements for all items. This action cannot be undone.',
+                        confirmText: 'Cancel Adjustment',
+                        cancelText: 'Keep Adjustment',
+                        variant: 'danger',
                       })
-                      closeModal()
-                      await loadAdjustments()
-                    } catch (e: any) {
-                      await notice({
-                        title: 'Cancellation failed',
-                        description: e?.response?.data?.error || 'An error occurred while cancelling the adjustment.',
-                        variant: 'warning',
-                      })
-                    }
-                  }}
-                >
-                  Cancel Adjustment
-                </Button>
+                      if (!proceed) return
+                      try {
+                        await api.post(`/adjustments/${selectedAdjustment.id}/cancel`, { reason: 'User cancelled from UI' })
+                        await notice({
+                          title: 'Adjustment cancelled',
+                          description: 'The adjustment was cancelled and stock was updated.',
+                          variant: 'success',
+                        })
+                        closeModal()
+                        await loadAdjustments()
+                      } catch (e: any) {
+                        await notice({
+                          title: 'Cancellation failed',
+                          description: e?.response?.data?.error || 'An error occurred while cancelling the adjustment.',
+                          variant: 'warning',
+                        })
+                      }
+                    }}
+                  >
+                    Cancel Adjustment
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -1859,13 +1886,81 @@ export default function AdjustmentsPage() {
                   Cancel
                 </Button>
                 <Button 
-                  onClick={handleCreateAdjustment}
+                  onClick={() => setIsReviewOpen(true)}
                   disabled={adjustmentItems.length === 0 || isUploadingDocuments}
                   className="bg-[#52a852] hover:bg-[#4a964a] text-white"
                 >
-                  {isUploadingDocuments ? 'Uploading...' : 'Create Adjustment'}
+                  {isUploadingDocuments ? 'Uploading...' : 'Review & Confirm'}
                 </Button>
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review & Confirm Dialog */}
+      <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Review Adjustment</DialogTitle>
+            <DialogDescription>Confirm the details below before creating the transaction.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div>
+                <div className="text-gray-500">Processed By</div>
+                <div className="font-medium">{user ? `${user.first_name} ${user.last_name}` : ''}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Adjustment Date</div>
+                <div className="font-medium">{adjustmentDate}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Warehouse</div>
+                <div className="font-medium">{selectedWarehouse?.name || '—'}</div>
+              </div>
+            </div>
+            <div className="border rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {adjustmentItems.map((item, idx) => (
+                    <TableRow key={`${item.product_id}-${idx}`}>
+                      <TableCell>{item.product_name}</TableCell>
+                      <TableCell className="font-mono text-sm">{item.product_sku}</TableCell>
+                      <TableCell className="text-right {item.quantity>0?'text-green-600':'text-red-600'}">{item.quantity}</TableCell>
+                      <TableCell className="text-right">₱{item.cost_price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-semibold">₱{(Math.abs(item.quantity) * item.cost_price).toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end gap-6 text-sm">
+              <div>
+                <div className="text-gray-500">Items</div>
+                <div className="font-medium text-right">{adjustmentItems.length}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Total Quantity</div>
+                <div className="font-medium text-right">{adjustmentItems.reduce((s,i)=> s + Math.abs(i.quantity), 0)}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Total Amount</div>
+                <div className="font-semibold text-right">₱{adjustmentItems.reduce((s,i)=> s + Math.abs(i.quantity)*i.cost_price, 0).toFixed(2)}</div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={()=>setIsReviewOpen(false)}>Back</Button>
+              <Button className="bg-[#52a852] hover:bg-[#4a964a] text-white" onClick={() => { setIsReviewOpen(false); handleCreateAdjustment() }}>Confirm & Create</Button>
             </div>
           </div>
         </DialogContent>
