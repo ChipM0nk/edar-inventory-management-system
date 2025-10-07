@@ -61,19 +61,33 @@ func (s *StockService) CreateStockMovement(ctx context.Context, req models.Creat
 		totalAmount = &amount
 	}
 
+	// Parse processed_date if provided, otherwise use current time
+	var processedDate time.Time
+	if req.ProcessedDate != nil && *req.ProcessedDate != "" {
+		parsedDate, err := time.Parse("2006-01-02", *req.ProcessedDate)
+		if err != nil {
+			processedDate = time.Now()
+		} else {
+			processedDate = parsedDate
+		}
+	} else {
+		processedDate = time.Now()
+	}
+
 	// Create stock movement
 	stockMovement, err := s.db.CreateStockMovement(ctx, &sqlc.CreateStockMovementParams{
-		ProductID:     utils.UUIDToPgxUUID(req.ProductID),
-		WarehouseID:   utils.UUIDToPgxUUID(req.WarehouseID),
-		MovementType:  req.MovementType,
-		Quantity:      int32(req.Quantity),
-		CostPrice:     utils.OptionalFloat64ToPgxNumeric(req.CostPrice),
-		TotalAmount:   utils.OptionalFloat64ToPgxNumeric(totalAmount),
-		ReferenceType: req.ReferenceType,
-		ReferenceID:   utils.OptionalUUIDToPgxUUID(req.ReferenceID),
-		UserID:        utils.UUIDToPgxUUID(*userID),
-		ProcessedBy:   utils.UUIDToPgxUUID(*userID), // Default to current user
-		ProcessedDate: utils.TimeToPgxTimestamptz(time.Now()),
+		ProductID:       utils.UUIDToPgxUUID(req.ProductID),
+		WarehouseID:     utils.UUIDToPgxUUID(req.WarehouseID),
+		MovementType:    req.MovementType,
+		Quantity:        int32(req.Quantity),
+		CostPrice:       utils.OptionalFloat64ToPgxNumeric(req.CostPrice),
+		TotalAmount:     utils.OptionalFloat64ToPgxNumeric(totalAmount),
+		ReferenceType:   req.ReferenceType,
+		ReferenceID:     utils.OptionalUUIDToPgxUUID(req.ReferenceID),
+		ReferenceNumber: req.ReferenceNumber,
+		UserID:          utils.UUIDToPgxUUID(*userID),
+		ProcessedBy:     utils.UUIDToPgxUUID(*userID), // Default to current user
+		ProcessedDate:   utils.TimeToPgxTimestamptz(processedDate),
 	})
 	if err != nil {
 		return nil, err
@@ -135,17 +149,18 @@ func (s *StockService) CreateStockMovement(ctx context.Context, req models.Creat
 	processedByValue := utils.PgxUUIDToUUID(stockMovement.ProcessedBy)
 	processedDateValue := utils.PgxTimestamptzToTime(stockMovement.ProcessedDate)
 	return &models.StockMovement{
-		ID:            utils.PgxUUIDToUUID(stockMovement.ID),
-		ProductID:     utils.PgxUUIDToUUID(stockMovement.ProductID),
-		WarehouseID:   utils.PgxUUIDToUUID(stockMovement.WarehouseID),
-		MovementType:  stockMovement.MovementType,
-		Quantity:      int(stockMovement.Quantity),
-		ReferenceType: stockMovement.ReferenceType,
-		ReferenceID:   &referenceID,
-		UserID:        &userIDValue,
-		ProcessedBy:   &processedByValue,
-		ProcessedDate: &processedDateValue,
-		CreatedAt:     utils.PgxTimestamptzToTime(stockMovement.CreatedAt),
+		ID:              utils.PgxUUIDToUUID(stockMovement.ID),
+		ProductID:       utils.PgxUUIDToUUID(stockMovement.ProductID),
+		WarehouseID:     utils.PgxUUIDToUUID(stockMovement.WarehouseID),
+		MovementType:    stockMovement.MovementType,
+		Quantity:        int(stockMovement.Quantity),
+		ReferenceType:   stockMovement.ReferenceType,
+		ReferenceID:     &referenceID,
+		ReferenceNumber: stockMovement.ReferenceNumber,
+		UserID:          &userIDValue,
+		ProcessedBy:     &processedByValue,
+		ProcessedDate:   &processedDateValue,
+		CreatedAt:       utils.PgxTimestamptzToTime(stockMovement.CreatedAt),
 	}, nil
 }
 

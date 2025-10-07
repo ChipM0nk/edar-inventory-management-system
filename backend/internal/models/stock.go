@@ -51,13 +51,16 @@ type StockMovement struct {
 }
 
 type CreateStockMovementRequest struct {
-	ProductID     uuid.UUID  `json:"product_id" validate:"required"`
-	WarehouseID   uuid.UUID  `json:"warehouse_id" validate:"required"`
-	MovementType  string     `json:"movement_type" validate:"required,oneof=in out transfer adjustment"`
-	Quantity      int        `json:"quantity" validate:"required"`
-	CostPrice     *float64   `json:"cost_price,omitempty" validate:"omitempty,min=0"`
-	ReferenceType *string    `json:"reference_type"`
-	ReferenceID   *uuid.UUID `json:"reference_id"`
+	ProductID       uuid.UUID  `json:"product_id" validate:"required"`
+	WarehouseID     uuid.UUID  `json:"warehouse_id" validate:"required"`
+	MovementType    string     `json:"movement_type" validate:"required,oneof=in out transfer adjustment"`
+	Quantity        int        `json:"quantity" validate:"required"`
+	CostPrice       *float64   `json:"cost_price,omitempty" validate:"omitempty,min=0"`
+	ReferenceType   *string    `json:"reference_type"`
+	ReferenceID     *uuid.UUID `json:"reference_id"`
+	ReferenceNumber *string    `json:"reference_number,omitempty"`
+	Reason          *string    `json:"reason,omitempty"`
+	ProcessedDate   *string    `json:"processed_date,omitempty"`
 }
 
 type BulkStockMovementRequest struct {

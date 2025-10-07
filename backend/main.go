@@ -76,6 +76,7 @@ func main() {
 	purchaseOrderService := services.NewPurchaseOrderService(db)
 	documentService := services.NewDocumentService(db)
 	adjustmentService := services.NewAdjustmentService(db, stockService)
+	transferService := services.NewTransferService(db)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userService, jwtService)
@@ -87,6 +88,7 @@ func main() {
 	purchaseOrderHandler := handlers.NewPurchaseOrderHandler(purchaseOrderService)
 	documentHandler := handlers.NewDocumentHandler(documentService)
 	adjustmentHandler := handlers.NewAdjustmentHandler(adjustmentService)
+	transferHandler := handlers.NewTransferHandler(transferService)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -218,6 +220,17 @@ func main() {
 				adjustments.PUT("/:id", adjustmentHandler.UpdateAdjustment)
 				adjustments.DELETE("/:id", adjustmentHandler.DeleteAdjustment)
 				adjustments.POST("/:id/cancel", adjustmentHandler.CancelAdjustment)
+			}
+
+			// Transfers
+			transfers := protected.Group("/transfers")
+			{
+				transfers.GET("", transferHandler.ListTransfers)
+				transfers.POST("", transferHandler.CreateTransfer)
+				transfers.GET("/:id", transferHandler.GetTransfer)
+				transfers.GET("/reference/:reference", transferHandler.GetTransferByReference)
+				transfers.PUT("/:id/status", transferHandler.UpdateTransferStatus)
+				transfers.DELETE("/:id", transferHandler.DeleteTransfer)
 			}
 
 			// Products by supplier
