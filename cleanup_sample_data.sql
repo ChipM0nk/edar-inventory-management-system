@@ -28,3 +28,4 @@ SELECT COUNT(*) as count FROM stock_movements;
 
 
 
+

@@ -296,3 +296,4 @@ func (h *TransferHandler) DeleteTransfer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Transfer deleted successfully"})
 }
 
+

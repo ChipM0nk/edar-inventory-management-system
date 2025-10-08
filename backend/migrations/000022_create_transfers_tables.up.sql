@@ -78,3 +78,4 @@ CREATE TRIGGER update_transfer_total_quantity_trigger
     FOR EACH ROW
     EXECUTE FUNCTION update_transfer_total_quantity();
 
+

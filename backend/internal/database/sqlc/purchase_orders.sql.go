@@ -308,9 +308,10 @@ func (q *Queries) GetPurchaseOrderStockMovements(ctx context.Context, referenceI
 }
 
 const ListPurchaseOrders = `-- name: ListPurchaseOrders :many
-SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, u.first_name, u.last_name
+SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
+LEFT JOIN users cu ON po.cancelled_by = cu.id
 ORDER BY po.order_date DESC, po.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -339,6 +340,8 @@ type ListPurchaseOrdersRow struct {
 	CancellationReason   *string            `json:"cancellation_reason"`
 	FirstName            string             `json:"first_name"`
 	LastName             string             `json:"last_name"`
+	CancelledByFirstName *string            `json:"cancelled_by_first_name"`
+	CancelledByLastName  *string            `json:"cancelled_by_last_name"`
 }
 
 func (q *Queries) ListPurchaseOrders(ctx context.Context, arg *ListPurchaseOrdersParams) ([]*ListPurchaseOrdersRow, error) {
@@ -369,6 +372,8 @@ func (q *Queries) ListPurchaseOrders(ctx context.Context, arg *ListPurchaseOrder
 			&i.CancellationReason,
 			&i.FirstName,
 			&i.LastName,
+			&i.CancelledByFirstName,
+			&i.CancelledByLastName,
 		); err != nil {
 			return nil, err
 		}
@@ -381,9 +386,10 @@ func (q *Queries) ListPurchaseOrders(ctx context.Context, arg *ListPurchaseOrder
 }
 
 const ListPurchaseOrdersWithFilter = `-- name: ListPurchaseOrdersWithFilter :many
-SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, u.first_name, u.last_name
+SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
+LEFT JOIN users cu ON po.cancelled_by = cu.id
 WHERE ($1::text IS NULL OR po.status = $1)
   AND ($2::text IS NULL OR po.supplier_name ILIKE '%' || $2 || '%')
   AND ($3::date IS NULL OR po.order_date >= $3)
@@ -420,6 +426,8 @@ type ListPurchaseOrdersWithFilterRow struct {
 	CancellationReason   *string            `json:"cancellation_reason"`
 	FirstName            string             `json:"first_name"`
 	LastName             string             `json:"last_name"`
+	CancelledByFirstName *string            `json:"cancelled_by_first_name"`
+	CancelledByLastName  *string            `json:"cancelled_by_last_name"`
 }
 
 func (q *Queries) ListPurchaseOrdersWithFilter(ctx context.Context, arg *ListPurchaseOrdersWithFilterParams) ([]*ListPurchaseOrdersWithFilterRow, error) {
@@ -457,6 +465,8 @@ func (q *Queries) ListPurchaseOrdersWithFilter(ctx context.Context, arg *ListPur
 			&i.CancellationReason,
 			&i.FirstName,
 			&i.LastName,
+			&i.CancelledByFirstName,
+			&i.CancelledByLastName,
 		); err != nil {
 			return nil, err
 		}

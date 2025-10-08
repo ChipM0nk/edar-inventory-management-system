@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { FileText, Building2, Calendar, User, Eye } from 'lucide-react'
+import { FileText, Building2, Calendar, User, Eye, AlertCircle, X } from 'lucide-react'
 import { PurchaseOrder } from '@/lib/types'
 import { formatDate, getStatusColor } from '@/lib/utils'
 import { DocumentsDialog } from './documents-dialog'
@@ -12,6 +12,7 @@ interface PurchaseOrderCardProps {
   isLoadingDocs: boolean
   isValidating: boolean
   onViewDocuments: (order: PurchaseOrder) => void
+  onViewDetails: (order: PurchaseOrder) => void
   onValidateDocument: (document: any, poNumber: string, orderDate: string) => void
   onViewDocument: (document: any) => void
   onDownloadDocument: (document: any) => void
@@ -25,6 +26,7 @@ export function PurchaseOrderCard({
   isLoadingDocs, 
   isValidating, 
   onViewDocuments, 
+  onViewDetails,
   onValidateDocument, 
   onViewDocument, 
   onDownloadDocument, 
@@ -33,6 +35,34 @@ export function PurchaseOrderCard({
 }: PurchaseOrderCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow">
+      {/* Cancellation Banner */}
+      {order.status === 'cancelled' && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex items-center gap-3">
+            <X className="h-5 w-5 text-red-600" />
+            <div>
+              <h3 className="text-sm font-semibold text-red-800">This purchase order has been cancelled</h3>
+              <p className="text-sm text-red-600 mt-1">No further actions can be taken on this order.</p>
+              {order.cancelled_by_first_name && order.cancelled_by_last_name && (
+                <p className="text-xs text-red-600 mt-1">
+                  Cancelled by: {order.cancelled_by_first_name} {order.cancelled_by_last_name}
+                </p>
+              )}
+              {order.cancelled_at && (
+                <p className="text-xs text-red-600">
+                  Cancelled on: {formatDate(order.cancelled_at)}
+                </p>
+              )}
+              {order.cancellation_reason && (
+                <p className="text-xs text-red-600">
+                  Reason: {order.cancellation_reason}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
@@ -51,7 +81,7 @@ export function PurchaseOrderCard({
               </span>
               <span className="flex items-center gap-1">
                 <User className="h-4 w-4" />
-                {order.first_name} {order.last_name}
+                {order.created_by_first_name} {order.created_by_last_name}
               </span>
             </CardDescription>
           </div>
@@ -78,25 +108,34 @@ export function PurchaseOrderCard({
               <p className="mt-1">Notes: {order.notes}</p>
             )}
           </div>
-          <DocumentsDialog
-            order={order}
-            documents={documents}
-            isLoadingDocs={isLoadingDocs}
-            isValidating={isValidating}
-            onValidateDocument={onValidateDocument}
-            onViewDocument={onViewDocument}
-            onDownloadDocument={onDownloadDocument}
-            onOpenDocumentInNewTab={onOpenDocumentInNewTab}
-            onDeleteDocument={onDeleteDocument}
-          >
+          <div className="flex gap-2">
             <Button 
               variant="outline" 
-              onClick={() => onViewDocuments(order)}
+              onClick={() => onViewDetails(order)}
             >
-              <Eye className="h-4 w-4 mr-2" />
-              View Documents
+              <FileText className="h-4 w-4 mr-2" />
+              View Details
             </Button>
-          </DocumentsDialog>
+            <DocumentsDialog
+              order={order}
+              documents={documents}
+              isLoadingDocs={isLoadingDocs}
+              isValidating={isValidating}
+              onValidateDocument={onValidateDocument}
+              onViewDocument={onViewDocument}
+              onDownloadDocument={onDownloadDocument}
+              onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+              onDeleteDocument={onDeleteDocument}
+            >
+              <Button 
+                variant="outline" 
+                onClick={() => onViewDocuments(order)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View Documents
+              </Button>
+            </DocumentsDialog>
+          </div>
         </div>
       </CardContent>
     </Card>

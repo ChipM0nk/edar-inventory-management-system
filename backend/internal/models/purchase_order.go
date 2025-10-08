@@ -22,6 +22,7 @@ type PurchaseOrder struct {
 	CancelledBy            *string    `json:"cancelled_by"`
 	CancelledByFirstName   *string    `json:"cancelled_by_first_name"`
 	CancelledByLastName    *string    `json:"cancelled_by_last_name"`
+	CancelledAt            *time.Time `json:"cancelled_at"`
 	CancellationReason     *string    `json:"cancellation_reason"`
 	CreatedAt              time.Time  `json:"created_at"`
 	UpdatedAt              time.Time  `json:"updated_at"`

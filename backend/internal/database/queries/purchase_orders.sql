@@ -11,16 +11,18 @@ LEFT JOIN users cu ON po.cancelled_by = cu.id
 WHERE po.id = $1;
 
 -- name: ListPurchaseOrders :many
-SELECT po.*, u.first_name, u.last_name
+SELECT po.*, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
+LEFT JOIN users cu ON po.cancelled_by = cu.id
 ORDER BY po.order_date DESC, po.created_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: ListPurchaseOrdersWithFilter :many
-SELECT po.*, u.first_name, u.last_name
+SELECT po.*, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
+LEFT JOIN users cu ON po.cancelled_by = cu.id
 WHERE ($1::text IS NULL OR po.status = $1)
   AND ($2::text IS NULL OR po.supplier_name ILIKE '%' || $2 || '%')
   AND ($3::date IS NULL OR po.order_date >= $3)

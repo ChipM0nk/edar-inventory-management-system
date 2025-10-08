@@ -11,8 +11,14 @@ export interface PurchaseOrder {
   expected_delivery_date?: string
   received_date?: string
   notes?: string
-  first_name: string
-  last_name: string
+  created_by: string
+  created_by_first_name: string
+  created_by_last_name: string
+  cancelled_by?: string
+  cancelled_by_first_name?: string
+  cancelled_by_last_name?: string
+  cancelled_at?: string
+  cancellation_reason?: string
   created_at: string
   updated_at: string
 }

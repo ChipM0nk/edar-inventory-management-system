@@ -12,6 +12,7 @@ import { PurchaseOrder, Document } from '@/lib/types'
 import { PurchaseOrderCard } from '@/components/purchase-orders/purchase-order-card'
 import { DocumentsDialog } from '@/components/purchase-orders/documents-dialog'
 import { DocumentViewerDialog } from '@/components/purchase-orders/document-viewer-dialog'
+import { PurchaseOrderDetailsDialog } from '@/components/purchase-orders/purchase-order-details-dialog'
 import { LoadingSpinner } from '@/components/shared/loading-spinner'
 import { EmptyState } from '@/components/shared/empty-state'
 
@@ -27,6 +28,7 @@ export default function PurchaseOrdersPage() {
   const [selectedDocumentUrl, setSelectedDocumentUrl] = useState<string | null>(null)
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false)
   const [isValidating, setIsValidating] = useState<string | null>(null)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -71,6 +73,31 @@ export default function PurchaseOrdersPage() {
       setDocuments([])
     } finally {
       setIsLoadingDocs(false)
+    }
+  }
+
+  const handleViewDetails = async (order: PurchaseOrder) => {
+    try {
+      console.log('🔍 Fetching individual PO for ID:', order.id)
+      console.log('🔍 Current order status:', order.status)
+      
+      // Fetch fresh data for the individual purchase order
+      const response = await api.get(`/purchase-orders/${order.id}`)
+      console.log('✅ Individual PO fetch response:', response.data)
+      console.log('✅ Response cancelled_at:', response.data.cancelled_at)
+      console.log('✅ Response cancelled_by_first_name:', response.data.cancelled_by_first_name)
+      console.log('✅ Response cancelled_by_last_name:', response.data.cancelled_by_last_name)
+      console.log('✅ Response cancellation_reason:', response.data.cancellation_reason)
+      
+      console.log('🔍 About to set selectedOrder and open modal')
+      setSelectedOrder(response.data)
+      setIsDetailsModalOpen(true)
+      console.log('🔍 Modal should now be open')
+    } catch (error) {
+      console.error('❌ Error fetching purchase order details:', error)
+      // Fallback to using the existing order data
+      setSelectedOrder(order)
+      setIsDetailsModalOpen(true)
     }
   }
 
@@ -255,6 +282,7 @@ export default function PurchaseOrdersPage() {
                       setSelectedOrder(order)
                       loadDocuments(order.id)
                     }}
+                    onViewDetails={handleViewDetails}
                     onValidateDocument={handleValidateDocument}
                     onViewDocument={handleViewDocument}
                     onDownloadDocument={handleDownloadDocument}
@@ -278,6 +306,13 @@ export default function PurchaseOrdersPage() {
               document={selectedDocument}
               documentUrl={selectedDocumentUrl}
               onDownload={handleDownloadDocument}
+            />
+
+            {/* Purchase Order Details Modal */}
+            <PurchaseOrderDetailsDialog
+              order={selectedOrder}
+              isOpen={isDetailsModalOpen}
+              onClose={() => setIsDetailsModalOpen(false)}
             />
 
           </div>
