@@ -77,3 +77,4 @@ CREATE TRIGGER update_transfer_total_quantity_trigger
     AFTER INSERT OR UPDATE OR DELETE ON transfer_items
     FOR EACH ROW
     EXECUTE FUNCTION update_transfer_total_quantity();
+

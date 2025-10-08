@@ -26,3 +26,4 @@ CREATE INDEX idx_stock_movements_total_amount ON stock_movements(total_amount);
 
 
 
+

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"time"
 	"inventory-system/internal/database"
 	sqlc "inventory-system/internal/database/sqlc"
@@ -85,6 +86,29 @@ func (s *TransferService) CreateTransfer(ctx context.Context, req models.CreateT
 			return nil, err
 		}
 
+		// Update stock level for outgoing movement (decrease quantity)
+		fromStock, err := s.db.GetStockLevel(ctx, &sqlc.GetStockLevelParams{
+			ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID: utils.UUIDToPgxUUID(req.FromWarehouseID),
+		})
+		if err != nil {
+			return nil, err
+		}
+		
+		// Check if we have enough stock
+		if fromStock.Quantity < int32(item.Quantity) {
+			return nil, errors.New("insufficient stock in source warehouse")
+		}
+		
+		_, err = s.db.UpdateStockQuantity(ctx, &sqlc.UpdateStockQuantityParams{
+			ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID: utils.UUIDToPgxUUID(req.FromWarehouseID),
+			Quantity:    fromStock.Quantity - int32(item.Quantity),
+		})
+		if err != nil {
+			return nil, err
+		}
+
 		// Create incoming stock movement to destination warehouse
 		_, err = s.db.CreateStockMovement(ctx, &sqlc.CreateStockMovementParams{
 			ProductID:       utils.UUIDToPgxUUID(item.ProductID),
@@ -100,6 +124,36 @@ func (s *TransferService) CreateTransfer(ctx context.Context, req models.CreateT
 		})
 		if err != nil {
 			return nil, err
+		}
+
+		// Update stock level for incoming movement (increase quantity)
+		toStock, err := s.db.GetStockLevel(ctx, &sqlc.GetStockLevelParams{
+			ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID: utils.UUIDToPgxUUID(req.ToWarehouseID),
+		})
+		if err != nil {
+			// If stock level doesn't exist, create it
+			_, err = s.db.CreateStockLevel(ctx, &sqlc.CreateStockLevelParams{
+				ProductID:        utils.UUIDToPgxUUID(item.ProductID),
+				WarehouseID:      utils.UUIDToPgxUUID(req.ToWarehouseID),
+				Quantity:         int32(item.Quantity),
+				ReservedQuantity: 0,
+				MinStockLevel:    &[]int32{0}[0],
+				MaxStockLevel:    &[]int32{0}[0],
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Update existing stock level
+			_, err = s.db.UpdateStockQuantity(ctx, &sqlc.UpdateStockQuantityParams{
+				ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+				WarehouseID: utils.UUIDToPgxUUID(req.ToWarehouseID),
+				Quantity:    toStock.Quantity + int32(item.Quantity),
+			})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -222,6 +276,27 @@ func (s *TransferService) ListTransfers(ctx context.Context, filter models.Trans
 			processedByName = *transfer.ProcessedByFirstName + " " + *transfer.ProcessedByLastName
 		}
 
+		// Get transfer items
+		items, err := s.db.GetTransferItems(ctx, transfer.ID)
+		if err != nil {
+			// Log error but continue with empty items
+			items = []*sqlc.GetTransferItemsRow{}
+		}
+
+		transferItems := make([]models.TransferItem, len(items))
+		for j, item := range items {
+			transferItems[j] = models.TransferItem{
+				ID:          utils.PgxUUIDToUUID(item.ID),
+				TransferID:  utils.PgxUUIDToUUID(item.TransferID),
+				ProductID:   utils.PgxUUIDToUUID(item.ProductID),
+				ProductName: item.ProductName,
+				ProductSKU:  item.ProductSku,
+				Quantity:    int(item.Quantity),
+				Reason:      item.Reason,
+				CreatedAt:   utils.PgxTimestamptzToTime(item.CreatedAt),
+			}
+		}
+
 		transferModels[i] = models.Transfer{
 			ID:                  utils.PgxUUIDToUUID(transfer.ID),
 			ReferenceNumber:     transfer.ReferenceNumber,
@@ -241,6 +316,7 @@ func (s *TransferService) ListTransfers(ctx context.Context, filter models.Trans
 			Notes:               transfer.Notes,
 			CreatedAt:           utils.PgxTimestamptzToTime(transfer.CreatedAt),
 			UpdatedAt:           utils.PgxTimestamptzToTime(transfer.UpdatedAt),
+			Items:               transferItems,
 		}
 	}
 
@@ -320,6 +396,14 @@ func (s *TransferService) UpdateTransferStatus(ctx context.Context, transferID u
 		return nil, err
 	}
 
+	// If cancelling, reverse stock movements
+	if status == "cancelled" && transfer.Status != "cancelled" {
+		err = s.reverseStockMovements(ctx, transfer)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	_, err = s.db.UpdateTransfer(ctx, &sqlc.UpdateTransferParams{
 		ID:              utils.UUIDToPgxUUID(transferID),
 		ReferenceNumber: transfer.ReferenceNumber,
@@ -338,6 +422,110 @@ func (s *TransferService) UpdateTransferStatus(ctx context.Context, transferID u
 	}
 
 	return s.GetTransfer(ctx, transferID)
+}
+
+// reverseStockMovements reverses the stock movements for a cancelled transfer
+func (s *TransferService) reverseStockMovements(ctx context.Context, transfer *models.Transfer) error {
+	tx, err := s.db.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for _, item := range transfer.Items {
+		// Reverse: Add quantity back to source warehouse (from warehouse)
+		fromStock, err := s.db.GetStockLevel(ctx, &sqlc.GetStockLevelParams{
+			ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID: utils.UUIDToPgxUUID(transfer.FromWarehouseID),
+		})
+		if err != nil {
+			// If stock level doesn't exist, create it
+			_, err = s.db.CreateStockLevel(ctx, &sqlc.CreateStockLevelParams{
+				ProductID:        utils.UUIDToPgxUUID(item.ProductID),
+				WarehouseID:      utils.UUIDToPgxUUID(transfer.FromWarehouseID),
+				Quantity:         int32(item.Quantity),
+				ReservedQuantity: 0,
+				MinStockLevel:    &[]int32{0}[0],
+				MaxStockLevel:    &[]int32{0}[0],
+			})
+			if err != nil {
+				return err
+			}
+		} else {
+			// Update existing stock level - add quantity back
+			_, err = s.db.UpdateStockQuantity(ctx, &sqlc.UpdateStockQuantityParams{
+				ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+				WarehouseID: utils.UUIDToPgxUUID(transfer.FromWarehouseID),
+				Quantity:    fromStock.Quantity + int32(item.Quantity),
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		// Reverse: Remove quantity from destination warehouse (to warehouse)
+		toStock, err := s.db.GetStockLevel(ctx, &sqlc.GetStockLevelParams{
+			ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID: utils.UUIDToPgxUUID(transfer.ToWarehouseID),
+		})
+		if err != nil {
+			// If stock level doesn't exist, that's fine - nothing to reverse
+			continue
+		}
+
+		// Check if we have enough stock to reverse
+		if toStock.Quantity < int32(item.Quantity) {
+			// Log warning but continue - this shouldn't happen in normal cases
+			continue
+		}
+
+		// Update existing stock level - remove quantity
+		_, err = s.db.UpdateStockQuantity(ctx, &sqlc.UpdateStockQuantityParams{
+			ProductID:   utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID: utils.UUIDToPgxUUID(transfer.ToWarehouseID),
+			Quantity:    toStock.Quantity - int32(item.Quantity),
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create reversal stock movements for audit trail
+		// Outgoing from destination warehouse (reversing the original incoming)
+		_, err = s.db.CreateStockMovement(ctx, &sqlc.CreateStockMovementParams{
+			ProductID:       utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID:     utils.UUIDToPgxUUID(transfer.ToWarehouseID),
+			MovementType:    "out",
+			Quantity:        int32(item.Quantity),
+			ReferenceType:   utils.StringPtr("transfer_cancellation"),
+			ReferenceID:     utils.UUIDToPgxUUID(transfer.ID),
+			ReferenceNumber: utils.StringPtr(transfer.ReferenceNumber + "_CANCELLED"),
+			UserID:          utils.UUIDToPgxUUID(transfer.CreatedBy),
+			ProcessedBy:     utils.UUIDToPgxUUID(transfer.CreatedBy),
+			ProcessedDate:   utils.TimeToPgxTimestamptz(time.Now()),
+		})
+		if err != nil {
+			return err
+		}
+
+		// Incoming to source warehouse (reversing the original outgoing)
+		_, err = s.db.CreateStockMovement(ctx, &sqlc.CreateStockMovementParams{
+			ProductID:       utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID:     utils.UUIDToPgxUUID(transfer.FromWarehouseID),
+			MovementType:    "in",
+			Quantity:        int32(item.Quantity),
+			ReferenceType:   utils.StringPtr("transfer_cancellation"),
+			ReferenceID:     utils.UUIDToPgxUUID(transfer.ID),
+			ReferenceNumber: utils.StringPtr(transfer.ReferenceNumber + "_CANCELLED"),
+			UserID:          utils.UUIDToPgxUUID(transfer.CreatedBy),
+			ProcessedBy:     utils.UUIDToPgxUUID(transfer.CreatedBy),
+			ProcessedDate:   utils.TimeToPgxTimestamptz(time.Now()),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (s *TransferService) DeleteTransfer(ctx context.Context, transferID uuid.UUID) error {
