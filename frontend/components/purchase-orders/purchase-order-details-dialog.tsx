@@ -188,14 +188,16 @@ export function PurchaseOrderDetailsDialog({
     <>
       {/* Main Order Details Dialog */}
       <Dialog open={isOpen && !showCancelDialog} onOpenChange={handleClose}>
-        <DialogContent className="w-[90vw] max-w-5xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader className="sticky top-0 bg-white z-50 border-b pb-4 mb-4 shadow-sm flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
+        <DialogContent className="w-[90vw] max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="sticky top-0 bg-white z-50 border-b border-gray-300 pb-4 mb-4 shadow-sm flex-shrink-0">
+            <DialogTitle className="flex items-center gap-3 text-xl font-semibold text-gray-900">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
               Purchase Order Details
-          </DialogTitle>
-            <DialogDescription>
-            Complete information about this purchase order and its products
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 mt-2">
+              Complete information about this purchase order and its products
             </DialogDescription>
         
             {/* Status Warning - Moved into header */}
@@ -250,120 +252,116 @@ export function PurchaseOrderDetailsDialog({
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto relative z-10">
-            <div className="space-y-4 p-1">
-              {/* Order Overview - Simplified Layout */}
-              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2 text-blue-800">
+            <div className="space-y-3 p-1">
+              {/* Order Overview - Report Style */}
+              <Card className="border border-gray-300 shadow-sm">
+                <CardHeader className="bg-gray-100 border-b border-gray-300 py-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900">
                     <Package className="h-4 w-4" />
                     Order Overview
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                    <div className="bg-white p-2 rounded border border-blue-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Hash className="h-3 w-3 text-blue-600" />
-                        <p className="text-xs text-gray-600">Reference</p>
+                <CardContent className="p-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div className="space-y-2">
+                      <div className="flex items-center">
+                        <span className="text-gray-600 font-bold w-28">Reference:</span>
+                        <span className="text-gray-900 font-mono">{order.po_number || 'N/A'}</span>
                       </div>
-                      <p className="text-sm font-semibold text-gray-900 font-mono">{order.po_number || 'N/A'}</p>
+                      <div className="flex items-center">
+                        <span className="text-gray-600 font-bold w-28">Purchase Date:</span>
+                        <span className="text-gray-900">{order.order_date ? formatDate(order.order_date) : 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="text-gray-600 font-bold w-28">Received Date:</span>
+                        <span className="text-gray-900">{order.received_date ? formatDate(order.received_date) : 'Not received'}</span>
+                      </div>
                     </div>
                     
-                    <div className="bg-white p-2 rounded border border-blue-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Calendar className="h-3 w-3 text-blue-600" />
-                        <p className="text-xs text-gray-600">Purchase Date</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center">
+                        <span className="text-gray-600 font-bold w-28">Processed By:</span>
+                        <span className="text-gray-900">{order.created_by_first_name && order.created_by_last_name ? `${order.created_by_first_name} ${order.created_by_last_name}` : 'Unknown'}</span>
                       </div>
-                      <p className="text-sm font-semibold text-gray-900">{order.order_date ? formatDate(order.order_date) : 'N/A'}</p>
+                      <div className="flex items-center">
+                        <span className="text-gray-600 font-bold w-28">Supplier:</span>
+                        <span className="text-gray-900">{order.supplier_name || 'Not specified'}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="text-gray-600 font-bold w-28">Warehouse:</span>
+                        <span className="text-gray-900">{order.warehouse_name || 'Not specified'}</span>
+                      </div>
                     </div>
-                    
-                    <div className="bg-white p-2 rounded border border-blue-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Calendar className="h-3 w-3 text-green-600" />
-                        <p className="text-xs text-gray-600">Received</p>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {order.received_date ? formatDate(order.received_date) : 'Not received'}
-                      </p>
-                    </div>
-                    
-                    <div className="bg-white p-2 rounded border border-blue-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <User className="h-3 w-3 text-blue-600" />
-                        <p className="text-xs text-gray-600">Processed By</p>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {order.created_by_first_name && order.created_by_last_name ? `${order.created_by_first_name} ${order.created_by_last_name}` : 'Unknown'}
-                      </p>
-                    </div>
-                    
-                    <div className="bg-white p-2 rounded border border-blue-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Building className="h-3 w-3 text-blue-600" />
-                        <p className="text-xs text-gray-600">Supplier</p>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-900">{order.supplier_name || 'Not specified'}</p>
-                    </div>
-                    
-                    <div className="bg-white p-2 rounded border border-blue-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Warehouse className="h-3 w-3 text-blue-600" />
-                        <p className="text-xs text-gray-600">Warehouse</p>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {order.warehouse_name || 'Not specified'}
-                      </p>
-                    </div>
-                    
-                    <div className="bg-white p-2 rounded border border-blue-100 lg:col-span-2 col-span-2">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Clock className="h-3 w-3 text-blue-600" />
-                        <p className="text-xs text-gray-600">Created At</p>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-900">{formatDateTime(order.created_at)}</p>
+                  </div>
+                  
+                  <div className="mt-3 pt-2 border-t border-gray-200">
+                    <div className="flex items-center text-sm">
+                      <span className="text-gray-600 font-bold w-28">Created At:</span>
+                      <span className="text-gray-900">{formatDateTime(order.created_at)}</span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Products Table - Enhanced with color scheme */}
-              <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2 text-green-800">
-                    <Package2 className="h-5 w-5" />
+              {/* Products Table - Report Style */}
+              <Card className="border border-gray-300 shadow-sm">
+                <CardHeader className="bg-gray-100 border-b border-gray-300 py-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900">
+                    <Package2 className="h-4 w-4" />
                     Products ({items.length})
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="bg-white rounded-lg border border-green-100 overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="overflow-hidden">
                     <Table>
-                      <TableHeader className="bg-green-50">
-                        <TableRow>
-                          <TableHead className="font-semibold text-green-800">Product</TableHead>
-                          <TableHead className="font-semibold text-green-800">SKU</TableHead>
-                          <TableHead className="font-semibold text-green-800 text-center">Quantity</TableHead>
-                          <TableHead className="font-semibold text-green-800 text-right">Unit Price</TableHead>
-                          <TableHead className="font-semibold text-green-800 text-right">Total</TableHead>
+                      <TableHeader className="bg-gray-100">
+                        <TableRow className="border-b border-gray-300">
+                          <TableHead className="font-semibold text-gray-900 text-left py-2 px-3 text-sm">Product Name</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-left py-2 px-3 text-sm">SKU</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-center py-2 px-3 text-sm">Qty</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-right py-2 px-3 text-sm">Unit Price</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-right py-2 px-3 text-sm">Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {items.length > 0 ? (
                           items.map((product, index) => (
-                            <TableRow key={index} className="hover:bg-green-25 transition-colors">
-                              <TableCell className="font-medium text-gray-900">{product.product_name}</TableCell>
-                              <TableCell className="font-mono text-sm text-gray-600">{product.sku}</TableCell>
-                              <TableCell className="text-center">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <TableRow 
+                              key={index} 
+                              className={`border-b border-gray-200 ${
+                                index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                              }`}
+                            >
+                              <TableCell className="py-2 px-3 text-sm">
+                                <span className="font-medium text-gray-900">
+                                  {product.product_name}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-2 px-3 text-sm">
+                                <span className="font-mono text-gray-600">
+                                  {product.sku}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-2 px-3 text-center text-sm">
+                                <span className="font-medium text-gray-900">
                                   {product.quantity}
                                 </span>
                               </TableCell>
-                              <TableCell className="font-mono text-sm text-gray-700 text-right">{formatCurrency(product.unit_price)}</TableCell>
-                              <TableCell className="font-mono text-sm font-semibold text-gray-900 text-right">{formatCurrency(product.total_price)}</TableCell>
+                              <TableCell className="py-2 px-3 text-right text-sm">
+                                <span className="font-mono text-gray-900">
+                                  {formatCurrency(product.unit_price)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-2 px-3 text-right text-sm">
+                                <span className="font-mono font-semibold text-gray-900">
+                                  {formatCurrency(product.total_price)}
+                                </span>
+                              </TableCell>
                             </TableRow>
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={5} className="h-24 text-center text-gray-500">
+                            <TableCell colSpan={5} className="h-24 text-center text-sm text-gray-500">
                               No products found for this purchase order.
                             </TableCell>
                           </TableRow>
@@ -372,33 +370,34 @@ export function PurchaseOrderDetailsDialog({
                     </Table>
                   </div>
                   
-                  {/* Total Amount - Moved below products */}
+                  {/* Total Amount - Compact and Separate */}
                   {items.length > 0 && (
-                    <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-5 w-5 text-blue-600" />
-                          <span className="text-sm font-medium text-gray-600">Total Amount</span>
+                    <div className="bg-gray-50 border-t border-gray-300 p-2">
+                      <div className="flex justify-end">
+                        <div className="bg-white border border-gray-200 rounded px-3 py-1 shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-600">Total:</span>
+                            <span className="text-sm font-bold text-gray-900">
+                              {formatCurrency(items.reduce((sum, item) => sum + item.total_price, 0))}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-2xl font-bold text-blue-700">
-                          {formatCurrency(items.reduce((sum, item) => sum + item.total_price, 0))}
-                        </span>
                       </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Documents Section (reusable) - Enhanced styling */}
-              <Card className="bg-gradient-to-r from-purple-50 to-violet-50 border-purple-200">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2 text-purple-800">
-                    <FileText className="h-5 w-5" />
+              {/* Documents Section - Minimal Report Style */}
+              <Card className="border border-gray-300 shadow-sm">
+                <CardHeader className="bg-gray-100 border-b border-gray-300 py-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2 text-gray-900">
+                    <FileText className="h-3 w-3" />
                     Documents
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="bg-white rounded-lg border border-purple-100">
+                <CardContent className="p-2">
+                  <div className="bg-white border border-gray-200 max-h-32 overflow-y-auto">
                     <DocumentsSection
                       referenceType="purchase_order"
                       referenceId={order.id!}
@@ -409,16 +408,16 @@ export function PurchaseOrderDetailsDialog({
                 </CardContent>
               </Card>
 
-              {/* Action Buttons - Enhanced styling */}
-              <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+              {/* Action Buttons - Report Style */}
+              <div className="flex justify-between items-center pt-4 border-t border-gray-300 bg-gray-100 -mx-6 px-6 py-3">
                 <div>
                   {order && canCancelPurchaseOrder(order.created_at) && order.status !== 'cancelled' && (
                     <Button
                       variant="outline"
                       onClick={() => setShowCancelDialog(true)}
-                      className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400 transition-colors"
+                      className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400 text-sm px-3 py-1"
                     >
-                      <Trash2 className="w-4 h-4 mr-2" />
+                      <Trash2 className="w-3 h-3 mr-1" />
                       Cancel Purchase Order
                     </Button>
                   )}
@@ -426,7 +425,7 @@ export function PurchaseOrderDetailsDialog({
                 <Button 
                   variant="outline" 
                   onClick={handleClose}
-                  className="px-6 py-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                  className="px-4 py-1 border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-sm"
                 >
                   Close
                 </Button>
