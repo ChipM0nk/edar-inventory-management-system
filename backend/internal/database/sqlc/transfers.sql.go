@@ -11,87 +11,36 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const CountTransfers = `-- name: CountTransfers :one
-SELECT COUNT(*) FROM transfers
-`
-
-func (q *Queries) CountTransfers(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, CountTransfers)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const CountTransfersWithFilter = `-- name: CountTransfersWithFilter :one
-SELECT COUNT(*)
-FROM transfers t
-WHERE ($1::text IS NULL OR t.reference_number ILIKE '%' || $1 || '%')
-  AND ($2::text IS NULL OR t.status = $2)
-  AND ($3::uuid IS NULL OR t.created_by = $3)
-  AND ($4::uuid IS NULL OR t.from_warehouse_id = $4)
-  AND ($5::uuid IS NULL OR t.to_warehouse_id = $5)
-  AND ($6::date IS NULL OR t.transfer_date >= $6)
-  AND ($7::date IS NULL OR t.transfer_date <= $7)
-`
-
-type CountTransfersWithFilterParams struct {
-	Column1 string      `json:"column_1"`
-	Column2 string      `json:"column_2"`
-	Column3 pgtype.UUID `json:"column_3"`
-	Column4 pgtype.UUID `json:"column_4"`
-	Column5 pgtype.UUID `json:"column_5"`
-	Column6 pgtype.Date `json:"column_6"`
-	Column7 pgtype.Date `json:"column_7"`
-}
-
-func (q *Queries) CountTransfersWithFilter(ctx context.Context, arg *CountTransfersWithFilterParams) (int64, error) {
-	row := q.db.QueryRow(ctx, CountTransfersWithFilter,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
-		arg.Column6,
-		arg.Column7,
-	)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const CreateTransfer = `-- name: CreateTransfer :one
-INSERT INTO transfers (reference_number, transfer_date, from_warehouse_id, to_warehouse_id, total_quantity, reason, status, created_by, processed_by, processed_date, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, reference_number, transfer_date, from_warehouse_id, to_warehouse_id, total_quantity, status, reason, created_by, processed_by, processed_date, notes, created_at, updated_at
+INSERT INTO transfers (
+    reference_number,
+    from_warehouse_id,
+    to_warehouse_id,
+    reason,
+    transfer_date,
+    created_by
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+) RETURNING id, reference_number, transfer_date, from_warehouse_id, to_warehouse_id, total_quantity, status, reason, created_by, processed_by, processed_date, notes, created_at, updated_at
 `
 
 type CreateTransferParams struct {
-	ReferenceNumber string             `json:"reference_number"`
-	TransferDate    pgtype.Date        `json:"transfer_date"`
-	FromWarehouseID pgtype.UUID        `json:"from_warehouse_id"`
-	ToWarehouseID   pgtype.UUID        `json:"to_warehouse_id"`
-	TotalQuantity   int32              `json:"total_quantity"`
-	Reason          *string            `json:"reason"`
-	Status          string             `json:"status"`
-	CreatedBy       pgtype.UUID        `json:"created_by"`
-	ProcessedBy     pgtype.UUID        `json:"processed_by"`
-	ProcessedDate   pgtype.Timestamptz `json:"processed_date"`
-	Notes           *string            `json:"notes"`
+	ReferenceNumber string      `json:"reference_number"`
+	FromWarehouseID pgtype.UUID `json:"from_warehouse_id"`
+	ToWarehouseID   pgtype.UUID `json:"to_warehouse_id"`
+	Reason          *string     `json:"reason"`
+	TransferDate    pgtype.Date `json:"transfer_date"`
+	CreatedBy       pgtype.UUID `json:"created_by"`
 }
 
 func (q *Queries) CreateTransfer(ctx context.Context, arg *CreateTransferParams) (*Transfer, error) {
 	row := q.db.QueryRow(ctx, CreateTransfer,
 		arg.ReferenceNumber,
-		arg.TransferDate,
 		arg.FromWarehouseID,
 		arg.ToWarehouseID,
-		arg.TotalQuantity,
 		arg.Reason,
-		arg.Status,
+		arg.TransferDate,
 		arg.CreatedBy,
-		arg.ProcessedBy,
-		arg.ProcessedDate,
-		arg.Notes,
 	)
 	var i Transfer
 	err := row.Scan(
@@ -114,25 +63,23 @@ func (q *Queries) CreateTransfer(ctx context.Context, arg *CreateTransferParams)
 }
 
 const CreateTransferItem = `-- name: CreateTransferItem :one
-INSERT INTO transfer_items (transfer_id, product_id, quantity, reason)
-VALUES ($1, $2, $3, $4)
-RETURNING id, transfer_id, product_id, quantity, reason, created_at
+INSERT INTO transfer_items (
+    transfer_id,
+    product_id,
+    quantity
+) VALUES (
+    $1, $2, $3
+) RETURNING id, transfer_id, product_id, quantity, reason, created_at
 `
 
 type CreateTransferItemParams struct {
 	TransferID pgtype.UUID `json:"transfer_id"`
 	ProductID  pgtype.UUID `json:"product_id"`
 	Quantity   int32       `json:"quantity"`
-	Reason     *string     `json:"reason"`
 }
 
 func (q *Queries) CreateTransferItem(ctx context.Context, arg *CreateTransferItemParams) (*TransferItem, error) {
-	row := q.db.QueryRow(ctx, CreateTransferItem,
-		arg.TransferID,
-		arg.ProductID,
-		arg.Quantity,
-		arg.Reason,
-	)
+	row := q.db.QueryRow(ctx, CreateTransferItem, arg.TransferID, arg.ProductID, arg.Quantity)
 	var i TransferItem
 	err := row.Scan(
 		&i.ID,
@@ -154,59 +101,41 @@ func (q *Queries) DeleteTransfer(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
-const DeleteTransferItem = `-- name: DeleteTransferItem :exec
-DELETE FROM transfer_items WHERE id = $1
-`
-
-func (q *Queries) DeleteTransferItem(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, DeleteTransferItem, id)
-	return err
-}
-
-const DeleteTransferItemsByTransferId = `-- name: DeleteTransferItemsByTransferId :exec
-DELETE FROM transfer_items WHERE transfer_id = $1
-`
-
-func (q *Queries) DeleteTransferItemsByTransferId(ctx context.Context, transferID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, DeleteTransferItemsByTransferId, transferID)
-	return err
-}
-
 const GetTransfer = `-- name: GetTransfer :one
-SELECT t.id, t.reference_number, t.transfer_date, t.from_warehouse_id, t.to_warehouse_id, t.total_quantity, t.status, t.reason, t.created_by, t.processed_by, t.processed_date, t.notes, t.created_at, t.updated_at, 
-       fw.name as from_warehouse_name,
-       tw.name as to_warehouse_name,
-       u.first_name as created_by_first_name, u.last_name as created_by_last_name,
-       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
+SELECT 
+    t.id, t.reference_number, t.transfer_date, t.from_warehouse_id, t.to_warehouse_id, t.total_quantity, t.status, t.reason, t.created_by, t.processed_by, t.processed_date, t.notes, t.created_at, t.updated_at,
+    wf.name as from_warehouse_name,
+    wf.location as from_warehouse_location,
+    wt.name as to_warehouse_name,
+    wt.location as to_warehouse_location,
+    u.first_name || ' ' || u.last_name as created_by_name
 FROM transfers t
-JOIN warehouses fw ON t.from_warehouse_id = fw.id
-JOIN warehouses tw ON t.to_warehouse_id = tw.id
-LEFT JOIN users u ON t.created_by = u.id
-LEFT JOIN users p ON t.processed_by = p.id
+JOIN warehouses wf ON t.from_warehouse_id = wf.id
+JOIN warehouses wt ON t.to_warehouse_id = wt.id
+JOIN users u ON t.created_by = u.id
 WHERE t.id = $1
 `
 
 type GetTransferRow struct {
-	ID                   pgtype.UUID        `json:"id"`
-	ReferenceNumber      string             `json:"reference_number"`
-	TransferDate         pgtype.Date        `json:"transfer_date"`
-	FromWarehouseID      pgtype.UUID        `json:"from_warehouse_id"`
-	ToWarehouseID        pgtype.UUID        `json:"to_warehouse_id"`
-	TotalQuantity        int32              `json:"total_quantity"`
-	Status               string             `json:"status"`
-	Reason               *string            `json:"reason"`
-	CreatedBy            pgtype.UUID        `json:"created_by"`
-	ProcessedBy          pgtype.UUID        `json:"processed_by"`
-	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
-	Notes                *string            `json:"notes"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
-	FromWarehouseName    string             `json:"from_warehouse_name"`
-	ToWarehouseName      string             `json:"to_warehouse_name"`
-	CreatedByFirstName   *string            `json:"created_by_first_name"`
-	CreatedByLastName    *string            `json:"created_by_last_name"`
-	ProcessedByFirstName *string            `json:"processed_by_first_name"`
-	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	ID                    pgtype.UUID        `json:"id"`
+	ReferenceNumber       string             `json:"reference_number"`
+	TransferDate          pgtype.Date        `json:"transfer_date"`
+	FromWarehouseID       pgtype.UUID        `json:"from_warehouse_id"`
+	ToWarehouseID         pgtype.UUID        `json:"to_warehouse_id"`
+	TotalQuantity         int32              `json:"total_quantity"`
+	Status                string             `json:"status"`
+	Reason                *string            `json:"reason"`
+	CreatedBy             pgtype.UUID        `json:"created_by"`
+	ProcessedBy           pgtype.UUID        `json:"processed_by"`
+	ProcessedDate         pgtype.Timestamptz `json:"processed_date"`
+	Notes                 *string            `json:"notes"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	FromWarehouseName     string             `json:"from_warehouse_name"`
+	FromWarehouseLocation string             `json:"from_warehouse_location"`
+	ToWarehouseName       string             `json:"to_warehouse_name"`
+	ToWarehouseLocation   string             `json:"to_warehouse_location"`
+	CreatedByName         interface{}        `json:"created_by_name"`
 }
 
 func (q *Queries) GetTransfer(ctx context.Context, id pgtype.UUID) (*GetTransferRow, error) {
@@ -228,50 +157,49 @@ func (q *Queries) GetTransfer(ctx context.Context, id pgtype.UUID) (*GetTransfer
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.FromWarehouseName,
+		&i.FromWarehouseLocation,
 		&i.ToWarehouseName,
-		&i.CreatedByFirstName,
-		&i.CreatedByLastName,
-		&i.ProcessedByFirstName,
-		&i.ProcessedByLastName,
+		&i.ToWarehouseLocation,
+		&i.CreatedByName,
 	)
 	return &i, err
 }
 
 const GetTransferByReferenceNumber = `-- name: GetTransferByReferenceNumber :one
-SELECT t.id, t.reference_number, t.transfer_date, t.from_warehouse_id, t.to_warehouse_id, t.total_quantity, t.status, t.reason, t.created_by, t.processed_by, t.processed_date, t.notes, t.created_at, t.updated_at, 
-       fw.name as from_warehouse_name,
-       tw.name as to_warehouse_name,
-       u.first_name as created_by_first_name, u.last_name as created_by_last_name,
-       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
+SELECT 
+    t.id, t.reference_number, t.transfer_date, t.from_warehouse_id, t.to_warehouse_id, t.total_quantity, t.status, t.reason, t.created_by, t.processed_by, t.processed_date, t.notes, t.created_at, t.updated_at,
+    wf.name as from_warehouse_name,
+    wf.location as from_warehouse_location,
+    wt.name as to_warehouse_name,
+    wt.location as to_warehouse_location,
+    u.first_name || ' ' || u.last_name as created_by_name
 FROM transfers t
-JOIN warehouses fw ON t.from_warehouse_id = fw.id
-JOIN warehouses tw ON t.to_warehouse_id = tw.id
-LEFT JOIN users u ON t.created_by = u.id
-LEFT JOIN users p ON t.processed_by = p.id
+JOIN warehouses wf ON t.from_warehouse_id = wf.id
+JOIN warehouses wt ON t.to_warehouse_id = wt.id
+JOIN users u ON t.created_by = u.id
 WHERE t.reference_number = $1
 `
 
 type GetTransferByReferenceNumberRow struct {
-	ID                   pgtype.UUID        `json:"id"`
-	ReferenceNumber      string             `json:"reference_number"`
-	TransferDate         pgtype.Date        `json:"transfer_date"`
-	FromWarehouseID      pgtype.UUID        `json:"from_warehouse_id"`
-	ToWarehouseID        pgtype.UUID        `json:"to_warehouse_id"`
-	TotalQuantity        int32              `json:"total_quantity"`
-	Status               string             `json:"status"`
-	Reason               *string            `json:"reason"`
-	CreatedBy            pgtype.UUID        `json:"created_by"`
-	ProcessedBy          pgtype.UUID        `json:"processed_by"`
-	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
-	Notes                *string            `json:"notes"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
-	FromWarehouseName    string             `json:"from_warehouse_name"`
-	ToWarehouseName      string             `json:"to_warehouse_name"`
-	CreatedByFirstName   *string            `json:"created_by_first_name"`
-	CreatedByLastName    *string            `json:"created_by_last_name"`
-	ProcessedByFirstName *string            `json:"processed_by_first_name"`
-	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	ID                    pgtype.UUID        `json:"id"`
+	ReferenceNumber       string             `json:"reference_number"`
+	TransferDate          pgtype.Date        `json:"transfer_date"`
+	FromWarehouseID       pgtype.UUID        `json:"from_warehouse_id"`
+	ToWarehouseID         pgtype.UUID        `json:"to_warehouse_id"`
+	TotalQuantity         int32              `json:"total_quantity"`
+	Status                string             `json:"status"`
+	Reason                *string            `json:"reason"`
+	CreatedBy             pgtype.UUID        `json:"created_by"`
+	ProcessedBy           pgtype.UUID        `json:"processed_by"`
+	ProcessedDate         pgtype.Timestamptz `json:"processed_date"`
+	Notes                 *string            `json:"notes"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	FromWarehouseName     string             `json:"from_warehouse_name"`
+	FromWarehouseLocation string             `json:"from_warehouse_location"`
+	ToWarehouseName       string             `json:"to_warehouse_name"`
+	ToWarehouseLocation   string             `json:"to_warehouse_location"`
+	CreatedByName         interface{}        `json:"created_by_name"`
 }
 
 func (q *Queries) GetTransferByReferenceNumber(ctx context.Context, referenceNumber string) (*GetTransferByReferenceNumberRow, error) {
@@ -293,22 +221,23 @@ func (q *Queries) GetTransferByReferenceNumber(ctx context.Context, referenceNum
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.FromWarehouseName,
+		&i.FromWarehouseLocation,
 		&i.ToWarehouseName,
-		&i.CreatedByFirstName,
-		&i.CreatedByLastName,
-		&i.ProcessedByFirstName,
-		&i.ProcessedByLastName,
+		&i.ToWarehouseLocation,
+		&i.CreatedByName,
 	)
 	return &i, err
 }
 
 const GetTransferItems = `-- name: GetTransferItems :many
-SELECT ti.id, ti.transfer_id, ti.product_id, ti.quantity, ti.reason, ti.created_at, 
-       p.name as product_name, p.sku as product_sku
+SELECT 
+    ti.id, ti.transfer_id, ti.product_id, ti.quantity, ti.reason, ti.created_at,
+    p.name as product_name,
+    p.sku as product_sku
 FROM transfer_items ti
 JOIN products p ON ti.product_id = p.id
 WHERE ti.transfer_id = $1
-ORDER BY ti.created_at
+ORDER BY p.name
 `
 
 type GetTransferItemsRow struct {
@@ -351,58 +280,150 @@ func (q *Queries) GetTransferItems(ctx context.Context, transferID pgtype.UUID) 
 	return items, nil
 }
 
-const ListTransfers = `-- name: ListTransfers :many
-SELECT t.id, t.reference_number, t.transfer_date, t.from_warehouse_id, t.to_warehouse_id, t.total_quantity, t.status, t.reason, t.created_by, t.processed_by, t.processed_date, t.notes, t.created_at, t.updated_at, 
-       fw.name as from_warehouse_name,
-       tw.name as to_warehouse_name,
-       u.first_name as created_by_first_name, u.last_name as created_by_last_name,
-       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
+const GetTransferWithItems = `-- name: GetTransferWithItems :many
+SELECT 
+    t.id as transfer_id,
+    t.reference_number,
+    t.from_warehouse_id,
+    t.to_warehouse_id,
+    t.reason,
+    t.transfer_date,
+    t.total_quantity,
+    t.status,
+    t.created_at,
+    wf.name as from_warehouse_name,
+    wf.location as from_warehouse_location,
+    wt.name as to_warehouse_name,
+    wt.location as to_warehouse_location,
+    u.first_name || ' ' || u.last_name as created_by_name,
+    ti.id as item_id,
+    ti.product_id,
+    ti.quantity as item_quantity,
+    p.name as product_name,
+    p.sku as product_sku
 FROM transfers t
-JOIN warehouses fw ON t.from_warehouse_id = fw.id
-JOIN warehouses tw ON t.to_warehouse_id = tw.id
-LEFT JOIN users u ON t.created_by = u.id
-LEFT JOIN users p ON t.processed_by = p.id
+JOIN warehouses wf ON t.from_warehouse_id = wf.id
+JOIN warehouses wt ON t.to_warehouse_id = wt.id
+JOIN users u ON t.created_by = u.id
+LEFT JOIN transfer_items ti ON t.id = ti.transfer_id
+LEFT JOIN products p ON ti.product_id = p.id
+ORDER BY t.created_at DESC, p.name
+`
+
+type GetTransferWithItemsRow struct {
+	TransferID            pgtype.UUID        `json:"transfer_id"`
+	ReferenceNumber       string             `json:"reference_number"`
+	FromWarehouseID       pgtype.UUID        `json:"from_warehouse_id"`
+	ToWarehouseID         pgtype.UUID        `json:"to_warehouse_id"`
+	Reason                *string            `json:"reason"`
+	TransferDate          pgtype.Date        `json:"transfer_date"`
+	TotalQuantity         int32              `json:"total_quantity"`
+	Status                string             `json:"status"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	FromWarehouseName     string             `json:"from_warehouse_name"`
+	FromWarehouseLocation string             `json:"from_warehouse_location"`
+	ToWarehouseName       string             `json:"to_warehouse_name"`
+	ToWarehouseLocation   string             `json:"to_warehouse_location"`
+	CreatedByName         interface{}        `json:"created_by_name"`
+	ItemID                pgtype.UUID        `json:"item_id"`
+	ProductID             pgtype.UUID        `json:"product_id"`
+	ItemQuantity          *int32             `json:"item_quantity"`
+	ProductName           *string            `json:"product_name"`
+	ProductSku            *string            `json:"product_sku"`
+}
+
+func (q *Queries) GetTransferWithItems(ctx context.Context) ([]*GetTransferWithItemsRow, error) {
+	rows, err := q.db.Query(ctx, GetTransferWithItems)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*GetTransferWithItemsRow{}
+	for rows.Next() {
+		var i GetTransferWithItemsRow
+		if err := rows.Scan(
+			&i.TransferID,
+			&i.ReferenceNumber,
+			&i.FromWarehouseID,
+			&i.ToWarehouseID,
+			&i.Reason,
+			&i.TransferDate,
+			&i.TotalQuantity,
+			&i.Status,
+			&i.CreatedAt,
+			&i.FromWarehouseName,
+			&i.FromWarehouseLocation,
+			&i.ToWarehouseName,
+			&i.ToWarehouseLocation,
+			&i.CreatedByName,
+			&i.ItemID,
+			&i.ProductID,
+			&i.ItemQuantity,
+			&i.ProductName,
+			&i.ProductSku,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetTransfers = `-- name: GetTransfers :many
+SELECT 
+    t.id, t.reference_number, t.transfer_date, t.from_warehouse_id, t.to_warehouse_id, t.total_quantity, t.status, t.reason, t.created_by, t.processed_by, t.processed_date, t.notes, t.created_at, t.updated_at,
+    wf.name as from_warehouse_name,
+    wf.location as from_warehouse_location,
+    wt.name as to_warehouse_name,
+    wt.location as to_warehouse_location,
+    u.first_name || ' ' || u.last_name as created_by_name
+FROM transfers t
+JOIN warehouses wf ON t.from_warehouse_id = wf.id
+JOIN warehouses wt ON t.to_warehouse_id = wt.id
+JOIN users u ON t.created_by = u.id
 ORDER BY t.created_at DESC
 LIMIT $1 OFFSET $2
 `
 
-type ListTransfersParams struct {
+type GetTransfersParams struct {
 	Limit  int32 `json:"limit"`
 	Offset int32 `json:"offset"`
 }
 
-type ListTransfersRow struct {
-	ID                   pgtype.UUID        `json:"id"`
-	ReferenceNumber      string             `json:"reference_number"`
-	TransferDate         pgtype.Date        `json:"transfer_date"`
-	FromWarehouseID      pgtype.UUID        `json:"from_warehouse_id"`
-	ToWarehouseID        pgtype.UUID        `json:"to_warehouse_id"`
-	TotalQuantity        int32              `json:"total_quantity"`
-	Status               string             `json:"status"`
-	Reason               *string            `json:"reason"`
-	CreatedBy            pgtype.UUID        `json:"created_by"`
-	ProcessedBy          pgtype.UUID        `json:"processed_by"`
-	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
-	Notes                *string            `json:"notes"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
-	FromWarehouseName    string             `json:"from_warehouse_name"`
-	ToWarehouseName      string             `json:"to_warehouse_name"`
-	CreatedByFirstName   *string            `json:"created_by_first_name"`
-	CreatedByLastName    *string            `json:"created_by_last_name"`
-	ProcessedByFirstName *string            `json:"processed_by_first_name"`
-	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+type GetTransfersRow struct {
+	ID                    pgtype.UUID        `json:"id"`
+	ReferenceNumber       string             `json:"reference_number"`
+	TransferDate          pgtype.Date        `json:"transfer_date"`
+	FromWarehouseID       pgtype.UUID        `json:"from_warehouse_id"`
+	ToWarehouseID         pgtype.UUID        `json:"to_warehouse_id"`
+	TotalQuantity         int32              `json:"total_quantity"`
+	Status                string             `json:"status"`
+	Reason                *string            `json:"reason"`
+	CreatedBy             pgtype.UUID        `json:"created_by"`
+	ProcessedBy           pgtype.UUID        `json:"processed_by"`
+	ProcessedDate         pgtype.Timestamptz `json:"processed_date"`
+	Notes                 *string            `json:"notes"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	FromWarehouseName     string             `json:"from_warehouse_name"`
+	FromWarehouseLocation string             `json:"from_warehouse_location"`
+	ToWarehouseName       string             `json:"to_warehouse_name"`
+	ToWarehouseLocation   string             `json:"to_warehouse_location"`
+	CreatedByName         interface{}        `json:"created_by_name"`
 }
 
-func (q *Queries) ListTransfers(ctx context.Context, arg *ListTransfersParams) ([]*ListTransfersRow, error) {
-	rows, err := q.db.Query(ctx, ListTransfers, arg.Limit, arg.Offset)
+func (q *Queries) GetTransfers(ctx context.Context, arg *GetTransfersParams) ([]*GetTransfersRow, error) {
+	rows, err := q.db.Query(ctx, GetTransfers, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []*ListTransfersRow{}
+	items := []*GetTransfersRow{}
 	for rows.Next() {
-		var i ListTransfersRow
+		var i GetTransfersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ReferenceNumber,
@@ -419,11 +440,10 @@ func (q *Queries) ListTransfers(ctx context.Context, arg *ListTransfersParams) (
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.FromWarehouseName,
+			&i.FromWarehouseLocation,
 			&i.ToWarehouseName,
-			&i.CreatedByFirstName,
-			&i.CreatedByLastName,
-			&i.ProcessedByFirstName,
-			&i.ProcessedByLastName,
+			&i.ToWarehouseLocation,
+			&i.CreatedByName,
 		); err != nil {
 			return nil, err
 		}
@@ -435,151 +455,20 @@ func (q *Queries) ListTransfers(ctx context.Context, arg *ListTransfersParams) (
 	return items, nil
 }
 
-const ListTransfersWithFilter = `-- name: ListTransfersWithFilter :many
-SELECT t.id, t.reference_number, t.transfer_date, t.from_warehouse_id, t.to_warehouse_id, t.total_quantity, t.status, t.reason, t.created_by, t.processed_by, t.processed_date, t.notes, t.created_at, t.updated_at, 
-       fw.name as from_warehouse_name,
-       tw.name as to_warehouse_name,
-       u.first_name as created_by_first_name, u.last_name as created_by_last_name,
-       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
-FROM transfers t
-JOIN warehouses fw ON t.from_warehouse_id = fw.id
-JOIN warehouses tw ON t.to_warehouse_id = tw.id
-LEFT JOIN users u ON t.created_by = u.id
-LEFT JOIN users p ON t.processed_by = p.id
-WHERE ($1::text IS NULL OR t.reference_number ILIKE '%' || $1 || '%')
-  AND ($2::text IS NULL OR t.status = $2)
-  AND ($3::uuid IS NULL OR t.created_by = $3)
-  AND ($4::uuid IS NULL OR t.from_warehouse_id = $4)
-  AND ($5::uuid IS NULL OR t.to_warehouse_id = $5)
-  AND ($6::date IS NULL OR t.transfer_date >= $6)
-  AND ($7::date IS NULL OR t.transfer_date <= $7)
-ORDER BY t.created_at DESC
-LIMIT $8 OFFSET $9
-`
-
-type ListTransfersWithFilterParams struct {
-	Column1 string      `json:"column_1"`
-	Column2 string      `json:"column_2"`
-	Column3 pgtype.UUID `json:"column_3"`
-	Column4 pgtype.UUID `json:"column_4"`
-	Column5 pgtype.UUID `json:"column_5"`
-	Column6 pgtype.Date `json:"column_6"`
-	Column7 pgtype.Date `json:"column_7"`
-	Limit   int32       `json:"limit"`
-	Offset  int32       `json:"offset"`
-}
-
-type ListTransfersWithFilterRow struct {
-	ID                   pgtype.UUID        `json:"id"`
-	ReferenceNumber      string             `json:"reference_number"`
-	TransferDate         pgtype.Date        `json:"transfer_date"`
-	FromWarehouseID      pgtype.UUID        `json:"from_warehouse_id"`
-	ToWarehouseID        pgtype.UUID        `json:"to_warehouse_id"`
-	TotalQuantity        int32              `json:"total_quantity"`
-	Status               string             `json:"status"`
-	Reason               *string            `json:"reason"`
-	CreatedBy            pgtype.UUID        `json:"created_by"`
-	ProcessedBy          pgtype.UUID        `json:"processed_by"`
-	ProcessedDate        pgtype.Timestamptz `json:"processed_date"`
-	Notes                *string            `json:"notes"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
-	FromWarehouseName    string             `json:"from_warehouse_name"`
-	ToWarehouseName      string             `json:"to_warehouse_name"`
-	CreatedByFirstName   *string            `json:"created_by_first_name"`
-	CreatedByLastName    *string            `json:"created_by_last_name"`
-	ProcessedByFirstName *string            `json:"processed_by_first_name"`
-	ProcessedByLastName  *string            `json:"processed_by_last_name"`
-}
-
-func (q *Queries) ListTransfersWithFilter(ctx context.Context, arg *ListTransfersWithFilterParams) ([]*ListTransfersWithFilterRow, error) {
-	rows, err := q.db.Query(ctx, ListTransfersWithFilter,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
-		arg.Column6,
-		arg.Column7,
-		arg.Limit,
-		arg.Offset,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []*ListTransfersWithFilterRow{}
-	for rows.Next() {
-		var i ListTransfersWithFilterRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.ReferenceNumber,
-			&i.TransferDate,
-			&i.FromWarehouseID,
-			&i.ToWarehouseID,
-			&i.TotalQuantity,
-			&i.Status,
-			&i.Reason,
-			&i.CreatedBy,
-			&i.ProcessedBy,
-			&i.ProcessedDate,
-			&i.Notes,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.FromWarehouseName,
-			&i.ToWarehouseName,
-			&i.CreatedByFirstName,
-			&i.CreatedByLastName,
-			&i.ProcessedByFirstName,
-			&i.ProcessedByLastName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const UpdateTransfer = `-- name: UpdateTransfer :one
+const UpdateTransferStatus = `-- name: UpdateTransferStatus :one
 UPDATE transfers 
-SET reference_number = $2, transfer_date = $3, from_warehouse_id = $4, to_warehouse_id = $5,
-    total_quantity = $6, reason = $7, status = $8, processed_by = $9, processed_date = $10, 
-    notes = $11, updated_at = NOW()
+SET status = $2, updated_at = NOW()
 WHERE id = $1
 RETURNING id, reference_number, transfer_date, from_warehouse_id, to_warehouse_id, total_quantity, status, reason, created_by, processed_by, processed_date, notes, created_at, updated_at
 `
 
-type UpdateTransferParams struct {
-	ID              pgtype.UUID        `json:"id"`
-	ReferenceNumber string             `json:"reference_number"`
-	TransferDate    pgtype.Date        `json:"transfer_date"`
-	FromWarehouseID pgtype.UUID        `json:"from_warehouse_id"`
-	ToWarehouseID   pgtype.UUID        `json:"to_warehouse_id"`
-	TotalQuantity   int32              `json:"total_quantity"`
-	Reason          *string            `json:"reason"`
-	Status          string             `json:"status"`
-	ProcessedBy     pgtype.UUID        `json:"processed_by"`
-	ProcessedDate   pgtype.Timestamptz `json:"processed_date"`
-	Notes           *string            `json:"notes"`
+type UpdateTransferStatusParams struct {
+	ID     pgtype.UUID `json:"id"`
+	Status string      `json:"status"`
 }
 
-func (q *Queries) UpdateTransfer(ctx context.Context, arg *UpdateTransferParams) (*Transfer, error) {
-	row := q.db.QueryRow(ctx, UpdateTransfer,
-		arg.ID,
-		arg.ReferenceNumber,
-		arg.TransferDate,
-		arg.FromWarehouseID,
-		arg.ToWarehouseID,
-		arg.TotalQuantity,
-		arg.Reason,
-		arg.Status,
-		arg.ProcessedBy,
-		arg.ProcessedDate,
-		arg.Notes,
-	)
+func (q *Queries) UpdateTransferStatus(ctx context.Context, arg *UpdateTransferStatusParams) (*Transfer, error) {
+	row := q.db.QueryRow(ctx, UpdateTransferStatus, arg.ID, arg.Status)
 	var i Transfer
 	err := row.Scan(
 		&i.ID,
@@ -596,39 +485,6 @@ func (q *Queries) UpdateTransfer(ctx context.Context, arg *UpdateTransferParams)
 		&i.Notes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const UpdateTransferItem = `-- name: UpdateTransferItem :one
-UPDATE transfer_items 
-SET product_id = $2, quantity = $3, reason = $4
-WHERE id = $1
-RETURNING id, transfer_id, product_id, quantity, reason, created_at
-`
-
-type UpdateTransferItemParams struct {
-	ID        pgtype.UUID `json:"id"`
-	ProductID pgtype.UUID `json:"product_id"`
-	Quantity  int32       `json:"quantity"`
-	Reason    *string     `json:"reason"`
-}
-
-func (q *Queries) UpdateTransferItem(ctx context.Context, arg *UpdateTransferItemParams) (*TransferItem, error) {
-	row := q.db.QueryRow(ctx, UpdateTransferItem,
-		arg.ID,
-		arg.ProductID,
-		arg.Quantity,
-		arg.Reason,
-	)
-	var i TransferItem
-	err := row.Scan(
-		&i.ID,
-		&i.TransferID,
-		&i.ProductID,
-		&i.Quantity,
-		&i.Reason,
-		&i.CreatedAt,
 	)
 	return &i, err
 }

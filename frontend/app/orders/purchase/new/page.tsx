@@ -410,7 +410,7 @@ export default function NewStockMovementPage() {
         })
       }
 
-      // Create stock movements
+      // Create purchase order
       const bulkRequest = {
         supplier_id: data.supplier_id,
         reference_number: data.reference_number || undefined,
@@ -451,11 +451,11 @@ export default function NewStockMovementPage() {
       setUploadedDocuments([])
       setShowConfirmationDialog(false)
       setPendingFormData(null)
-      router.push('/inventory/purchase')
+      router.push('/orders/purchase')
     } catch (error: any) {
-      console.error('Error creating stock movement:', error)
+      console.error('Error creating purchase order:', error)
       
-      let errorMessage = 'Error creating stock movement. Please try again.'
+      let errorMessage = 'Error creating purchase order. Please try again.'
       
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error
@@ -655,7 +655,7 @@ export default function NewStockMovementPage() {
                 <CardHeader>
                   <CardTitle>Products</CardTitle>
                   <CardDescription>
-                    Add products to this stock movement
+                    Add products to this purchase order
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -861,7 +861,7 @@ export default function NewStockMovementPage() {
                                       (selectedProduct && productCost >= selectedProduct.unit_price)
                                     }
                                   >
-                                    Add to Stock Movement
+                                    Add to Purchase Order
                                   </Button>
                                 </div>
                               )}
@@ -880,7 +880,7 @@ export default function NewStockMovementPage() {
                   <CardHeader>
                     <CardTitle>Selected Products</CardTitle>
                     <CardDescription>
-                      Review and manage the products in this stock movement
+                      Review and manage the products in this purchase order
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -1066,7 +1066,7 @@ export default function NewStockMovementPage() {
                   disabled={isSubmitting || selectedItems.length === 0}
                   className="px-8"
                 >
-                  {isSubmitting ? 'Creating...' : 'Create Stock Movement'}
+                  {isSubmitting ? 'Creating...' : 'Create Purchase Order'}
                 </Button>
               </div>
               </form>

@@ -325,7 +325,7 @@ export default function PurchasePage() {
                 </Button>
                 <Button 
                   className="flex items-center gap-2 bg-[#52a852] hover:bg-[#4a964a] text-white"
-                  onClick={() => router.push('/inventory/movements/new')}
+                  onClick={() => router.push('/orders/purchase/new')}
                 >
                   <Package className="h-4 w-4" />
                   New PO

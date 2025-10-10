@@ -11,7 +11,7 @@ import (
 )
 
 type Querier interface {
-	CancelPurchaseOrder(ctx context.Context, id pgtype.UUID) (*PurchaseOrder, error)
+	CancelPurchaseOrder(ctx context.Context, arg *CancelPurchaseOrderParams) (*PurchaseOrder, error)
 	CountAdjustments(ctx context.Context) (int64, error)
 	CountAdjustmentsWithFilter(ctx context.Context, arg *CountAdjustmentsWithFilterParams) (int64, error)
 	CountCategoriesWithFilter(ctx context.Context, arg *CountCategoriesWithFilterParams) (int64, error)
@@ -26,8 +26,6 @@ type Querier interface {
 	CountStockMovements(ctx context.Context) (int64, error)
 	CountStockMovementsWithFilter(ctx context.Context, arg *CountStockMovementsWithFilterParams) (int64, error)
 	CountSuppliersWithFilter(ctx context.Context, arg *CountSuppliersWithFilterParams) (int64, error)
-	CountTransfers(ctx context.Context) (int64, error)
-	CountTransfersWithFilter(ctx context.Context, arg *CountTransfersWithFilterParams) (int64, error)
 	CountWarehouses(ctx context.Context, arg *CountWarehousesParams) (int64, error)
 	CreateAdjustment(ctx context.Context, arg *CreateAdjustmentParams) (*Adjustment, error)
 	CreateAdjustmentItem(ctx context.Context, arg *CreateAdjustmentItemParams) (*AdjustmentItem, error)
@@ -51,8 +49,6 @@ type Querier interface {
 	DeleteProduct(ctx context.Context, id pgtype.UUID) error
 	DeleteSupplier(ctx context.Context, id pgtype.UUID) error
 	DeleteTransfer(ctx context.Context, id pgtype.UUID) error
-	DeleteTransferItem(ctx context.Context, id pgtype.UUID) error
-	DeleteTransferItemsByTransferId(ctx context.Context, transferID pgtype.UUID) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteWarehouse(ctx context.Context, id pgtype.UUID) error
 	GetAdjustment(ctx context.Context, id pgtype.UUID) (*GetAdjustmentRow, error)
@@ -79,6 +75,8 @@ type Querier interface {
 	GetTransfer(ctx context.Context, id pgtype.UUID) (*GetTransferRow, error)
 	GetTransferByReferenceNumber(ctx context.Context, referenceNumber string) (*GetTransferByReferenceNumberRow, error)
 	GetTransferItems(ctx context.Context, transferID pgtype.UUID) ([]*GetTransferItemsRow, error)
+	GetTransferWithItems(ctx context.Context) ([]*GetTransferWithItemsRow, error)
+	GetTransfers(ctx context.Context, arg *GetTransfersParams) ([]*GetTransfersRow, error)
 	GetUser(ctx context.Context, id pgtype.UUID) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	GetWarehouse(ctx context.Context, id pgtype.UUID) (*Warehouse, error)
@@ -101,8 +99,6 @@ type Querier interface {
 	ListStockMovementsWithFilter(ctx context.Context, arg *ListStockMovementsWithFilterParams) ([]*ListStockMovementsWithFilterRow, error)
 	ListSuppliers(ctx context.Context) ([]*Supplier, error)
 	ListSuppliersWithFilter(ctx context.Context, arg *ListSuppliersWithFilterParams) ([]*Supplier, error)
-	ListTransfers(ctx context.Context, arg *ListTransfersParams) ([]*ListTransfersRow, error)
-	ListTransfersWithFilter(ctx context.Context, arg *ListTransfersWithFilterParams) ([]*ListTransfersWithFilterRow, error)
 	ListUsers(ctx context.Context) ([]*User, error)
 	ListWarehouses(ctx context.Context, arg *ListWarehousesParams) ([]*Warehouse, error)
 	UpdateAdjustment(ctx context.Context, arg *UpdateAdjustmentParams) (*Adjustment, error)
@@ -117,8 +113,7 @@ type Querier interface {
 	UpdateStockLevel(ctx context.Context, arg *UpdateStockLevelParams) (*StockLevel, error)
 	UpdateStockQuantity(ctx context.Context, arg *UpdateStockQuantityParams) (*StockLevel, error)
 	UpdateSupplier(ctx context.Context, arg *UpdateSupplierParams) (*Supplier, error)
-	UpdateTransfer(ctx context.Context, arg *UpdateTransferParams) (*Transfer, error)
-	UpdateTransferItem(ctx context.Context, arg *UpdateTransferItemParams) (*TransferItem, error)
+	UpdateTransferStatus(ctx context.Context, arg *UpdateTransferStatusParams) (*Transfer, error)
 	UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User, error)
 	UpdateUserPassword(ctx context.Context, arg *UpdateUserPasswordParams) (*User, error)
 	UpdateWarehouse(ctx context.Context, arg *UpdateWarehouseParams) (*Warehouse, error)

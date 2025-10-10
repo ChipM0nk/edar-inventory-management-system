@@ -45,7 +45,7 @@ export default function StockMovementsPage() {
               </div>
               <Button 
                 className="flex items-center gap-2"
-                onClick={() => router.push('/inventory/movements/new')}
+                onClick={() => router.push('/orders/purchase/new')}
               >
                 <Plus className="h-4 w-4" />
                 New Movement

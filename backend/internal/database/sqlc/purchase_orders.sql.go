@@ -13,13 +13,23 @@ import (
 
 const CancelPurchaseOrder = `-- name: CancelPurchaseOrder :one
 UPDATE purchase_orders
-SET status = 'cancelled', updated_at = NOW()
+SET status = 'cancelled', 
+    cancelled_by = $2,
+    cancelled_at = NOW(),
+    cancellation_reason = $3,
+    updated_at = NOW()
 WHERE id = $1 AND status != 'cancelled'
 RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason
 `
 
-func (q *Queries) CancelPurchaseOrder(ctx context.Context, id pgtype.UUID) (*PurchaseOrder, error) {
-	row := q.db.QueryRow(ctx, CancelPurchaseOrder, id)
+type CancelPurchaseOrderParams struct {
+	ID                 pgtype.UUID `json:"id"`
+	CancelledBy        pgtype.UUID `json:"cancelled_by"`
+	CancellationReason *string     `json:"cancellation_reason"`
+}
+
+func (q *Queries) CancelPurchaseOrder(ctx context.Context, arg *CancelPurchaseOrderParams) (*PurchaseOrder, error) {
+	row := q.db.QueryRow(ctx, CancelPurchaseOrder, arg.ID, arg.CancelledBy, arg.CancellationReason)
 	var i PurchaseOrder
 	err := row.Scan(
 		&i.ID,

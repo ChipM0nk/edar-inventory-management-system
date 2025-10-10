@@ -167,9 +167,6 @@ func (h *PurchaseOrderHandler) UpdatePurchaseOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, purchaseOrder)
 }
 
-
-
-
 // CancelPurchaseOrder cancels a purchase order
 // @Summary Cancel purchase order
 // @Description Cancel a purchase order by ID with a reason
@@ -205,7 +202,20 @@ func (h *PurchaseOrderHandler) CancelPurchaseOrder(c *gin.Context) {
 		return
 	}
 
-	purchaseOrder, err := h.purchaseOrderService.CancelPurchaseOrder(id, req.Reason)
+	// Get user ID from JWT token
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userIDUUID, ok := userID.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	purchaseOrder, err := h.purchaseOrderService.CancelPurchaseOrder(id, req.Reason, userIDUUID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

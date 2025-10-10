@@ -248,7 +248,7 @@ func (s *PurchaseOrderService) UpdatePurchaseOrder(id string, req models.UpdateP
 	}, nil
 }
 
-func (s *PurchaseOrderService) CancelPurchaseOrder(id string, reason string) (*models.PurchaseOrder, error) {
+func (s *PurchaseOrderService) CancelPurchaseOrder(id string, reason string, userID uuid.UUID) (*models.PurchaseOrder, error) {
 	ctx := context.Background()
 
 	// Parse the purchase order ID
@@ -310,7 +310,11 @@ func (s *PurchaseOrderService) CancelPurchaseOrder(id string, reason string) (*m
 	}
 
 	// Cancel the purchase order
-	cancelledPO, err := s.db.CancelPurchaseOrder(ctx, utils.UUIDToPgxUUID(purchaseOrderID))
+	cancelledPO, err := s.db.CancelPurchaseOrder(ctx, &sqlc.CancelPurchaseOrderParams{
+		ID:                 utils.UUIDToPgxUUID(purchaseOrderID),
+		CancelledBy:        utils.UUIDToPgxUUID(userID),
+		CancellationReason: &reason,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to cancel purchase order %s: %w", purchaseOrderID.String(), err)
 	}
@@ -332,5 +336,14 @@ func (s *PurchaseOrderService) CancelPurchaseOrder(id string, reason string) (*m
 		CreatedBy:            utils.PgxUUIDToUUID(cancelledPO.CreatedBy).String(),
 		CreatedAt:            utils.PgxTimestamptzToTime(cancelledPO.CreatedAt),
 		UpdatedAt:            utils.PgxTimestamptzToTime(cancelledPO.UpdatedAt),
+		CancelledBy: func() *string {
+			if cancelledPO.CancelledBy.Valid {
+				id := utils.PgxUUIDToUUID(cancelledPO.CancelledBy).String()
+				return &id
+			}
+			return nil
+		}(),
+		CancelledAt:        utils.OptionalPgxTimestamptzToTimePtr(cancelledPO.CancelledAt),
+		CancellationReason: cancelledPO.CancellationReason,
 	}, nil
 }

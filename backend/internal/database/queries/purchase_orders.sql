@@ -55,7 +55,11 @@ WHERE ($1::text IS NULL OR po.status = $1)
 
 -- name: CancelPurchaseOrder :one
 UPDATE purchase_orders
-SET status = 'cancelled', updated_at = NOW()
+SET status = 'cancelled', 
+    cancelled_by = $2,
+    cancelled_at = NOW(),
+    cancellation_reason = $3,
+    updated_at = NOW()
 WHERE id = $1 AND status != 'cancelled'
 RETURNING *;
 
