@@ -555,7 +555,7 @@ export default function PurchasePage() {
       isOpen={isModalOpen}
       onClose={closeModal}
       onOrderUpdated={loadPurchaseOrders}
-    />
+      />
     </>
   )
 }

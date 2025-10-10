@@ -1,7 +1,9 @@
+'use client'
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Download } from 'lucide-react'
-import { Document } from '@/lib/types'
+import { Document } from './document-card'
 
 interface DocumentViewerDialogProps {
   isOpen: boolean

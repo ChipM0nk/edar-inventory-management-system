@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { AppLayout } from '@/components/app-layout'
 import { AdjustmentDetailsDialog, AdjustmentReviewDialog } from '@/components/adjustments'
+import { DocumentsSection } from '@/components/documents'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -527,9 +528,9 @@ export default function AdjustmentsPage() {
         description: 'Please add at least one item to the adjustment',
         variant: 'info',
       })
-      return
-    }
-
+        return
+      }
+      
     if (!user) {
       await notice({
         title: 'Not authenticated',

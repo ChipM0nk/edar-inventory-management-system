@@ -4,34 +4,15 @@ import { Badge } from '@/components/ui/badge'
 import { FileText, Building2, Calendar, User, Eye, AlertCircle, X } from 'lucide-react'
 import { PurchaseOrder } from '@/lib/types'
 import { formatDate, getStatusColor } from '@/lib/utils'
-import { DocumentsDialog } from './documents-dialog'
 
 interface PurchaseOrderCardProps {
   order: PurchaseOrder
-  documents: any[]
-  isLoadingDocs: boolean
-  isValidating: boolean
-  onViewDocuments: (order: PurchaseOrder) => void
   onViewDetails: (order: PurchaseOrder) => void
-  onValidateDocument: (document: any, poNumber: string, orderDate: string) => void
-  onViewDocument: (document: any) => void
-  onDownloadDocument: (document: any) => void
-  onOpenDocumentInNewTab: (document: any) => void
-  onDeleteDocument: (document: any) => void
 }
 
 export function PurchaseOrderCard({ 
   order, 
-  documents, 
-  isLoadingDocs, 
-  isValidating, 
-  onViewDocuments, 
-  onViewDetails,
-  onValidateDocument, 
-  onViewDocument, 
-  onDownloadDocument, 
-  onOpenDocumentInNewTab,
-  onDeleteDocument
+  onViewDetails 
 }: PurchaseOrderCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -116,25 +97,13 @@ export function PurchaseOrderCard({
               <FileText className="h-4 w-4 mr-2" />
               View Details
             </Button>
-            <DocumentsDialog
-              order={order}
-              documents={documents}
-              isLoadingDocs={isLoadingDocs}
-              isValidating={isValidating}
-              onValidateDocument={onValidateDocument}
-              onViewDocument={onViewDocument}
-              onDownloadDocument={onDownloadDocument}
-              onOpenDocumentInNewTab={onOpenDocumentInNewTab}
-              onDeleteDocument={onDeleteDocument}
+            <Button 
+              variant="outline" 
+              onClick={() => onViewDetails(order)}
             >
-              <Button 
-                variant="outline" 
-                onClick={() => onViewDocuments(order)}
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                View Documents
-              </Button>
-            </DocumentsDialog>
+              <Eye className="h-4 w-4 mr-2" />
+              View Documents
+            </Button>
           </div>
         </div>
       </CardContent>

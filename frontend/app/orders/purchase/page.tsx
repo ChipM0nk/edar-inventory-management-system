@@ -8,10 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import api from '@/lib/api'
-import { PurchaseOrder, Document } from '@/lib/types'
+import { PurchaseOrder } from '@/lib/types'
 import { PurchaseOrderCard } from '@/components/purchase-orders/purchase-order-card'
-import { DocumentsDialog } from '@/components/purchase-orders/documents-dialog'
-import { DocumentViewerDialog } from '@/components/purchase-orders/document-viewer-dialog'
 import { PurchaseOrderDetailsDialog } from '@/components/purchase-orders/purchase-order-details-dialog'
 import { LoadingSpinner } from '@/components/shared/loading-spinner'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -22,12 +20,6 @@ export default function PurchaseOrdersPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null)
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [isLoadingDocs, setIsLoadingDocs] = useState(false)
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
-  const [selectedDocumentUrl, setSelectedDocumentUrl] = useState<string | null>(null)
-  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false)
-  const [isValidating, setIsValidating] = useState<string | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
 
   useEffect(() => {
@@ -42,14 +34,6 @@ export default function PurchaseOrdersPage() {
     }
   }, [user])
 
-  // Cleanup blob URLs on unmount
-  useEffect(() => {
-    return () => {
-      if (selectedDocumentUrl) {
-        window.URL.revokeObjectURL(selectedDocumentUrl)
-      }
-    }
-  }, [selectedDocumentUrl])
 
   const loadPurchaseOrders = async () => {
     try {
@@ -63,18 +47,6 @@ export default function PurchaseOrdersPage() {
     }
   }
 
-  const loadDocuments = async (purchaseOrderId: string) => {
-    try {
-      setIsLoadingDocs(true)
-      const response = await api.get(`/documents/purchase-order/${purchaseOrderId}`)
-      setDocuments(response.data || [])
-    } catch (error) {
-      console.error('Error loading documents:', error)
-      setDocuments([])
-    } finally {
-      setIsLoadingDocs(false)
-    }
-  }
 
   const handleViewDetails = async (order: PurchaseOrder) => {
     try {
@@ -101,122 +73,8 @@ export default function PurchaseOrdersPage() {
     }
   }
 
-  const validateDocument = async (documentId: string, poNumber: string, orderDate: string) => {
-    try {
-      setIsValidating(documentId)
-      const response = await api.post(`/documents/${documentId}/validate`, null, {
-        params: {
-          po_number: poNumber,
-          order_date: orderDate
-        }
-      })
-      
-      // Reload documents to get updated validation status
-      if (selectedOrder) {
-        await loadDocuments(selectedOrder.id)
-      }
-      
-      return response.data
-    } catch (error) {
-      console.error('Error validating document:', error)
-      throw error
-    } finally {
-      setIsValidating(null)
-    }
-  }
 
 
-  const handleViewDocument = async (document: Document) => {
-    try {
-      setSelectedDocument(document)
-      
-      console.log('Fetching document:', document.id)
-      
-      // Fetch the document as blob and create URL
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      console.log('Document response received:', response.status)
-      
-      if (response.status === 200) {
-        const url = window.URL.createObjectURL(new Blob([response.data]))
-        setSelectedDocumentUrl(url)
-        setIsDocumentModalOpen(true)
-      } else {
-        throw new Error(`Unexpected response status: ${response.status}`)
-      }
-    } catch (error: any) {
-      console.error('Error loading document:', error)
-      console.error('Error details:', error.response?.data)
-      alert(`Failed to load document: ${error.response?.data?.error || error.message}`)
-    }
-  }
-
-  const handleDownloadDocument = async (document: Document) => {
-    try {
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = window.document.createElement('a')
-      link.href = url
-      link.setAttribute('download', document.file_name)
-      window.document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error downloading document:', error)
-    }
-  }
-
-  const openDocumentInNewTab = async (document: Document) => {
-    try {
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      window.open(url, '_blank')
-      
-      // Clean up the blob URL after a delay
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url)
-      }, 10000)
-    } catch (error) {
-      console.error('Error opening document:', error)
-      alert('Failed to open document. Please try downloading it instead.')
-    }
-  }
-
-  const handleValidateDocument = async (document: Document, poNumber: string, orderDate: string) => {
-    try {
-      await validateDocument(document.id, poNumber, orderDate)
-    } catch (error) {
-      alert('Failed to validate document. Please try again.')
-    }
-  }
-
-  const handleDeleteDocument = async (document: Document) => {
-    if (!confirm(`Are you sure you want to delete "${document.file_name}"? This action cannot be undone.`)) {
-      return
-    }
-
-    try {
-      await api.delete(`/documents/${document.id}`)
-      
-      // Remove the document from the current documents list
-      setDocuments(prev => prev.filter(doc => doc.id !== document.id))
-      
-      // Show success message
-      alert('Document deleted successfully')
-    } catch (error) {
-      console.error('Error deleting document:', error)
-      alert('Failed to delete document. Please try again.')
-    }
-  }
 
   if (isLoading) {
     return (
@@ -275,38 +133,12 @@ export default function PurchaseOrdersPage() {
                   <PurchaseOrderCard
                     key={order.id}
                     order={order}
-                    documents={documents}
-                    isLoadingDocs={isLoadingDocs}
-                    isValidating={isValidating === order.id}
-                    onViewDocuments={(order) => {
-                      setSelectedOrder(order)
-                      loadDocuments(order.id)
-                    }}
                     onViewDetails={handleViewDetails}
-                    onValidateDocument={handleValidateDocument}
-                    onViewDocument={handleViewDocument}
-                    onDownloadDocument={handleDownloadDocument}
-                    onOpenDocumentInNewTab={openDocumentInNewTab}
-                    onDeleteDocument={handleDeleteDocument}
                   />
                 ))}
               </div>
             )}
 
-            {/* Document View Modal */}
-            <DocumentViewerDialog
-              isOpen={isDocumentModalOpen}
-              onOpenChange={(open) => {
-                setIsDocumentModalOpen(open)
-                if (!open && selectedDocumentUrl) {
-                  window.URL.revokeObjectURL(selectedDocumentUrl)
-                  setSelectedDocumentUrl(null)
-                }
-              }}
-              document={selectedDocument}
-              documentUrl={selectedDocumentUrl}
-              onDownload={handleDownloadDocument}
-            />
 
             {/* Purchase Order Details Modal */}
             <PurchaseOrderDetailsDialog

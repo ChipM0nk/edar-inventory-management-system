@@ -23,7 +23,6 @@ import {
   RefreshCw, 
   ArrowLeft, 
   Package, 
-  Eye, 
   Calendar, 
   User, 
   DollarSign, 
@@ -33,16 +32,14 @@ import {
   Hash, 
   Building, 
   Clock, 
-  Upload, 
-  X, 
   Trash2, 
-  FileImage, 
-  File 
+  FileImage
 } from 'lucide-react'
 import { getStatusDisplayText } from '@/lib/utils'
 import api from '@/lib/api'
-import { DocumentViewerDialog } from './document-viewer-dialog'
+import { DocumentsSection } from '@/components/documents'
 import { useNotice } from '@/hooks/use-notice'
+import { PurchaseOrder as GlobalPurchaseOrder } from '@/lib/types'
 
 interface PurchaseOrderProduct {
   product_id: string
@@ -74,22 +71,10 @@ interface PurchaseOrder {
   products: PurchaseOrderProduct[]
 }
 
-interface Document {
-  id: string
-  purchase_order_id: string
-  file_name: string
-  file_path: string
-  file_size: number
-  file_type: string
-  uploaded_at: string
-  has_po_reference?: boolean
-  has_matching_date?: boolean
-  validation_status?: string
-  validation_notes?: string
-}
+// Document type and UI handled by DocumentsSection
 
 interface PurchaseOrderDetailsDialogProps {
-  order: PurchaseOrder | null
+  order: GlobalPurchaseOrder | null
   isOpen: boolean
   onClose: () => void
   onOrderUpdated?: () => void
@@ -101,14 +86,7 @@ export function PurchaseOrderDetailsDialog({
   onClose,
   onOrderUpdated 
 }: PurchaseOrderDetailsDialogProps) {
-  // Document-related state
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
-  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
-  const [viewingDocument, setViewingDocument] = useState<string | null>(null)
-  const [documentUrl, setDocumentUrl] = useState<string | null>(null)
+  // Documents handled by DocumentsSection
   
   // Cancel confirmation state
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -118,12 +96,7 @@ export function PurchaseOrderDetailsDialog({
   // Notice dialog
   const [NoticeDialog, notice] = useNotice()
 
-  // Load documents when dialog opens
-  useEffect(() => {
-    if (isOpen && order?.id) {
-      loadDocuments(order.id)
-    }
-  }, [isOpen, order?.id])
+  // No local document loading; handled by DocumentsSection
 
   // Format functions
   const formatDate = (dateString: string) => {
@@ -164,8 +137,8 @@ export function PurchaseOrderDetailsDialog({
     const type = fileType.toLowerCase()
     if (type.includes('image')) {
       return <FileImage className="w-5 h-5 text-green-500" />
-    } else if (type.includes('pdf')) {
-      return <File className="w-5 h-5 text-red-500" />
+  } else if (type.includes('pdf')) {
+      return <FileText className="w-5 h-5 text-red-500" />
     } else {
       return <FileText className="w-5 h-5 text-gray-400" />
     }
@@ -185,175 +158,7 @@ export function PurchaseOrderDetailsDialog({
     return daysDifference <= 30
   }
 
-  // Load documents for a purchase order
-  const loadDocuments = async (purchaseOrderId: string) => {
-    try {
-      setIsLoadingDocuments(true)
-      const response = await api.get(`/documents/by-reference/purchase_order/${purchaseOrderId}`)
-      setDocuments(response.data || [])
-    } catch (error) {
-      console.error('Error loading documents:', error)
-      setDocuments([])
-    } finally {
-      setIsLoadingDocuments(false)
-    }
-  }
-
-  // Handle file selection for upload
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || [])
-    setUploadedFiles(prev => [...prev, ...files])
-  }
-
-  // Remove file from upload list
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
-  }
-
-  // Upload documents
-  const uploadDocuments = async () => {
-    if (!order || uploadedFiles.length === 0) return
-
-    try {
-      setIsUploadingDocuments(true)
-      const formData = new FormData()
-      
-      uploadedFiles.forEach((file) => {
-        formData.append('documents', file)
-      })
-      formData.append('reference_type', 'purchase_order')
-      formData.append('reference_id', order.id!)
-
-      await api.post('/documents/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-
-      // Reload documents and clear upload files
-      await loadDocuments(order.id!)
-      setUploadedFiles([])
-      setShowDocumentUpload(false)
-      
-      await notice({
-        title: 'Upload complete',
-        description: 'Documents uploaded successfully!',
-        variant: 'success',
-      })
-    } catch (error) {
-      console.error('Error uploading documents:', error)
-      await notice({
-        title: 'Upload failed',
-        description: 'Error uploading documents. Please try again.',
-        variant: 'warning',
-      })
-    } finally {
-      setIsUploadingDocuments(false)
-    }
-  }
-
-  // Download document
-  const downloadDocument = async (document: Document) => {
-    try {
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = window.document.createElement('a')
-      link.href = url
-      link.setAttribute('download', document.file_name)
-      window.document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error downloading document:', error)
-      await notice({
-        title: 'Download failed',
-        description: 'Error downloading document. Please try again.',
-        variant: 'warning',
-      })
-    }
-  }
-
-  // Delete document
-  const deleteDocument = async (document: Document) => {
-    if (!confirm(`Are you sure you want to delete "${document.file_name}"? This action cannot be undone.`)) {
-      return
-    }
-
-    try {
-      await api.delete(`/documents/${document.id}`)
-      setDocuments(prev => prev.filter(doc => doc.id !== document.id))
-      await notice({
-        title: 'Document deleted',
-        description: 'Document deleted successfully',
-        variant: 'success',
-      })
-    } catch (error) {
-      console.error('Error deleting document:', error)
-      await notice({
-        title: 'Delete failed',
-        description: 'Failed to delete document. Please try again.',
-        variant: 'warning',
-      })
-    }
-  }
-
-  // View document
-  const viewDocument = async (document: Document) => {
-    try {
-      setViewingDocument(document.id)
-      
-      const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/html', 'text/css', 'text/javascript']
-      if (!viewableTypes.includes(document.file_type.toLowerCase())) {
-        await notice({
-          title: 'Cannot preview file',
-          description: `This file type (${document.file_type}) cannot be viewed in the browser. Please download it instead.`,
-          variant: 'info',
-        })
-        return
-      }
-      
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      const blob = new Blob([response.data], { type: document.file_type })
-      const url = window.URL.createObjectURL(blob)
-      setDocumentUrl(url)
-      
-    } catch (error: any) {
-      console.error('Error viewing document:', error)
-      if (error.response?.status === 404) {
-        await notice({
-          title: 'Document not found',
-          description: 'Document not found. It may have been deleted.',
-          variant: 'warning',
-        })
-      } else if (error.response?.status === 403) {
-        await notice({
-          title: 'Access denied',
-          description: 'You do not have permission to view this document.',
-          variant: 'warning',
-        })
-      } else if (error.response?.status === 500) {
-        await notice({
-          title: 'Server error',
-          description: 'Server error while retrieving document. Please try again later.',
-          variant: 'warning',
-        })
-      } else {
-        await notice({
-          title: 'View failed',
-          description: 'Error viewing document. Please try again or download the file instead.',
-          variant: 'warning',
-        })
-      }
-      setViewingDocument(null)
-    }
-  }
+  // Documents are now handled exclusively via DocumentsSection
 
   // Handle cancel purchase order
   const handleCancelPurchaseOrder = async () => {
@@ -401,12 +206,8 @@ export function PurchaseOrderDetailsDialog({
   }
 
   const handleClose = () => {
-    setDocuments([])
-    setUploadedFiles([])
-    setShowDocumentUpload(false)
     setShowCancelDialog(false)
     setCancellationReason('')
-    setViewingDocument(null)
     onClose()
   }
 
@@ -429,15 +230,15 @@ export function PurchaseOrderDetailsDialog({
               {order.status === 'received' && (
                 <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                   COMPLETED
-                </span>
+            </span>
               )}
-            </DialogTitle>
+          </DialogTitle>
             <DialogDescription>
-              Complete information about this purchase order and its products
+            Complete information about this purchase order and its products
             </DialogDescription>
-            
+        
             {/* Status Warning - Moved into header */}
-            {order.status === 'cancelled' && (
+          {order.status === 'cancelled' && (
               <div className="mt-3 bg-red-50 border-l-4 border-red-400 p-3 rounded-r">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
@@ -460,8 +261,8 @@ export function PurchaseOrderDetailsDialog({
                               {order.cancelled_by_first_name || ''} {order.cancelled_by_last_name || ''}
                             </span>
                           </div>
-                        )}
-                        {order.cancelled_at && (
+                  )}
+                  {order.cancelled_at && (
                           <div className="flex items-center gap-2 mb-2">
                             <Clock className="h-4 w-4 text-red-500" />
                             <span className="text-xs text-red-600">
@@ -469,8 +270,8 @@ export function PurchaseOrderDetailsDialog({
                               {formatDateTime(order.cancelled_at)}
                             </span>
                           </div>
-                        )}
-                        {order.cancellation_reason && (
+                  )}
+                  {order.cancellation_reason && (
                           <div className="flex items-start gap-2">
                             <FileText className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
                             <span className="text-xs text-red-600">
@@ -482,18 +283,18 @@ export function PurchaseOrderDetailsDialog({
                       </div>
                     )}
                   </div>
-                </div>
               </div>
-            )}
+            </div>
+          )}
           </DialogHeader>
-          
+
           <div className="flex-1 overflow-y-auto relative z-10">
             <div className="space-y-6 p-1">
-              {/* Order Overview */}
-              <Card>
+          {/* Order Overview */}
+          <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Order Overview</CardTitle>
-                </CardHeader>
+              <CardTitle className="text-lg">Order Overview</CardTitle>
+            </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center gap-3">
@@ -501,8 +302,8 @@ export function PurchaseOrderDetailsDialog({
                       <div>
                         <p className="text-sm font-medium">Reference ID</p>
                         <p className="text-sm text-gray-600 font-mono">{order.reference_number || order.reference_id}</p>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                     <div className="flex items-center gap-3">
                       <div className="h-4 w-4 flex items-center justify-center">
                         <div className={`w-3 h-3 rounded-full ${
@@ -518,29 +319,29 @@ export function PurchaseOrderDetailsDialog({
                         <p className="text-sm text-gray-600 capitalize">
                           {getStatusDisplayText(order.status)}
                         </p>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                     <div className="flex items-center gap-3">
                       <Calendar className="h-4 w-4 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium">Purchase Date</p>
                         <p className="text-sm text-gray-600">{formatDate(order.processed_date)}</p>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                     <div className="flex items-center gap-3">
                       <User className="h-4 w-4 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium">Processed By</p>
                         <p className="text-sm text-gray-600">{order.processed_by}</p>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                     <div className="flex items-center gap-3">
                       <Clock className="h-4 w-4 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium">Created At</p>
                         <p className="text-sm text-gray-600">{formatDateTime(order.created_at)}</p>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                     <div className="flex items-center gap-3">
                       <Building className="h-4 w-4 text-gray-500" />
                       <div>
@@ -570,14 +371,14 @@ export function PurchaseOrderDetailsDialog({
                       <div className="flex items-center justify-center gap-2 mb-2">
                         <DollarSign className="h-5 w-5 text-green-500" />
                         <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                      </div>
+                  </div>
                       <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.total_amount)}</p>
                     </div>
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-2 mb-2">
                         <Package2 className="h-5 w-5 text-purple-500" />
                         <p className="text-sm font-medium text-gray-600">Products</p>
-                      </div>
+                  </div>
                       <p className="text-2xl font-bold text-purple-600">{order.products.length}</p>
                     </div>
                   </div>
@@ -615,163 +416,19 @@ export function PurchaseOrderDetailsDialog({
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                </CardContent>
-              </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Documents Section */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Documents
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Upload Documents */}
-                  <div className="mb-4">
-                    {order.status !== 'cancelled' && (
-                      <div className="flex items-center gap-2 mb-3">
-                        <Button
-                          onClick={() => setShowDocumentUpload(!showDocumentUpload)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Add Documents
-                        </Button>
-                      </div>
-                    )}
-                    
-                    {showDocumentUpload && order.status !== 'cancelled' && (
-                      <div className="border rounded-lg p-4 bg-gray-50">
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Select documents to upload
-                            </label>
-                            <input
-                              type="file"
-                              multiple
-                              accept=".pdf,.png,.jpg,.jpeg"
-                              onChange={handleFileSelect}
-                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                            />
-                          </div>
-                          
-                          {uploadedFiles.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-gray-700 mb-2">Selected files:</p>
-                              <ul className="space-y-1">
-                                {uploadedFiles.map((file, index) => (
-                                  <li key={index} className="flex items-center justify-between text-sm text-gray-600 bg-white p-2 rounded">
-                                    <span>{file.name} ({formatFileSize(file.size)})</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => removeFile(index)}
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </Button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={uploadDocuments}
-                              disabled={uploadedFiles.length === 0 || isUploadingDocuments}
-                              size="sm"
-                            >
-                              {isUploadingDocuments ? 'Uploading...' : 'Upload'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setShowDocumentUpload(false)
-                                setUploadedFiles([])
-                              }}
-                              size="sm"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+              {/* Documents Section (reusable) */}
+              <DocumentsSection
+                referenceType="purchase_order"
+                referenceId={order.id!}
+                title="Documents"
+                showValidation={true}
+              />
 
-                  {/* Existing Documents */}
-                  {isLoadingDocuments ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="mt-2 text-gray-600">Loading documents...</p>
-                    </div>
-                  ) : documents.length > 0 ? (
-                    <div className="space-y-3">
-                      {documents.map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div className="flex items-center gap-3">
-                            {getFileIcon(doc.file_type)}
-                            <div>
-                              <p className="font-medium text-sm">{doc.file_name}</p>
-                              <p className="text-xs text-gray-500">
-                                {formatFileSize(doc.file_size)} • Uploaded {formatDateTime(doc.uploaded_at)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {isViewable(doc.file_type) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => viewDocument(doc)}
-                                className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50"
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                View
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => downloadDocument(doc)}
-                              className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
-                            >
-                              Download
-                            </Button>
-                            {order.status !== 'cancelled' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => deleteDocument(doc)}
-                                className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Delete
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                      <p>No documents uploaded yet</p>
-                      {order.status === 'cancelled' ? (
-                        <p className="text-sm">Documents cannot be added to cancelled purchase orders</p>
-                      ) : (
-                        <p className="text-sm">Click "Add Documents" to upload receipts, invoices, or other supporting files</p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Action Buttons */}
+          {/* Action Buttons */}
               <div className="flex justify-between">
                 <div>
                   {order && canCancelPurchaseOrder(order.created_at) && order.status !== 'cancelled' && (
@@ -786,9 +443,9 @@ export function PurchaseOrderDetailsDialog({
                   )}
                 </div>
                 <Button variant="outline" onClick={handleClose}>
-                  Close
-                </Button>
-              </div>
+              Close
+            </Button>
+          </div>
             </div>
           </div>
         </DialogContent>
@@ -851,28 +508,11 @@ export function PurchaseOrderDetailsDialog({
             >
               {isCancelling ? 'Cancelling...' : 'Cancel Purchase Order'}
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </DialogContent>
+    </Dialog>
 
-      {/* Document Viewer Dialog */}
-      <DocumentViewerDialog
-        isOpen={viewingDocument !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setViewingDocument(null)
-            if (documentUrl) {
-              window.URL.revokeObjectURL(documentUrl)
-              setDocumentUrl(null)
-            }
-          }
-        }}
-        document={documents.find(doc => doc.id === viewingDocument) || null}
-        documentUrl={documentUrl}
-        onDownload={downloadDocument}
-      />
-
-      {/* Notice Dialog */}
+      {/* Notice Dialog remains for other actions */}
       {NoticeDialog}
     </>
   )
