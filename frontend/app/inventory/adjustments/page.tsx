@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { AppLayout } from '@/components/app-layout'
+import { AdjustmentDetailsDialog, AdjustmentReviewDialog } from '@/components/adjustments'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -94,8 +95,6 @@ export default function AdjustmentsPage() {
   const [filteredAdjustments, setFilteredAdjustments] = useState<Adjustment[]>([])
   const [selectedAdjustment, setSelectedAdjustment] = useState<Adjustment | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isLoadingAdjustmentDetails, setIsLoadingAdjustmentDetails] = useState(false)
-  const [adjustmentDetailsError, setAdjustmentDetailsError] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
@@ -123,17 +122,8 @@ export default function AdjustmentsPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
   
-  // Document display state
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
-  const [viewingDocument, setViewingDocument] = useState<string | null>(null)
-  const [documentViewerUrl, setDocumentViewerUrl] = useState<string | null>(null)
+  // Document display state (for Create Adjustment Modal only)
   const [documentUrl, setDocumentUrl] = useState<string | null>(null)
-  
-  // Document upload state for details modal
-  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
-  const [uploadedFilesDetails, setUploadedFilesDetails] = useState<File[]>([])
-  const [isUploadingDocumentsDetails, setIsUploadingDocumentsDetails] = useState(false)
   
   // Reference fields for PO/SO connections
   const [referenceType, setReferenceType] = useState<string>('')
@@ -272,7 +262,7 @@ export default function AdjustmentsPage() {
             : 'Unknown',
           processed_date: adj.processed_date || adj.created_at,
           created_at: adj.created_at,
-          items: Array(itemCount).fill(null), // Create array with correct length for display
+          items: [], // Will be loaded when adjustment details are opened
           status: adj.status,
           notes: adj.notes
         }
@@ -381,65 +371,14 @@ export default function AdjustmentsPage() {
     setIsUploadingDocuments(false)
   }
 
-  const handleAdjustmentClick = async (adjustment: Adjustment) => {
+  const handleAdjustmentClick = (adjustment: Adjustment) => {
     setSelectedAdjustment(adjustment)
     setIsModalOpen(true)
-    setIsLoadingAdjustmentDetails(true)
-    setAdjustmentDetailsError(null)
-    
-    // Load documents for this adjustment
-    loadDocuments(adjustment.id)
-    
-    // Fetch detailed adjustment data including items
-    try {
-      const response = await api.get(`/adjustments/${adjustment.id}`)
-      const detailedAdjustment = response.data
-      
-      // Convert backend adjustment to frontend format with items
-      const convertedAdjustment: Adjustment = {
-        id: detailedAdjustment.id,
-        reference_id: detailedAdjustment.reference_number,
-        total_quantity: detailedAdjustment.total_quantity,
-        processed_by: detailedAdjustment.processed_by_first_name && detailedAdjustment.processed_by_last_name 
-          ? `${detailedAdjustment.processed_by_first_name} ${detailedAdjustment.processed_by_last_name}`
-          : detailedAdjustment.created_by_first_name && detailedAdjustment.created_by_last_name
-          ? `${detailedAdjustment.created_by_first_name} ${detailedAdjustment.created_by_last_name}`
-          : 'Unknown',
-        processed_date: detailedAdjustment.processed_date || detailedAdjustment.created_at,
-        created_at: detailedAdjustment.created_at,
-        status: detailedAdjustment.status,
-        notes: detailedAdjustment.notes,
-        items: detailedAdjustment.items?.map((item: any) => ({
-          product_id: item.product_id,
-          product_name: item.product_name || 'Unknown Product',
-          product_sku: item.product_sku || 'N/A',
-          warehouse_id: item.warehouse_id,
-          warehouse_name: item.warehouse_name || 'Unknown Warehouse',
-          quantity: item.quantity,
-          cost_price: item.cost_price || 0,
-          reason: item.reason || 'N/A'
-        })) || []
-      }
-      
-      setSelectedAdjustment(convertedAdjustment)
-    } catch (error: any) {
-      console.error('Error fetching adjustment details:', error)
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to load adjustment details'
-      setAdjustmentDetailsError(errorMessage)
-      // Keep the original adjustment data if fetch fails
-    } finally {
-      setIsLoadingAdjustmentDetails(false)
-    }
   }
 
   const closeModal = () => {
     setIsModalOpen(false)
     setSelectedAdjustment(null)
-    setAdjustmentDetailsError(null)
-    setDocuments([])
-    setDocumentUrl(null)
-    setShowDocumentUpload(false)
-    setUploadedFilesDetails([])
   }
 
   const checkStockLevel = async (productId: string, warehouseId: string): Promise<number> => {
@@ -464,7 +403,11 @@ export default function AdjustmentsPage() {
     const finalReason = adjustmentReason === 'Other' ? adjustmentReasonOther.trim() : adjustmentReason
     
     if (!selectedProduct || !selectedWarehouse || !adjustmentQuantity.trim() || quantity <= 0 || !adjustmentCostPrice.trim() || costPrice < 0 || !finalReason) {
-      alert('Please fill in all required fields with valid values')
+      await notice({
+        title: 'Invalid fields',
+        description: 'Please fill in all required fields with valid values',
+        variant: 'warning',
+      })
       return
     }
 
@@ -476,13 +419,21 @@ export default function AdjustmentsPage() {
         setCurrentStockLevel(currentStock)
         
         if (currentStock < quantity) {
-          alert(`Insufficient stock! Current stock: ${currentStock}, trying to subtract: ${quantity}`)
+          await notice({
+            title: 'Insufficient stock',
+            description: `Current stock: ${currentStock}, trying to subtract: ${quantity}`,
+            variant: 'warning',
+          })
           setIsCheckingStock(false)
           return
         }
       } catch (error) {
         console.error('Error checking stock:', error)
-        alert('Error checking stock level. Please try again.')
+        await notice({
+          title: 'Check failed',
+          description: 'Error checking stock level. Please try again.',
+          variant: 'warning',
+        })
         setIsCheckingStock(false)
         return
       }
@@ -569,162 +520,22 @@ export default function AdjustmentsPage() {
     return viewableTypes.includes(fileType.toLowerCase())
   }
 
-  // Load documents for an adjustment
-  const loadDocuments = async (adjustmentId: string) => {
-    try {
-      setIsLoadingDocuments(true)
-      console.log('Loading documents for adjustment ID:', adjustmentId)
-      const response = await api.get(`/documents/by-reference/adjustment/${adjustmentId}`)
-      console.log('Documents response:', response.data)
-      setDocuments(response.data || [])
-    } catch (error) {
-      console.error('Error loading documents:', error)
-      console.error('Error details:', (error as any).response?.data)
-      setDocuments([])
-    } finally {
-      setIsLoadingDocuments(false)
-    }
-  }
-
-  // Download document
-  const downloadDocument = async (document: Document) => {
-    try {
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = window.document.createElement('a')
-      link.href = url
-      link.setAttribute('download', document.file_name)
-      window.document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error downloading document:', error)
-      alert('Error downloading document. Please try again.')
-    }
-  }
-
-  // View document in new tab
-  const viewDocument = async (document: Document) => {
-    try {
-      setViewingDocument(document.id)
-      
-      // Check if file type is viewable in browser
-      const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/html', 'text/css', 'text/javascript']
-      if (!viewableTypes.includes(document.file_type.toLowerCase())) {
-        alert(`This file type (${document.file_type}) cannot be viewed in the browser. Please download it instead.`)
-        return
-      }
-      
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      // Create blob URL with the correct MIME type
-      const blob = new Blob([response.data], { type: document.file_type })
-      const url = window.URL.createObjectURL(blob)
-      
-      // Set the document URL for the viewer dialog
-      setDocumentUrl(url)
-      
-    } catch (error: any) {
-      console.error('Error viewing document:', error)
-      if (error.response?.status === 404) {
-        alert('Document not found. It may have been deleted.')
-      } else if (error.response?.status === 403) {
-        alert('You do not have permission to view this document.')
-      } else {
-        alert('Error viewing document. Please try again.')
-      }
-    } finally {
-      setViewingDocument(null)
-    }
-  }
-
-  // Delete document
-  const deleteDocument = async (document: Document) => {
-    const confirmed = await confirm({
-      title: 'Delete document?',
-      description: `"${document.file_name}" will be permanently deleted. This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      variant: 'danger',
-    })
-    if (!confirmed) return
-
-    try {
-      await api.delete(`/documents/${document.id}`)
-      
-      // Remove the document from the current documents list
-      setDocuments(prev => prev.filter(doc => doc.id !== document.id))
-      
-      // Show success message
-      await notice({
-        title: 'Document deleted',
-        description: 'Document deleted successfully.',
-        okText: 'OK',
-        variant: 'success',
-      })
-    } catch (error) {
-      console.error('Error deleting document:', error)
-      alert('Failed to delete document. Please try again.')
-    }
-  }
-
-  // Document upload functions for details modal
-  const handleFileSelectDetails = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || [])
-    setUploadedFilesDetails(prev => [...prev, ...files])
-  }
-
-  const removeFileDetails = (index: number) => {
-    setUploadedFilesDetails(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const uploadDocumentsDetails = async () => {
-    if (!selectedAdjustment || uploadedFilesDetails.length === 0) return
-
-    try {
-      setIsUploadingDocumentsDetails(true)
-      const formData = new FormData()
-      
-      uploadedFilesDetails.forEach((file) => {
-        formData.append('documents', file)
-      })
-      formData.append('reference_type', 'adjustment')
-      formData.append('reference_id', selectedAdjustment.id)
-
-      await api.post('/documents/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-      
-      // Reload documents and clear upload files
-      await loadDocuments(selectedAdjustment.id)
-      setUploadedFilesDetails([])
-      setShowDocumentUpload(false)
-      
-      alert('Documents uploaded successfully!')
-    } catch (error) {
-      console.error('Error uploading documents:', error)
-      alert('Error uploading documents. Please try again.')
-    } finally {
-      setIsUploadingDocumentsDetails(false)
-    }
-  }
-
   const handleCreateAdjustment = async () => {
     if (adjustmentItems.length === 0) {
-      alert('Please add at least one item to the adjustment')
+      await notice({
+        title: 'No items',
+        description: 'Please add at least one item to the adjustment',
+        variant: 'info',
+      })
       return
     }
 
     if (!user) {
-      alert('User not authenticated')
+      await notice({
+        title: 'Not authenticated',
+        description: 'User not authenticated',
+        variant: 'warning',
+      })
       return
     }
 
@@ -789,7 +600,11 @@ export default function AdjustmentsPage() {
         } catch (documentError) {
           console.error('Error uploading documents:', documentError)
           // Don't fail the entire adjustment creation if document upload fails
-          alert('Adjustment created successfully, but some documents failed to upload. You can try uploading them later.')
+          await notice({
+            title: 'Partial success',
+            description: 'Adjustment created, but some documents failed to upload. You can try uploading them later.',
+            variant: 'warning',
+          })
         } finally {
           setIsUploadingDocuments(false)
         }
@@ -1003,374 +818,12 @@ export default function AdjustmentsPage() {
         </div>
 
       {/* Adjustment Detail Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Adjustment Details
-              {selectedAdjustment?.status === 'cancelled' && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  Cancelled
-                </span>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              Complete information about this inventory adjustment
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedAdjustment && (
-            <div className="space-y-6">
-              {/* Cancelled Banner */}
-              {selectedAdjustment.status === 'cancelled' && (
-                <div className="border border-red-200 bg-red-50 text-red-800 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5">
-                      <svg className="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.721-1.36 3.486 0l6.518 11.59c.75 1.335-.213 2.986-1.742 2.986H3.48c-1.53 0-2.492-1.651-1.742-2.986l6.518-11.59zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V7a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
-                    </div>
-                    <div>
-                      <p className="font-semibold">This adjustment has been cancelled</p>
-                      <p className="text-sm opacity-90">No further actions can be taken on this adjustment.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* Adjustment Overview */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Adjustment Overview</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <Hash className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Reference Number</p>
-                        <p className="text-sm text-gray-600 font-mono">{selectedAdjustment.reference_id}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {selectedAdjustment.status === 'cancelled' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Cancelled
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                        Adjustment
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Processed Date</p>
-                        <p className="text-sm text-gray-600">{formatDate(selectedAdjustment.processed_date)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <User className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Processed By</p>
-                        <p className="text-sm text-gray-600">{selectedAdjustment.processed_by}</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Cancellation Info */}
-              {selectedAdjustment.status === 'cancelled' && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Cancellation</CardTitle>
-                    <CardDescription>
-                      Details of the cancellation
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {selectedAdjustment.notes && (
-                      <div className="text-sm text-gray-700">
-                        <span className="font-medium">Reason: </span>
-                        {selectedAdjustment.notes}
-                      </div>
-                    )}
-                    <div className="text-xs text-gray-500">Cancelled at: {formatDate(selectedAdjustment.processed_date)}</div>
-                    <div className="text-xs text-gray-500">Cancelled by: {selectedAdjustment.processed_by}</div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Adjustment Items */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Adjustment Items</CardTitle>
-                  <CardDescription>
-                    Complete list of items in this adjustment
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingAdjustmentDetails ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                      <p className="mt-2 text-gray-600">Loading adjustment details...</p>
-                    </div>
-                  ) : adjustmentDetailsError ? (
-                    <div className="text-center py-8">
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                          <AlertTriangle className="h-5 w-5 text-red-500" />
-                          <h3 className="text-sm font-medium text-red-800">Error Loading Details</h3>
-                        </div>
-                        <p className="text-sm text-red-700">{adjustmentDetailsError}</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAdjustmentClick(selectedAdjustment!)}
-                          className="mt-3 text-red-600 border-red-300 hover:bg-red-50"
-                        >
-                          Try Again
-                        </Button>
-                      </div>
-                    </div>
-                  ) : selectedAdjustment.items.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">No items found for this adjustment</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Warehouse</TableHead>
-                            <TableHead>Quantity</TableHead>
-                            <TableHead>Cost Price</TableHead>
-                            <TableHead>Reason</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedAdjustment.items.map((item, index) => (
-                            <TableRow key={`${item.product_id}-${index}`}>
-                              <TableCell className="font-medium">
-                                {item.product_name}
-                              </TableCell>
-                              <TableCell className="font-mono text-sm">
-                                {item.product_sku}
-                              </TableCell>
-                              <TableCell>
-                                {item.warehouse_name}
-                              </TableCell>
-                              <TableCell className={`font-medium ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {item.quantity > 0 ? '+' : ''}{item.quantity}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                ₱{item.cost_price.toFixed(2)}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {item.reason}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Documents Section */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Documents
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Upload Documents */}
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Button
-                        onClick={() => setShowDocumentUpload(!showDocumentUpload)}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        Add Documents
-                      </Button>
-                    </div>
-                    
-                    {showDocumentUpload && (
-                      <div className="border rounded-lg p-4 bg-gray-50">
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Select documents to upload
-                            </label>
-                            <input
-                              type="file"
-                              multiple
-                              accept=".pdf,.png,.jpg,.jpeg"
-                              onChange={handleFileSelectDetails}
-                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                            />
-                          </div>
-                          
-                          {uploadedFilesDetails.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-gray-700 mb-2">Selected files:</p>
-                              <ul className="space-y-1">
-                                {uploadedFilesDetails.map((file, index) => (
-                                  <li key={index} className="flex items-center justify-between text-sm text-gray-600 bg-white p-2 rounded">
-                                    <span>{file.name} ({formatFileSize(file.size)})</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => removeFileDetails(index)}
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </Button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={uploadDocumentsDetails}
-                              disabled={uploadedFilesDetails.length === 0 || isUploadingDocumentsDetails}
-                              size="sm"
-                            >
-                              {isUploadingDocumentsDetails ? 'Uploading...' : 'Upload'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setShowDocumentUpload(false)
-                                setUploadedFilesDetails([])
-                              }}
-                              size="sm"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {isLoadingDocuments ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="mt-2 text-gray-600">Loading documents...</p>
-                    </div>
-                  ) : documents.length > 0 ? (
-                    <div className="space-y-3">
-                      {documents.map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div className="flex items-center gap-3">
-                            {getFileIcon(doc.file_type)}
-                            <div>
-                              <p className="font-medium text-sm">{doc.file_name}</p>
-                              <p className="text-xs text-gray-500">
-                                {formatFileSize(doc.file_size)} • Uploaded {formatDateTime(doc.uploaded_at)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {isViewable(doc.file_type) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => viewDocument(doc)}
-                                className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50"
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                View
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => downloadDocument(doc)}
-                              className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
-                            >
-                              Download
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteDocument(doc)}
-                              className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              Delete
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                      <p>No documents attached to this adjustment</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={closeModal}>
-                  Close
-                </Button>
-                {/* Cancel adjustment action */}
-                {selectedAdjustment.status !== 'cancelled' && (
-                  <Button
-                    variant="destructive"
-                    onClick={async () => {
-                      if (!selectedAdjustment) return
-                      const proceed = await confirm({
-                        title: 'Cancel adjustment?',
-                        description: 'This will reverse stock movements for all items. This action cannot be undone.',
-                        confirmText: 'Cancel Adjustment',
-                        cancelText: 'Keep Adjustment',
-                        variant: 'danger',
-                      })
-                      if (!proceed) return
-                      try {
-                        await api.post(`/adjustments/${selectedAdjustment.id}/cancel`, { reason: 'User cancelled from UI' })
-                        await notice({
-                          title: 'Adjustment cancelled',
-                          description: 'The adjustment was cancelled and stock was updated.',
-                          variant: 'success',
-                        })
-                        closeModal()
-                        await loadAdjustments()
-                      } catch (e: any) {
-                        await notice({
-                          title: 'Cancellation failed',
-                          description: e?.response?.data?.error || 'An error occurred while cancelling the adjustment.',
-                          variant: 'warning',
-                        })
-                      }
-                    }}
-                  >
-                    Cancel Adjustment
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+        <AdjustmentDetailsDialog
+          adjustment={selectedAdjustment}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onOrderUpdated={loadAdjustments}
+        />
 
       {/* Create Adjustment Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
@@ -1899,72 +1352,15 @@ export default function AdjustmentsPage() {
       </Dialog>
 
       {/* Review & Confirm Dialog */}
-      <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Review Adjustment</DialogTitle>
-            <DialogDescription>Confirm the details below before creating the transaction.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div>
-                <div className="text-gray-500">Processed By</div>
-                <div className="font-medium">{user ? `${user.first_name} ${user.last_name}` : ''}</div>
-              </div>
-              <div>
-                <div className="text-gray-500">Adjustment Date</div>
-                <div className="font-medium">{adjustmentDate}</div>
-              </div>
-              <div>
-                <div className="text-gray-500">Warehouse</div>
-                <div className="font-medium">{selectedWarehouse?.name || '—'}</div>
-              </div>
-            </div>
-            <div className="border rounded-md overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {adjustmentItems.map((item, idx) => (
-                    <TableRow key={`${item.product_id}-${idx}`}>
-                      <TableCell>{item.product_name}</TableCell>
-                      <TableCell className="font-mono text-sm">{item.product_sku}</TableCell>
-                      <TableCell className="text-right {item.quantity>0?'text-green-600':'text-red-600'}">{item.quantity}</TableCell>
-                      <TableCell className="text-right">₱{item.cost_price.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-semibold">₱{(Math.abs(item.quantity) * item.cost_price).toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex justify-end gap-6 text-sm">
-              <div>
-                <div className="text-gray-500">Items</div>
-                <div className="font-medium text-right">{adjustmentItems.length}</div>
-              </div>
-              <div>
-                <div className="text-gray-500">Total Quantity</div>
-                <div className="font-medium text-right">{adjustmentItems.reduce((s,i)=> s + Math.abs(i.quantity), 0)}</div>
-              </div>
-              <div>
-                <div className="text-gray-500">Total Amount</div>
-                <div className="font-semibold text-right">₱{adjustmentItems.reduce((s,i)=> s + Math.abs(i.quantity)*i.cost_price, 0).toFixed(2)}</div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={()=>setIsReviewOpen(false)}>Back</Button>
-              <Button className="bg-[#52a852] hover:bg-[#4a964a] text-white" onClick={() => { setIsReviewOpen(false); handleCreateAdjustment() }}>Confirm & Create</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AdjustmentReviewDialog
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        onConfirm={() => { setIsReviewOpen(false); handleCreateAdjustment() }}
+        items={adjustmentItems}
+        processedBy={user ? `${user.first_name} ${user.last_name}` : ''}
+        adjustmentDate={adjustmentDate}
+        warehouseName={selectedWarehouse?.name || ''}
+      />
 
       {/* Document Viewer Dialog */}
       <Dialog open={!!documentUrl} onOpenChange={() => setDocumentUrl(null)}>

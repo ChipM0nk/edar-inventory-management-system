@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,7 @@ import {
 import { getStatusDisplayText } from '@/lib/utils'
 import api from '@/lib/api'
 import { DocumentViewerDialog } from './document-viewer-dialog'
+import { useNotice } from '@/hooks/use-notice'
 
 interface PurchaseOrderProduct {
   product_id: string
@@ -113,13 +114,16 @@ export function PurchaseOrderDetailsDialog({
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancellationReason, setCancellationReason] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
+  
+  // Notice dialog
+  const [NoticeDialog, notice] = useNotice()
 
   // Load documents when dialog opens
-  useState(() => {
+  useEffect(() => {
     if (isOpen && order?.id) {
       loadDocuments(order.id)
     }
-  })
+  }, [isOpen, order?.id])
 
   // Format functions
   const formatDate = (dateString: string) => {
@@ -185,7 +189,7 @@ export function PurchaseOrderDetailsDialog({
   const loadDocuments = async (purchaseOrderId: string) => {
     try {
       setIsLoadingDocuments(true)
-      const response = await api.get(`/documents/purchase-order/${purchaseOrderId}`)
+      const response = await api.get(`/documents/by-reference/purchase_order/${purchaseOrderId}`)
       setDocuments(response.data || [])
     } catch (error) {
       console.error('Error loading documents:', error)
@@ -215,9 +219,10 @@ export function PurchaseOrderDetailsDialog({
       const formData = new FormData()
       
       uploadedFiles.forEach((file) => {
-        formData.append(`documents`, file)
+        formData.append('documents', file)
       })
-      formData.append('purchase_order_id', order.id!)
+      formData.append('reference_type', 'purchase_order')
+      formData.append('reference_id', order.id!)
 
       await api.post('/documents/upload', formData, {
         headers: {
@@ -230,10 +235,18 @@ export function PurchaseOrderDetailsDialog({
       setUploadedFiles([])
       setShowDocumentUpload(false)
       
-      alert('Documents uploaded successfully!')
+      await notice({
+        title: 'Upload complete',
+        description: 'Documents uploaded successfully!',
+        variant: 'success',
+      })
     } catch (error) {
       console.error('Error uploading documents:', error)
-      alert('Error uploading documents. Please try again.')
+      await notice({
+        title: 'Upload failed',
+        description: 'Error uploading documents. Please try again.',
+        variant: 'warning',
+      })
     } finally {
       setIsUploadingDocuments(false)
     }
@@ -256,7 +269,11 @@ export function PurchaseOrderDetailsDialog({
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Error downloading document:', error)
-      alert('Error downloading document. Please try again.')
+      await notice({
+        title: 'Download failed',
+        description: 'Error downloading document. Please try again.',
+        variant: 'warning',
+      })
     }
   }
 
@@ -269,10 +286,18 @@ export function PurchaseOrderDetailsDialog({
     try {
       await api.delete(`/documents/${document.id}`)
       setDocuments(prev => prev.filter(doc => doc.id !== document.id))
-      alert('Document deleted successfully')
+      await notice({
+        title: 'Document deleted',
+        description: 'Document deleted successfully',
+        variant: 'success',
+      })
     } catch (error) {
       console.error('Error deleting document:', error)
-      alert('Failed to delete document. Please try again.')
+      await notice({
+        title: 'Delete failed',
+        description: 'Failed to delete document. Please try again.',
+        variant: 'warning',
+      })
     }
   }
 
@@ -283,7 +308,11 @@ export function PurchaseOrderDetailsDialog({
       
       const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/html', 'text/css', 'text/javascript']
       if (!viewableTypes.includes(document.file_type.toLowerCase())) {
-        alert(`This file type (${document.file_type}) cannot be viewed in the browser. Please download it instead.`)
+        await notice({
+          title: 'Cannot preview file',
+          description: `This file type (${document.file_type}) cannot be viewed in the browser. Please download it instead.`,
+          variant: 'info',
+        })
         return
       }
       
@@ -298,13 +327,29 @@ export function PurchaseOrderDetailsDialog({
     } catch (error: any) {
       console.error('Error viewing document:', error)
       if (error.response?.status === 404) {
-        alert('Document not found. It may have been deleted.')
+        await notice({
+          title: 'Document not found',
+          description: 'Document not found. It may have been deleted.',
+          variant: 'warning',
+        })
       } else if (error.response?.status === 403) {
-        alert('You do not have permission to view this document.')
+        await notice({
+          title: 'Access denied',
+          description: 'You do not have permission to view this document.',
+          variant: 'warning',
+        })
       } else if (error.response?.status === 500) {
-        alert('Server error while retrieving document. Please try again later.')
+        await notice({
+          title: 'Server error',
+          description: 'Server error while retrieving document. Please try again later.',
+          variant: 'warning',
+        })
       } else {
-        alert('Error viewing document. Please try again or download the file instead.')
+        await notice({
+          title: 'View failed',
+          description: 'Error viewing document. Please try again or download the file instead.',
+          variant: 'warning',
+        })
       }
       setViewingDocument(null)
     }
@@ -313,7 +358,11 @@ export function PurchaseOrderDetailsDialog({
   // Handle cancel purchase order
   const handleCancelPurchaseOrder = async () => {
     if (!order || !cancellationReason.trim()) {
-      alert('Please provide a reason for cancellation')
+      await notice({
+        title: 'Reason required',
+        description: 'Please provide a reason for cancellation',
+        variant: 'info',
+      })
       return
     }
 
@@ -324,7 +373,11 @@ export function PurchaseOrderDetailsDialog({
         reason: cancellationReason
       })
       
-      alert('Purchase order cancelled successfully')
+      await notice({
+        title: 'Purchase order cancelled',
+        description: 'Purchase order cancelled successfully',
+        variant: 'success',
+      })
       
       setShowCancelDialog(false)
       setCancellationReason('')
@@ -337,7 +390,11 @@ export function PurchaseOrderDetailsDialog({
     } catch (error: any) {
       console.error('Error cancelling purchase order:', error)
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
-      alert(`Error cancelling purchase order: ${errorMessage}`)
+      await notice({
+        title: 'Cancellation failed',
+        description: `Error cancelling purchase order: ${errorMessage}`,
+        variant: 'warning',
+      })
     } finally {
       setIsCancelling(false)
     }
@@ -814,6 +871,9 @@ export function PurchaseOrderDetailsDialog({
         documentUrl={documentUrl}
         onDownload={downloadDocument}
       />
+
+      {/* Notice Dialog */}
+      {NoticeDialog}
     </>
   )
 }
