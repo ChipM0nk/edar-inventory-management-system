@@ -79,3 +79,4 @@ CREATE TRIGGER update_transfer_total_quantity_trigger
     EXECUTE FUNCTION update_transfer_total_quantity();
 
 
+
