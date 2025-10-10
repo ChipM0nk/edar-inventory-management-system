@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -91,6 +91,12 @@ export default function NewStockMovementPage() {
   const [productCostDisplay, setProductCostDisplay] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [createdPurchaseOrderId, setCreatedPurchaseOrderId] = useState<string>('')
+
+  // Refs
+  const poReferenceInputRef = useRef<HTMLInputElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Form setup
   const form = useForm<StockInForm>({
@@ -128,6 +134,32 @@ export default function NewStockMovementPage() {
       loadWarehouses()
     }
   }, [user])
+
+  // Auto-focus on PO Reference input when component mounts
+  useEffect(() => {
+    if (user && !isLoading) {
+      // Small delay to ensure the input is rendered
+      const timer = setTimeout(() => {
+        if (poReferenceInputRef.current) {
+          poReferenceInputRef.current.focus()
+        }
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [user, isLoading])
+
+  // Auto-focus on search input when product dialog opens
+  useEffect(() => {
+    if (isProductDialogOpen) {
+      // Small delay to ensure the dialog and input are rendered
+      const timer = setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus()
+        }
+      }, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [isProductDialogOpen])
 
   // Load suppliers
   const loadSuppliers = async () => {
@@ -452,13 +484,14 @@ export default function NewStockMovementPage() {
         // Don't fail the entire process if status update fails
       }
       
-      // Reset form and redirect
+      // Reset form and show success dialog
       form.reset()
       setStockInItems([])
       setUploadedDocuments([])
       setShowConfirmationDialog(false)
       setPendingFormData(null)
-      router.push('/orders/purchase')
+      setCreatedPurchaseOrderId(purchaseOrderId)
+      setShowSuccessDialog(true)
     } catch (error: any) {
       console.error('Error creating purchase order:', error)
       
@@ -478,6 +511,23 @@ export default function NewStockMovementPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Handle success dialog actions
+  const handleViewPurchaseOrder = () => {
+    setShowSuccessDialog(false)
+    router.push('/orders/purchase')
+  }
+
+  const handleCreateAnother = () => {
+    setShowSuccessDialog(false)
+    setCreatedPurchaseOrderId('')
+    // Form is already reset, just focus on PO reference
+    setTimeout(() => {
+      if (poReferenceInputRef.current) {
+        poReferenceInputRef.current.focus()
+      }
+    }, 100)
   }
 
   if (isLoading) {
@@ -531,7 +581,7 @@ export default function NewStockMovementPage() {
                   <CardContent className="space-y-8">
                     {/* Main Form Fields */}
                     <div className="space-y-6">
-                      {/* First Row: PO Reference, PO Date, Received Date, Supplier */}
+                      {/* First Row: PO Reference, Supplier, PO Date, Received Date */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <FormField
                           control={form.control}
@@ -544,12 +594,44 @@ export default function NewStockMovementPage() {
                                   placeholder="PO-12345"
                                   className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                                   {...field}
+                                  ref={poReferenceInputRef}
                                   onChange={(e) => {
                                     const upperValue = e.target.value.toUpperCase()
                                     field.onChange(upperValue)
                                   }}
                                 />
                               </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="supplier_id"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-semibold text-gray-800 mb-3 block">Supplier *</FormLabel>
+                              <Select
+                                value={field.value}
+                                onValueChange={(value) => {
+                                  field.onChange(value)
+                                  handleSupplierChange(value)
+                                }}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                    <SelectValue placeholder="Select a supplier" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {suppliers.map((supplier) => (
+                                    <SelectItem key={supplier.id} value={supplier.id}>
+                                      {supplier.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -588,37 +670,6 @@ export default function NewStockMovementPage() {
                                   {...field} 
                                 />
                               </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="supplier_id"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm font-semibold text-gray-800 mb-3 block">Supplier *</FormLabel>
-                              <Select
-                                value={field.value}
-                                onValueChange={(value) => {
-                                  field.onChange(value)
-                                  handleSupplierChange(value)
-                                }}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                                    <SelectValue placeholder="Select a supplier" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {suppliers.map((supplier) => (
-                                    <SelectItem key={supplier.id} value={supplier.id}>
-                                      {supplier.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -721,6 +772,7 @@ export default function NewStockMovementPage() {
                                 <div className="relative">
                                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                                   <Input
+                                    ref={searchInputRef}
                                     id="search"
                                     placeholder="Search by name or SKU..."
                                     value={searchTerm}
@@ -1285,6 +1337,49 @@ export default function NewStockMovementPage() {
                 )}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <DialogTitle className="text-xl font-semibold text-gray-900">Purchase Order Created!</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Your purchase order has been successfully created and processed.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-green-800">Purchase Order ID:</span>
+            </div>
+            <p className="text-sm text-green-700 font-mono mt-1">{createdPurchaseOrderId}</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCreateAnother}
+              className="flex-1"
+            >
+              Create Another
+            </Button>
+            <Button
+              type="button"
+              onClick={handleViewPurchaseOrder}
+              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+            >
+              View Purchase Orders
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

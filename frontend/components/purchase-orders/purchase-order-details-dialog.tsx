@@ -193,16 +193,6 @@ export function PurchaseOrderDetailsDialog({
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Purchase Order Details
-              {order.received_date && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Received: {formatDate(order.received_date)}
-                </span>
-              )}
-              {!order.received_date && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                  Not Received
-                </span>
-              )}
           </DialogTitle>
             <DialogDescription>
             Complete information about this purchase order and its products
@@ -260,123 +250,115 @@ export function PurchaseOrderDetailsDialog({
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto relative z-10">
-            <div className="space-y-6 p-1">
-          {/* Order Overview */}
-          <Card>
-                <CardHeader>
-              <CardTitle className="text-lg">Order Overview</CardTitle>
-            </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <Hash className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Reference ID</p>
-                        <p className="text-sm text-gray-600 font-mono">{order.po_number || 'N/A'}</p>
-                  </div>
-                </div>
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Received Date</p>
-                        <p className="text-sm text-gray-600">
-                          {order.received_date ? formatDate(order.received_date) : 'Not received'}
-                        </p>
-                  </div>
-                </div>
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Purchase Date</p>
-                        <p className="text-sm text-gray-600">{order.order_date ? formatDate(order.order_date) : 'N/A'}</p>
-                  </div>
-                </div>
-                    <div className="flex items-center gap-3">
-                      <User className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Processed By</p>
-                        <p className="text-sm text-gray-600">{order.created_by_first_name && order.created_by_last_name ? `${order.created_by_first_name} ${order.created_by_last_name}` : 'Unknown'}</p>
-                  </div>
-                </div>
-                    <div className="flex items-center gap-3">
-                      <Clock className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Created At</p>
-                        <p className="text-sm text-gray-600">{formatDateTime(order.created_at)}</p>
-                  </div>
-                </div>
-                    <div className="flex items-center gap-3">
-                      <Building className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Supplier</p>
-                        <p className="text-sm text-gray-600">{order.supplier_name || 'Not specified'}</p>
+            <div className="space-y-4 p-1">
+              {/* Order Overview - Simplified Layout */}
+              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2 text-blue-800">
+                    <Package className="h-4 w-4" />
+                    Order Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Hash className="h-3 w-3 text-blue-600" />
+                        <p className="text-xs text-gray-600">Reference</p>
                       </div>
+                      <p className="text-sm font-semibold text-gray-900 font-mono">{order.po_number || 'N/A'}</p>
                     </div>
                     
-                    <div className="flex items-center gap-3">
-                      <Warehouse className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium">Warehouse</p>
-                        <p className="text-sm text-gray-600">
-                          {order.warehouse_name || 'Not specified'}
-                        </p>
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Calendar className="h-3 w-3 text-blue-600" />
+                        <p className="text-xs text-gray-600">Purchase Date</p>
                       </div>
+                      <p className="text-sm font-semibold text-gray-900">{order.order_date ? formatDate(order.order_date) : 'N/A'}</p>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Calendar className="h-3 w-3 text-green-600" />
+                        <p className="text-xs text-gray-600">Received</p>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {order.received_date ? formatDate(order.received_date) : 'Not received'}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <div className="flex items-center gap-1 mb-1">
+                        <User className="h-3 w-3 text-blue-600" />
+                        <p className="text-xs text-gray-600">Processed By</p>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {order.created_by_first_name && order.created_by_last_name ? `${order.created_by_first_name} ${order.created_by_last_name}` : 'Unknown'}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Building className="h-3 w-3 text-blue-600" />
+                        <p className="text-xs text-gray-600">Supplier</p>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900">{order.supplier_name || 'Not specified'}</p>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Warehouse className="h-3 w-3 text-blue-600" />
+                        <p className="text-xs text-gray-600">Warehouse</p>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {order.warehouse_name || 'Not specified'}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border border-blue-100 lg:col-span-2 col-span-2">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Clock className="h-3 w-3 text-blue-600" />
+                        <p className="text-xs text-gray-600">Created At</p>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900">{formatDateTime(order.created_at)}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Order Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Order Summary</CardTitle>
+              {/* Products Table - Enhanced with color scheme */}
+              <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2 text-green-800">
+                    <Package2 className="h-5 w-5" />
+                    Products ({items.length})
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-2 mb-2">
-                        <DollarSign className="h-5 w-5 text-green-500" />
-                        <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                      </div>
-                      <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.total_amount)}</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-2 mb-2">
-                        <Calendar className="h-5 w-5 text-blue-500" />
-                        <p className="text-sm font-medium text-gray-600">Received Date</p>
-                      </div>
-                      <p className="text-2xl font-bold text-gray-700">{order.received_date ? formatDate(order.received_date) : '-'}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Products Table - load from API */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Products</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
+                <CardContent className="pt-0">
+                  <div className="bg-white rounded-lg border border-green-100 overflow-hidden">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="bg-green-50">
                         <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Unit Price</TableHead>
-                          <TableHead>Total</TableHead>
+                          <TableHead className="font-semibold text-green-800">Product</TableHead>
+                          <TableHead className="font-semibold text-green-800">SKU</TableHead>
+                          <TableHead className="font-semibold text-green-800 text-center">Quantity</TableHead>
+                          <TableHead className="font-semibold text-green-800 text-right">Unit Price</TableHead>
+                          <TableHead className="font-semibold text-green-800 text-right">Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {items.length > 0 ? (
                           items.map((product, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="font-medium">{product.product_name}</TableCell>
-                              <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                              <TableCell className="font-medium">{product.quantity}</TableCell>
-                              <TableCell className="font-mono text-sm">{formatCurrency(product.unit_price)}</TableCell>
-                              <TableCell className="font-mono text-sm font-medium">{formatCurrency(product.total_price)}</TableCell>
+                            <TableRow key={index} className="hover:bg-green-25 transition-colors">
+                              <TableCell className="font-medium text-gray-900">{product.product_name}</TableCell>
+                              <TableCell className="font-mono text-sm text-gray-600">{product.sku}</TableCell>
+                              <TableCell className="text-center">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {product.quantity}
+                                </span>
+                              </TableCell>
+                              <TableCell className="font-mono text-sm text-gray-700 text-right">{formatCurrency(product.unit_price)}</TableCell>
+                              <TableCell className="font-mono text-sm font-semibold text-gray-900 text-right">{formatCurrency(product.total_price)}</TableCell>
                             </TableRow>
                           ))
                         ) : (
@@ -389,35 +371,66 @@ export function PurchaseOrderDetailsDialog({
                       </TableBody>
                     </Table>
                   </div>
+                  
+                  {/* Total Amount - Moved below products */}
+                  {items.length > 0 && (
+                    <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-5 w-5 text-blue-600" />
+                          <span className="text-sm font-medium text-gray-600">Total Amount</span>
+                        </div>
+                        <span className="text-2xl font-bold text-blue-700">
+                          {formatCurrency(items.reduce((sum, item) => sum + item.total_price, 0))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Documents Section (reusable) */}
-              <DocumentsSection
-                referenceType="purchase_order"
-                referenceId={order.id!}
-                title="Documents"
-                showValidation={true}
-              />
+              {/* Documents Section (reusable) - Enhanced styling */}
+              <Card className="bg-gradient-to-r from-purple-50 to-violet-50 border-purple-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2 text-purple-800">
+                    <FileText className="h-5 w-5" />
+                    Documents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="bg-white rounded-lg border border-purple-100">
+                    <DocumentsSection
+                      referenceType="purchase_order"
+                      referenceId={order.id!}
+                      title=""
+                      showValidation={true}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Action Buttons */}
-              <div className="flex justify-between">
+              {/* Action Buttons - Enhanced styling */}
+              <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                 <div>
                   {order && canCancelPurchaseOrder(order.created_at) && order.status !== 'cancelled' && (
                     <Button
                       variant="outline"
                       onClick={() => setShowCancelDialog(true)}
-                      className="text-red-600 border-red-300 hover:bg-red-50"
+                      className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400 transition-colors"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
                       Cancel Purchase Order
                     </Button>
                   )}
                 </div>
-                <Button variant="outline" onClick={handleClose}>
-              Close
-            </Button>
-          </div>
+                <Button 
+                  variant="outline" 
+                  onClick={handleClose}
+                  className="px-6 py-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

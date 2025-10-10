@@ -459,7 +459,7 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 		if len(req.Items) > 0 {
 			warehouseID = &req.Items[0].WarehouseID
 		}
-		
+
 		purchaseOrder, err := s.db.CreatePurchaseOrder(ctx, &sqlc.CreatePurchaseOrderParams{
 			PoNumber:             poNumber,
 			SupplierName:         supplier.Name,
