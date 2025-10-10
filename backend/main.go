@@ -21,18 +21,18 @@
 package main
 
 import (
-	"log"
 	"inventory-system/docs"
 	"inventory-system/internal/auth"
 	"inventory-system/internal/config"
 	"inventory-system/internal/database"
 	"inventory-system/internal/handlers"
 	"inventory-system/internal/services"
+	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func main() {
@@ -98,12 +98,12 @@ func main() {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
 		}
-		
+
 		c.Next()
 	})
 
@@ -142,7 +142,6 @@ func main() {
 				products.PUT("/:id", productHandler.UpdateProduct)
 				products.DELETE("/:id", productHandler.DeleteProduct)
 			}
-
 
 			// Categories
 			categories := protected.Group("/categories")
@@ -192,11 +191,11 @@ func main() {
 			// Purchase orders
 			purchaseOrders := protected.Group("/purchase-orders")
 			{
-			purchaseOrders.GET("", purchaseOrderHandler.ListPurchaseOrders)
-			purchaseOrders.POST("", purchaseOrderHandler.CreatePurchaseOrder)
-			purchaseOrders.GET("/:id", purchaseOrderHandler.GetPurchaseOrder)
-			purchaseOrders.PUT("/:id", purchaseOrderHandler.UpdatePurchaseOrder)
-			purchaseOrders.POST("/:id/cancel", purchaseOrderHandler.CancelPurchaseOrder)
+				purchaseOrders.GET("", purchaseOrderHandler.ListPurchaseOrders)
+				purchaseOrders.POST("", purchaseOrderHandler.CreatePurchaseOrder)
+				purchaseOrders.GET("/:id", purchaseOrderHandler.GetPurchaseOrder)
+				purchaseOrders.PUT("/:id", purchaseOrderHandler.UpdatePurchaseOrder)
+				purchaseOrders.POST("/:id/cancel", purchaseOrderHandler.CancelPurchaseOrder)
 			}
 
 			// Documents

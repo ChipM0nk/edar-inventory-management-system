@@ -99,6 +99,7 @@ type PurchaseOrder struct {
 	CancelledBy          pgtype.UUID        `json:"cancelled_by"`
 	CancelledAt          pgtype.Timestamptz `json:"cancelled_at"`
 	CancellationReason   *string            `json:"cancellation_reason"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
 }
 
 type PurchaseOrderItem struct {

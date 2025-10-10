@@ -46,7 +46,6 @@ func optionalTimeToPgxTimestamp(t *time.Time) pgtype.Timestamp {
 	return pgtype.Timestamp{Time: *t, Valid: true}
 }
 
-
 func (s *StockService) CreateStockMovement(ctx context.Context, req models.CreateStockMovementRequest, userID *uuid.UUID) (*models.StockMovement, error) {
 	tx, err := s.db.BeginTx(ctx)
 	if err != nil {
@@ -110,12 +109,12 @@ func (s *StockService) CreateStockMovement(ctx context.Context, req models.Creat
 		// If stock level doesn't exist, create it
 		if req.MovementType == "in" || req.MovementType == "adjustment" {
 			_, err = s.db.CreateStockLevel(ctx, &sqlc.CreateStockLevelParams{
-				ProductID:       utils.UUIDToPgxUUID(req.ProductID),
-				WarehouseID:     utils.UUIDToPgxUUID(req.WarehouseID),
-				Quantity:        int32(req.Quantity),
+				ProductID:        utils.UUIDToPgxUUID(req.ProductID),
+				WarehouseID:      utils.UUIDToPgxUUID(req.WarehouseID),
+				Quantity:         int32(req.Quantity),
 				ReservedQuantity: 0,
-				MinStockLevel:   &[]int32{0}[0],
-				MaxStockLevel:   &[]int32{0}[0],
+				MinStockLevel:    &[]int32{0}[0],
+				MaxStockLevel:    &[]int32{0}[0],
 			})
 			if err != nil {
 				return nil, err
@@ -173,32 +172,32 @@ func (s *StockService) GetStockLevel(ctx context.Context, productID, warehouseID
 		return nil, err
 	}
 
-    // Safely handle nullable numeric fields from the DB
-    var maxStockLevelPtr *int
-    if stockLevel.MaxStockLevel != nil {
-        tmp := int(*stockLevel.MaxStockLevel)
-        maxStockLevelPtr = &tmp
-    }
+	// Safely handle nullable numeric fields from the DB
+	var maxStockLevelPtr *int
+	if stockLevel.MaxStockLevel != nil {
+		tmp := int(*stockLevel.MaxStockLevel)
+		maxStockLevelPtr = &tmp
+	}
 
-    var availableQty int
-    if stockLevel.AvailableQuantity != nil {
-        availableQty = int(*stockLevel.AvailableQuantity)
-    }
+	var availableQty int
+	if stockLevel.AvailableQuantity != nil {
+		availableQty = int(*stockLevel.AvailableQuantity)
+	}
 
-    var minLevel int
-    if stockLevel.MinStockLevel != nil {
-        minLevel = int(*stockLevel.MinStockLevel)
-    }
+	var minLevel int
+	if stockLevel.MinStockLevel != nil {
+		minLevel = int(*stockLevel.MinStockLevel)
+	}
 
-    return &models.StockLevel{
+	return &models.StockLevel{
 		ID:                utils.PgxUUIDToUUID(stockLevel.ID),
 		ProductID:         utils.PgxUUIDToUUID(stockLevel.ProductID),
 		WarehouseID:       utils.PgxUUIDToUUID(stockLevel.WarehouseID),
 		Quantity:          int(stockLevel.Quantity),
 		ReservedQuantity:  int(stockLevel.ReservedQuantity),
-        AvailableQuantity: availableQty,
-        MinStockLevel:     minLevel,
-        MaxStockLevel:     maxStockLevelPtr,
+		AvailableQuantity: availableQty,
+		MinStockLevel:     minLevel,
+		MaxStockLevel:     maxStockLevelPtr,
 		LastUpdated:       utils.PgxTimestamptzToTime(stockLevel.LastUpdated),
 		CreatedAt:         utils.PgxTimestamptzToTime(stockLevel.CreatedAt),
 		UpdatedAt:         utils.PgxTimestamptzToTime(stockLevel.UpdatedAt),
@@ -240,17 +239,17 @@ func (s *StockService) ListStockLevels(ctx context.Context, filter models.StockL
 			val := int(*stockLevel.MaxStockLevel)
 			maxStockLevel = &val
 		}
-		
+
 		var availableQuantity int
 		if stockLevel.AvailableQuantity != nil {
 			availableQuantity = int(*stockLevel.AvailableQuantity)
 		}
-		
+
 		var minStockLevel int
 		if stockLevel.MinStockLevel != nil {
 			minStockLevel = int(*stockLevel.MinStockLevel)
 		}
-		
+
 		result[i] = models.StockLevel{
 			ID:                utils.PgxUUIDToUUID(stockLevel.ID),
 			ProductID:         utils.PgxUUIDToUUID(stockLevel.ProductID),
@@ -291,13 +290,13 @@ func (s *StockService) ListStockMovements(ctx context.Context, filter models.Sto
 	if filter.ProductID != nil || filter.WarehouseID != nil || filter.MovementType != nil || filter.DateFrom != nil || filter.DateTo != nil {
 		// Use filtered query
 		stockMovementRows, err = s.db.ListStockMovementsWithFilter(ctx, &sqlc.ListStockMovementsWithFilterParams{
-			Column1:  utils.OptionalUUIDToPgxUUID(filter.ProductID),
-			Column2:  utils.OptionalUUIDToPgxUUID(filter.WarehouseID),
-			Column3:  utils.OptionalStringToString(filter.MovementType),
-			Column4:  utils.OptionalTimeToPgxTimestamp(filter.DateFrom),
-			Column5:  utils.OptionalTimeToPgxTimestamp(filter.DateTo),
-			Limit:    int32(filter.Limit),
-			Offset:   int32(offset),
+			Column1: utils.OptionalUUIDToPgxUUID(filter.ProductID),
+			Column2: utils.OptionalUUIDToPgxUUID(filter.WarehouseID),
+			Column3: utils.OptionalStringToString(filter.MovementType),
+			Column4: utils.OptionalTimeToPgxTimestamp(filter.DateFrom),
+			Column5: utils.OptionalTimeToPgxTimestamp(filter.DateTo),
+			Limit:   int32(filter.Limit),
+			Offset:  int32(offset),
 		})
 		if err != nil {
 			return nil, err
@@ -360,28 +359,28 @@ func (s *StockService) ListStockMovements(ctx context.Context, filter models.Sto
 		processedBy := utils.OptionalPgxUUIDToUUID(movement.ProcessedBy)
 		processedDate := utils.OptionalPgxTimestamptzToTimePtr(movement.ProcessedDate)
 		result[i] = models.StockMovement{
-			ID:            utils.PgxUUIDToUUID(movement.ID),
-			ProductID:     utils.PgxUUIDToUUID(movement.ProductID),
-			WarehouseID:   utils.PgxUUIDToUUID(movement.WarehouseID),
-			MovementType:  movement.MovementType,
-			Quantity:      int(movement.Quantity),
-			CostPrice:     utils.OptionalPgxNumericToFloat64Ptr(movement.CostPrice),
-			TotalAmount:   utils.OptionalPgxNumericToFloat64Ptr(movement.TotalAmount),
-			ReferenceType: movement.ReferenceType,
-			ReferenceID:   &referenceID,
-			ReferenceNumber: movement.ReferenceNumber,
-			UserID:        &userID,
-			ProcessedBy:   processedBy,
-			ProcessedDate: processedDate,
-			CreatedAt:     utils.PgxTimestamptzToTime(movement.CreatedAt),
-			ProductName:   &movement.ProductName,
-			ProductSKU:    &movement.Sku,
-			WarehouseName: &movement.WarehouseName,
-			UserFirstName: movement.FirstName,
-			UserLastName:  movement.LastName,
+			ID:                   utils.PgxUUIDToUUID(movement.ID),
+			ProductID:            utils.PgxUUIDToUUID(movement.ProductID),
+			WarehouseID:          utils.PgxUUIDToUUID(movement.WarehouseID),
+			MovementType:         movement.MovementType,
+			Quantity:             int(movement.Quantity),
+			CostPrice:            utils.OptionalPgxNumericToFloat64Ptr(movement.CostPrice),
+			TotalAmount:          utils.OptionalPgxNumericToFloat64Ptr(movement.TotalAmount),
+			ReferenceType:        movement.ReferenceType,
+			ReferenceID:          &referenceID,
+			ReferenceNumber:      movement.ReferenceNumber,
+			UserID:               &userID,
+			ProcessedBy:          processedBy,
+			ProcessedDate:        processedDate,
+			CreatedAt:            utils.PgxTimestamptzToTime(movement.CreatedAt),
+			ProductName:          &movement.ProductName,
+			ProductSKU:           &movement.Sku,
+			WarehouseName:        &movement.WarehouseName,
+			UserFirstName:        movement.FirstName,
+			UserLastName:         movement.LastName,
 			ProcessedByFirstName: movement.ProcessedByFirstName,
 			ProcessedByLastName:  movement.ProcessedByLastName,
-			SupplierName: movement.SupplierName,
+			SupplierName:         movement.SupplierName,
 		}
 	}
 
@@ -455,6 +454,12 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 
 		// Create purchase order
 		notes := "Created from stock movement"
+		// Use the first warehouse from the items as the primary warehouse for the PO
+		var warehouseID *uuid.UUID
+		if len(req.Items) > 0 {
+			warehouseID = &req.Items[0].WarehouseID
+		}
+		
 		purchaseOrder, err := s.db.CreatePurchaseOrder(ctx, &sqlc.CreatePurchaseOrderParams{
 			PoNumber:             poNumber,
 			SupplierName:         supplier.Name,
@@ -463,6 +468,7 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 			ExpectedDeliveryDate: pgtype.Date{Time: req.ProcessedDate, Valid: true},
 			Notes:                &notes,
 			CreatedBy:            utils.UUIDToPgxUUID(*userID),
+			WarehouseID:          utils.OptionalUUIDToPgxUUID(warehouseID),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create purchase order: %w", err)
@@ -521,12 +527,12 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 		if err != nil {
 			// If stock level doesn't exist, create it
 			_, err = s.db.CreateStockLevel(ctx, &sqlc.CreateStockLevelParams{
-				ProductID:       utils.UUIDToPgxUUID(item.ProductID),
-				WarehouseID:     utils.UUIDToPgxUUID(item.WarehouseID),
-				Quantity:        int32(item.Quantity),
+				ProductID:        utils.UUIDToPgxUUID(item.ProductID),
+				WarehouseID:      utils.UUIDToPgxUUID(item.WarehouseID),
+				Quantity:         int32(item.Quantity),
 				ReservedQuantity: 0,
-				MinStockLevel:   &[]int32{0}[0],
-				MaxStockLevel:   &[]int32{0}[0],
+				MinStockLevel:    &[]int32{0}[0],
+				MaxStockLevel:    &[]int32{0}[0],
 			})
 			if err != nil {
 				return nil, err
@@ -540,6 +546,20 @@ func (s *StockService) CreateBulkStockMovement(ctx context.Context, req models.B
 			})
 			if err != nil {
 				return nil, err
+			}
+		}
+
+		// Create purchase order item if we have a purchase order
+		if purchaseOrderID != nil && item.CostPrice != nil {
+			_, err = s.db.CreatePurchaseOrderItem(ctx, &sqlc.CreatePurchaseOrderItemParams{
+				PurchaseOrderID: utils.UUIDToPgxUUID(*purchaseOrderID),
+				ProductID:       utils.UUIDToPgxUUID(item.ProductID),
+				Quantity:        int32(item.Quantity),
+				UnitPrice:       utils.Float64ToPgxNumeric(*item.CostPrice),
+				TotalPrice:      utils.Float64ToPgxNumeric(*totalAmount),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create purchase order item: %w", err)
 			}
 		}
 

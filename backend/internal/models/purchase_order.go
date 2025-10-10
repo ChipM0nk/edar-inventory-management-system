@@ -6,26 +6,42 @@ import (
 )
 
 type PurchaseOrder struct {
-	ID                     string     `json:"id"`
-	PoNumber               string     `json:"po_number" validate:"required"`
-	SupplierName           string     `json:"supplier_name"`
-	SupplierContact        *string    `json:"supplier_contact"`
-	TotalAmount            float64    `json:"total_amount"`
-	Status                 string     `json:"status"`
-	OrderDate              time.Time  `json:"order_date"`
-	ExpectedDeliveryDate   *time.Time `json:"expected_delivery_date"`
-	ReceivedDate           *time.Time `json:"received_date"`
-	Notes                  *string    `json:"notes"`
-	CreatedBy              string     `json:"created_by"`
-	CreatedByFirstName     *string    `json:"created_by_first_name"`
-	CreatedByLastName      *string    `json:"created_by_last_name"`
-	CancelledBy            *string    `json:"cancelled_by"`
-	CancelledByFirstName   *string    `json:"cancelled_by_first_name"`
-	CancelledByLastName    *string    `json:"cancelled_by_last_name"`
-	CancelledAt            *time.Time `json:"cancelled_at"`
-	CancellationReason     *string    `json:"cancellation_reason"`
-	CreatedAt              time.Time  `json:"created_at"`
-	UpdatedAt              time.Time  `json:"updated_at"`
+	ID                   string              `json:"id"`
+	PoNumber             string              `json:"po_number" validate:"required"`
+	SupplierName         string              `json:"supplier_name"`
+	SupplierContact      *string             `json:"supplier_contact"`
+	TotalAmount          float64             `json:"total_amount"`
+	Status               string              `json:"status"`
+	OrderDate            time.Time           `json:"order_date"`
+	ExpectedDeliveryDate *time.Time          `json:"expected_delivery_date"`
+	ReceivedDate         *time.Time          `json:"received_date"`
+	Notes                *string             `json:"notes"`
+	CreatedBy            string              `json:"created_by"`
+	CreatedByFirstName   *string             `json:"created_by_first_name"`
+	CreatedByLastName    *string             `json:"created_by_last_name"`
+	CancelledBy          *string             `json:"cancelled_by"`
+	CancelledByFirstName *string             `json:"cancelled_by_first_name"`
+	CancelledByLastName  *string             `json:"cancelled_by_last_name"`
+	CancelledAt          *time.Time          `json:"cancelled_at"`
+	CancellationReason   *string             `json:"cancellation_reason"`
+	CreatedAt            time.Time           `json:"created_at"`
+	UpdatedAt            time.Time           `json:"updated_at"`
+	Items                []PurchaseOrderItem `json:"items,omitempty"`
+	WarehouseID          *string             `json:"warehouse_id,omitempty"`
+	WarehouseName        *string             `json:"warehouse_name,omitempty"`
+}
+
+// PurchaseOrderItem represents a line item in a purchase order
+type PurchaseOrderItem struct {
+	ID               string  `json:"id"`
+	PurchaseOrderID  string  `json:"purchase_order_id"`
+	ProductID        string  `json:"product_id"`
+	ProductName      string  `json:"product_name"`
+	SKU              string  `json:"sku"`
+	Quantity         int32   `json:"quantity"`
+	UnitPrice        float64 `json:"unit_price"`
+	TotalPrice       float64 `json:"total_price"`
+	ReceivedQuantity *int32  `json:"received_quantity"`
 }
 
 type CreatePurchaseOrderRequest struct {
@@ -36,6 +52,7 @@ type CreatePurchaseOrderRequest struct {
 	ExpectedDeliveryDate *time.Time `json:"expected_delivery_date"`
 	Notes                *string    `json:"notes"`
 	CreatedBy            string     `json:"created_by"`
+	WarehouseID          *string    `json:"warehouse_id"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for CreatePurchaseOrderRequest
@@ -92,5 +109,3 @@ type UpdatePurchaseOrderRequest struct {
 	ReceivedDate         *time.Time `json:"received_date"`
 	Notes                *string    `json:"notes"`
 }
-
-

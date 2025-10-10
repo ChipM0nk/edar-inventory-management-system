@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Plus, Package, Search, X } from 'lucide-react'
+import { Plus, Package, Search, X, FileText } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
 import { AppLayout } from '@/components/app-layout'
@@ -61,6 +61,7 @@ const stockInSchema = z.object({
   received_date: z.string().min(1, 'Received date is required'),
   processed_by: z.string().min(1, 'Processed by is required'),
   reference_number: z.string().min(1, 'PO Reference Number is required'),
+  po_date: z.string().min(1, 'PO Date is required'),
   documents: z.array(z.any()).optional(),
   notes: z.string().optional(),
 })
@@ -100,6 +101,7 @@ export default function NewStockMovementPage() {
       received_date: new Date().toISOString().split('T')[0],
       processed_by: user ? user.id : '',
       reference_number: '',
+      po_date: new Date().toISOString().split('T')[0],
       notes: '',
     },
   })
@@ -358,6 +360,10 @@ export default function NewStockMovementPage() {
       return
     }
 
+    console.log('Form data warehouse_id:', data.warehouse_id)
+    console.log('Available warehouses:', warehouses)
+    console.log('Selected warehouse:', warehouses.find(w => w.id === data.warehouse_id))
+
     // Show confirmation dialog first
     setPendingFormData(data)
     setShowConfirmationDialog(true)
@@ -384,10 +390,11 @@ export default function NewStockMovementPage() {
         po_number: data.reference_number,
         supplier_name: selectedSupplierData.name,
         supplier_contact: selectedSupplierData.email,
-        order_date: new Date().toISOString(),
+        order_date: new Date(data.po_date).toISOString(),
         expected_delivery_date: null, // Not available in this form
         notes: data.notes || '',
         created_by: user?.id || '',
+        warehouse_id: data.warehouse_id, // Include warehouse_id
       }
 
       console.log('Creating purchase order:', purchaseOrderData)
@@ -497,170 +504,174 @@ export default function NewStockMovementPage() {
   return (
     <AppLayout>
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">New Purchase Order</h1>
-              <p className="mt-2 text-gray-600">Add new purchase order to your inventory</p>
+        <div className="max-w-7xl mx-auto py-4 sm:px-6 lg:px-8">
+          <div className="px-4 py-4 sm:px-0">
+            <div className="mb-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">New Purchase Order</h1>
+                  <p className="mt-1 text-gray-600">Add new purchase order to your inventory</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">Processed By</p>
+                  <p className="font-medium text-gray-900">
+                    {user ? `${user.first_name} ${user.last_name}` : 'Unknown User'}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                 {/* Basic Information */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Purchase Order Information</CardTitle>
-                    <CardDescription>
-                      Enter the basic information for this purchase order
-                    </CardDescription>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Purchase Order Information</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="supplier_id"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Supplier *</FormLabel>
-                            <Select
-                              value={field.value}
-                              onValueChange={(value) => {
-                                field.onChange(value)
-                                handleSupplierChange(value)
-                              }}
-                            >
+                  <CardContent className="space-y-8">
+                    {/* Main Form Fields */}
+                    <div className="space-y-6">
+                      {/* First Row: PO Reference, PO Date, Received Date, Supplier */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="reference_number"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-semibold text-gray-800 mb-3 block">PO Reference Number *</FormLabel>
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a supplier" />
-                                </SelectTrigger>
+                                <Input
+                                  placeholder="PO-12345"
+                                  className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  {...field}
+                                  onChange={(e) => {
+                                    const upperValue = e.target.value.toUpperCase()
+                                    field.onChange(upperValue)
+                                  }}
+                                />
                               </FormControl>
-                              <SelectContent>
-                                {suppliers.map((supplier) => (
-                                  <SelectItem key={supplier.id} value={supplier.id}>
-                                    {supplier.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                      <FormField
-                        control={form.control}
-                        name="warehouse_id"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Warehouse *</FormLabel>
-                            <Select
-                              value={field.value}
-                              onValueChange={field.onChange}
-                            >
+                        <FormField
+                          control={form.control}
+                          name="po_date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-semibold text-gray-800 mb-3 block">PO Date *</FormLabel>
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a warehouse" />
-                                </SelectTrigger>
+                                <Input 
+                                  type="date" 
+                                  className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500" 
+                                  style={{ width: '100%' }}
+                                  {...field} 
+                                />
                               </FormControl>
-                              <SelectContent>
-                                {warehouses.map((warehouse) => (
-                                  <SelectItem key={warehouse.id} value={warehouse.id}>
-                                    {warehouse.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                      <FormField
-                        control={form.control}
-                        name="received_date"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Received Date *</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                        <FormField
+                          control={form.control}
+                          name="received_date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-semibold text-gray-800 mb-3 block">Received Date *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="date" 
+                                  className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  style={{ width: '100%' }}
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                      <FormField
-                        control={form.control}
-                        name="processed_by"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Processed By *</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Enter processor name"
-                                readOnly
-                                {...field}
-                                value={user ? `${user.first_name} ${user.last_name}` : field.value}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="reference_number"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>PO Reference Number *</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="PO-12345"
-                                {...field}
-                                onChange={(e) => {
-                                  const upperValue = e.target.value.toUpperCase()
-                                  field.onChange(upperValue)
+                        <FormField
+                          control={form.control}
+                          name="supplier_id"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-semibold text-gray-800 mb-3 block">Supplier *</FormLabel>
+                              <Select
+                                value={field.value}
+                                onValueChange={(value) => {
+                                  field.onChange(value)
+                                  handleSupplierChange(value)
                                 }}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                    <SelectValue placeholder="Select a supplier" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {suppliers.map((supplier) => (
+                                    <SelectItem key={supplier.id} value={supplier.id}>
+                                      {supplier.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                      <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-2">
-                            <FormLabel>Notes</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Additional notes..."
-                                rows={3}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                  </div>
+                      {/* Second Row: Warehouse */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="lg:col-span-1">
+                          <FormField
+                            control={form.control}
+                            name="warehouse_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-sm font-semibold text-gray-800 mb-3 block">Warehouse *</FormLabel>
+                                <Select
+                                  value={field.value}
+                                  onValueChange={field.onChange}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                      <SelectValue placeholder="Select a warehouse" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {warehouses.map((warehouse) => (
+                                      <SelectItem key={warehouse.id} value={warehouse.id}>
+                                        {warehouse.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
                 </CardContent>
               </Card>
 
               {/* Products Section */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Products</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Products</CardTitle>
                   <CardDescription>
                     Add products to this purchase order
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {!watchedSupplier ? (
-                    <div className="text-center py-8">
+                    <div className="text-center py-4">
                       <p className="text-gray-500">Select a supplier to add products</p>
                     </div>
                   ) : (
@@ -698,8 +709,8 @@ export default function NewStockMovementPage() {
                             </DialogDescription>
                           </DialogHeader>
                           {isLoadingData ? (
-                            <div className="text-center py-8">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                            <div className="text-center py-4">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
                               <p className="mt-2 text-gray-600">Loading products...</p>
                             </div>
                           ) : (
@@ -877,8 +888,8 @@ export default function NewStockMovementPage() {
               {/* Selected Products Table */}
               {selectedItems.length > 0 && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Selected Products</CardTitle>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Selected Products</CardTitle>
                     <CardDescription>
                       Review and manage the products in this purchase order
                     </CardDescription>
@@ -930,6 +941,33 @@ export default function NewStockMovementPage() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Notes Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Notes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">Additional Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Additional notes..."
+                            rows={3}
+                            className="mt-1 resize-none"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
 
               {/* Document Upload Section */}
               <Card>
@@ -1077,36 +1115,51 @@ export default function NewStockMovementPage() {
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmationDialog} onOpenChange={setShowConfirmationDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Confirm Purchase Order</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-gray-900">Confirm Purchase Order</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Review the details below before creating your purchase order
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
             {/* PO Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-medium text-gray-900 mb-3">Purchase Order Summary</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">PO Reference:</span>
-                  <p className="text-gray-600">{pendingFormData?.reference_number || 'Not specified'}</p>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Package className="h-5 w-5 text-blue-600" />
+                Purchase Order Summary
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                <div className="bg-white p-3 rounded-lg border border-blue-100">
+                  <span className="font-medium text-gray-700 block mb-1">PO Reference:</span>
+                  <p className="text-gray-900 font-mono">{pendingFormData?.reference_number || 'Not specified'}</p>
                 </div>
-                <div>
-                  <span className="font-medium">Processed By:</span>
-                  <p className="text-gray-600">{user ? `${user.first_name} ${user.last_name}` : 'Unknown'}</p>
+                <div className="bg-white p-3 rounded-lg border border-blue-100">
+                  <span className="font-medium text-gray-700 block mb-1">PO Date:</span>
+                  <p className="text-gray-900">{pendingFormData?.po_date || 'Not specified'}</p>
                 </div>
-                <div>
-                  <span className="font-medium">Received Date:</span>
-                  <p className="text-gray-600">{pendingFormData?.received_date}</p>
+                <div className="bg-white p-3 rounded-lg border border-blue-100">
+                  <span className="font-medium text-gray-700 block mb-1">Received Date:</span>
+                  <p className="text-gray-900">{pendingFormData?.received_date}</p>
                 </div>
-                <div>
-                  <span className="font-medium">Total Products:</span>
-                  <p className="text-gray-600">{selectedItems.filter(item => item.selected && item.quantity > 0).length}</p>
+                <div className="bg-white p-3 rounded-lg border border-blue-100">
+                  <span className="font-medium text-gray-700 block mb-1">Total Products:</span>
+                  <p className="text-gray-900 font-semibold">{selectedItems.filter(item => item.selected && item.quantity > 0).length}</p>
                 </div>
-                <div>
-                  <span className="font-medium">Supplier:</span>
-                  <p className="text-gray-600">
+                <div className="bg-white p-3 rounded-lg border border-blue-100">
+                  <span className="font-medium text-gray-700 block mb-1">Supplier:</span>
+                  <p className="text-gray-900">
                     {pendingFormData?.supplier_id 
                       ? suppliers.find(s => s.id === pendingFormData.supplier_id)?.name || 'Unknown Supplier'
+                      : 'Not specified'
+                    }
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-blue-100">
+                  <span className="font-medium text-gray-700 block mb-1">Warehouse:</span>
+                  <p className="text-gray-900">
+                    {pendingFormData?.warehouse_id 
+                      ? warehouses.find(w => w.id === pendingFormData.warehouse_id)?.name || 'Unknown Warehouse'
                       : 'Not specified'
                     }
                   </p>
@@ -1114,47 +1167,104 @@ export default function NewStockMovementPage() {
               </div>
             </div>
 
-            {/* Products List */}
+            {/* Products Table */}
             <div>
-              <h3 className="font-medium text-gray-900 mb-3">Products to Add:</h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {selectedItems.filter(item => item.selected && item.quantity > 0).map((item, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 bg-white border rounded-lg">
-                    <div>
-                      <p className="font-medium">{item.product_name}</p>
-                      <p className="text-sm text-gray-500">{item.product_sku}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">Qty: {item.quantity}</p>
-                      <p className="text-sm text-gray-500">${item.cost_price.toFixed(2)} each</p>
-                      <p className="text-sm font-medium">${(item.quantity * item.cost_price).toFixed(2)} total</p>
-                    </div>
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Package className="h-5 w-5 text-green-600" />
+                Products to Add:
+              </h3>
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-green-50">
+                    <TableRow>
+                      <TableHead className="font-semibold text-gray-900">Product</TableHead>
+                      <TableHead className="font-semibold text-gray-900">SKU</TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-center">Quantity</TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-right">Unit Price</TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedItems.filter(item => item.selected && item.quantity > 0).map((item, index) => (
+                      <TableRow key={index} className="hover:bg-gray-50 transition-colors">
+                        <TableCell className="font-medium text-gray-900">
+                          {item.product_name}
+                        </TableCell>
+                        <TableCell className="font-mono text-gray-600">
+                          {item.product_sku}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {item.quantity}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-gray-700">
+                          ${item.cost_price.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-gray-900">
+                          ${(item.quantity * item.cost_price).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              {/* Total Summary */}
+              <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="flex justify-end">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">Total Items: {selectedItems.filter(item => item.selected && item.quantity > 0).length}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      Grand Total: ${selectedItems
+                        .filter(item => item.selected && item.quantity > 0)
+                        .reduce((sum, item) => sum + (item.quantity * item.cost_price), 0)
+                        .toFixed(2)
+                      }
+                    </p>
                   </div>
-                ))}
+                </div>
               </div>
             </div>
 
             {/* Documents */}
             {uploadedDocuments.length > 0 && (
               <div>
-                <h3 className="font-medium text-gray-900 mb-3">Documents to Upload:</h3>
-                <div className="space-y-1">
-                  {uploadedDocuments.map((file, index) => (
-                    <p key={index} className="text-sm text-gray-600">• {file.name} ({formatFileSize(file.size)})</p>
-                  ))}
+                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-purple-600" />
+                  Documents to Upload:
+                </h3>
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="space-y-2">
+                    {uploadedDocuments.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <FileText className="h-4 w-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{file.name}</p>
+                            <p className="text-sm text-gray-500">{formatFileSize(file.size)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Action Buttons */}
-            <div className="flex justify-end space-x-3 pt-4 border-t">
+            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
               <Button
                 type="button"
                 variant="outline"
+                size="lg"
                 onClick={() => {
                   setShowConfirmationDialog(false)
                   setPendingFormData(null)
                 }}
+                className="px-8"
               >
                 Cancel
               </Button>
@@ -1162,9 +1272,17 @@ export default function NewStockMovementPage() {
                 type="button"
                 onClick={handleConfirmSubmit}
                 disabled={isSubmitting}
-                className="bg-[#52a852] hover:bg-[#4a964a] text-white"
+                size="lg"
+                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-8 shadow-lg hover:shadow-xl transition-all duration-200"
               >
-                {isSubmitting ? 'Creating...' : 'Confirm & Create PO'}
+                {isSubmitting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Creating...
+                  </div>
+                ) : (
+                  'Confirm & Create PO'
+                )}
               </Button>
             </div>
           </div>

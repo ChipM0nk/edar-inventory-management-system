@@ -222,3 +222,15 @@ func UUIDToPgxUUIDPtr(uuid *uuid.UUID) pgtype.UUID {
 	}
 	return pgtype.UUID{Bytes: *uuid, Valid: true}
 }
+
+// Helper function to convert optional string to UUID pointer
+func OptionalStringToUUIDPtr(s *string) *uuid.UUID {
+	if s == nil || *s == "" {
+		return nil
+	}
+	id, err := uuid.Parse(*s)
+	if err != nil {
+		return nil
+	}
+	return &id
+}

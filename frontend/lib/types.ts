@@ -1,5 +1,17 @@
 // Shared types for the application
 
+export interface PurchaseOrderItem {
+  id: string
+  purchase_order_id: string
+  product_id: string
+  product_name: string
+  sku: string
+  quantity: number
+  unit_price: number
+  total_price: number
+  received_quantity?: number
+}
+
 export interface PurchaseOrder {
   id: string
   po_number: string
@@ -21,6 +33,9 @@ export interface PurchaseOrder {
   cancellation_reason?: string
   created_at: string
   updated_at: string
+  items?: PurchaseOrderItem[]
+  warehouse_id?: string
+  warehouse_name?: string
 }
 
 export interface Document {

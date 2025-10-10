@@ -19,7 +19,7 @@ SET status = 'cancelled',
     cancellation_reason = $3,
     updated_at = NOW()
 WHERE id = $1 AND status != 'cancelled'
-RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason
+RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason, warehouse_id
 `
 
 type CancelPurchaseOrderParams struct {
@@ -48,6 +48,7 @@ func (q *Queries) CancelPurchaseOrder(ctx context.Context, arg *CancelPurchaseOr
 		&i.CancelledBy,
 		&i.CancelledAt,
 		&i.CancellationReason,
+		&i.WarehouseID,
 	)
 	return &i, err
 }
@@ -92,9 +93,9 @@ func (q *Queries) CountPurchaseOrdersWithFilter(ctx context.Context, arg *CountP
 }
 
 const CreatePurchaseOrder = `-- name: CreatePurchaseOrder :one
-INSERT INTO purchase_orders (po_number, supplier_name, supplier_contact, order_date, expected_delivery_date, notes, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason
+INSERT INTO purchase_orders (po_number, supplier_name, supplier_contact, order_date, expected_delivery_date, notes, created_by, warehouse_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason, warehouse_id
 `
 
 type CreatePurchaseOrderParams struct {
@@ -105,6 +106,7 @@ type CreatePurchaseOrderParams struct {
 	ExpectedDeliveryDate pgtype.Date `json:"expected_delivery_date"`
 	Notes                *string     `json:"notes"`
 	CreatedBy            pgtype.UUID `json:"created_by"`
+	WarehouseID          pgtype.UUID `json:"warehouse_id"`
 }
 
 func (q *Queries) CreatePurchaseOrder(ctx context.Context, arg *CreatePurchaseOrderParams) (*PurchaseOrder, error) {
@@ -116,6 +118,7 @@ func (q *Queries) CreatePurchaseOrder(ctx context.Context, arg *CreatePurchaseOr
 		arg.ExpectedDeliveryDate,
 		arg.Notes,
 		arg.CreatedBy,
+		arg.WarehouseID,
 	)
 	var i PurchaseOrder
 	err := row.Scan(
@@ -135,15 +138,54 @@ func (q *Queries) CreatePurchaseOrder(ctx context.Context, arg *CreatePurchaseOr
 		&i.CancelledBy,
 		&i.CancelledAt,
 		&i.CancellationReason,
+		&i.WarehouseID,
+	)
+	return &i, err
+}
+
+const CreatePurchaseOrderItem = `-- name: CreatePurchaseOrderItem :one
+INSERT INTO purchase_order_items (purchase_order_id, product_id, quantity, unit_price, total_price)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, purchase_order_id, product_id, quantity, unit_price, total_price, received_quantity, created_at, updated_at
+`
+
+type CreatePurchaseOrderItemParams struct {
+	PurchaseOrderID pgtype.UUID    `json:"purchase_order_id"`
+	ProductID       pgtype.UUID    `json:"product_id"`
+	Quantity        int32          `json:"quantity"`
+	UnitPrice       pgtype.Numeric `json:"unit_price"`
+	TotalPrice      pgtype.Numeric `json:"total_price"`
+}
+
+func (q *Queries) CreatePurchaseOrderItem(ctx context.Context, arg *CreatePurchaseOrderItemParams) (*PurchaseOrderItem, error) {
+	row := q.db.QueryRow(ctx, CreatePurchaseOrderItem,
+		arg.PurchaseOrderID,
+		arg.ProductID,
+		arg.Quantity,
+		arg.UnitPrice,
+		arg.TotalPrice,
+	)
+	var i PurchaseOrderItem
+	err := row.Scan(
+		&i.ID,
+		&i.PurchaseOrderID,
+		&i.ProductID,
+		&i.Quantity,
+		&i.UnitPrice,
+		&i.TotalPrice,
+		&i.ReceivedQuantity,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
 const GetPurchaseOrder = `-- name: GetPurchaseOrder :one
-SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
+SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, po.warehouse_id, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name, w.name as warehouse_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
 LEFT JOIN users cu ON po.cancelled_by = cu.id
+LEFT JOIN warehouses w ON po.warehouse_id = w.id
 WHERE po.id = $1
 `
 
@@ -164,10 +206,12 @@ type GetPurchaseOrderRow struct {
 	CancelledBy          pgtype.UUID        `json:"cancelled_by"`
 	CancelledAt          pgtype.Timestamptz `json:"cancelled_at"`
 	CancellationReason   *string            `json:"cancellation_reason"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
 	FirstName            string             `json:"first_name"`
 	LastName             string             `json:"last_name"`
 	CancelledByFirstName *string            `json:"cancelled_by_first_name"`
 	CancelledByLastName  *string            `json:"cancelled_by_last_name"`
+	WarehouseName        *string            `json:"warehouse_name"`
 }
 
 func (q *Queries) GetPurchaseOrder(ctx context.Context, id pgtype.UUID) (*GetPurchaseOrderRow, error) {
@@ -190,10 +234,12 @@ func (q *Queries) GetPurchaseOrder(ctx context.Context, id pgtype.UUID) (*GetPur
 		&i.CancelledBy,
 		&i.CancelledAt,
 		&i.CancellationReason,
+		&i.WarehouseID,
 		&i.FirstName,
 		&i.LastName,
 		&i.CancelledByFirstName,
 		&i.CancelledByLastName,
+		&i.WarehouseName,
 	)
 	return &i, err
 }
@@ -318,10 +364,11 @@ func (q *Queries) GetPurchaseOrderStockMovements(ctx context.Context, referenceI
 }
 
 const ListPurchaseOrders = `-- name: ListPurchaseOrders :many
-SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
+SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, po.warehouse_id, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name, w.name as warehouse_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
 LEFT JOIN users cu ON po.cancelled_by = cu.id
+LEFT JOIN warehouses w ON po.warehouse_id = w.id
 ORDER BY po.order_date DESC, po.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -348,10 +395,12 @@ type ListPurchaseOrdersRow struct {
 	CancelledBy          pgtype.UUID        `json:"cancelled_by"`
 	CancelledAt          pgtype.Timestamptz `json:"cancelled_at"`
 	CancellationReason   *string            `json:"cancellation_reason"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
 	FirstName            string             `json:"first_name"`
 	LastName             string             `json:"last_name"`
 	CancelledByFirstName *string            `json:"cancelled_by_first_name"`
 	CancelledByLastName  *string            `json:"cancelled_by_last_name"`
+	WarehouseName        *string            `json:"warehouse_name"`
 }
 
 func (q *Queries) ListPurchaseOrders(ctx context.Context, arg *ListPurchaseOrdersParams) ([]*ListPurchaseOrdersRow, error) {
@@ -380,10 +429,12 @@ func (q *Queries) ListPurchaseOrders(ctx context.Context, arg *ListPurchaseOrder
 			&i.CancelledBy,
 			&i.CancelledAt,
 			&i.CancellationReason,
+			&i.WarehouseID,
 			&i.FirstName,
 			&i.LastName,
 			&i.CancelledByFirstName,
 			&i.CancelledByLastName,
+			&i.WarehouseName,
 		); err != nil {
 			return nil, err
 		}
@@ -396,10 +447,11 @@ func (q *Queries) ListPurchaseOrders(ctx context.Context, arg *ListPurchaseOrder
 }
 
 const ListPurchaseOrdersWithFilter = `-- name: ListPurchaseOrdersWithFilter :many
-SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name
+SELECT po.id, po.po_number, po.supplier_name, po.supplier_contact, po.total_amount, po.status, po.order_date, po.expected_delivery_date, po.received_date, po.notes, po.created_by, po.created_at, po.updated_at, po.cancelled_by, po.cancelled_at, po.cancellation_reason, po.warehouse_id, u.first_name, u.last_name, cu.first_name as cancelled_by_first_name, cu.last_name as cancelled_by_last_name, w.name as warehouse_name
 FROM purchase_orders po
 JOIN users u ON po.created_by = u.id
 LEFT JOIN users cu ON po.cancelled_by = cu.id
+LEFT JOIN warehouses w ON po.warehouse_id = w.id
 WHERE ($1::text IS NULL OR po.status = $1)
   AND ($2::text IS NULL OR po.supplier_name ILIKE '%' || $2 || '%')
   AND ($3::date IS NULL OR po.order_date >= $3)
@@ -434,10 +486,12 @@ type ListPurchaseOrdersWithFilterRow struct {
 	CancelledBy          pgtype.UUID        `json:"cancelled_by"`
 	CancelledAt          pgtype.Timestamptz `json:"cancelled_at"`
 	CancellationReason   *string            `json:"cancellation_reason"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
 	FirstName            string             `json:"first_name"`
 	LastName             string             `json:"last_name"`
 	CancelledByFirstName *string            `json:"cancelled_by_first_name"`
 	CancelledByLastName  *string            `json:"cancelled_by_last_name"`
+	WarehouseName        *string            `json:"warehouse_name"`
 }
 
 func (q *Queries) ListPurchaseOrdersWithFilter(ctx context.Context, arg *ListPurchaseOrdersWithFilterParams) ([]*ListPurchaseOrdersWithFilterRow, error) {
@@ -473,10 +527,12 @@ func (q *Queries) ListPurchaseOrdersWithFilter(ctx context.Context, arg *ListPur
 			&i.CancelledBy,
 			&i.CancelledAt,
 			&i.CancellationReason,
+			&i.WarehouseID,
 			&i.FirstName,
 			&i.LastName,
 			&i.CancelledByFirstName,
 			&i.CancelledByLastName,
+			&i.WarehouseName,
 		); err != nil {
 			return nil, err
 		}
@@ -492,7 +548,7 @@ const UpdatePurchaseOrder = `-- name: UpdatePurchaseOrder :one
 UPDATE purchase_orders
 SET supplier_name = $2, supplier_contact = $3, status = $4, expected_delivery_date = $5, received_date = $6, notes = $7, updated_at = NOW()
 WHERE id = $1
-RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason
+RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason, warehouse_id
 `
 
 type UpdatePurchaseOrderParams struct {
@@ -533,6 +589,7 @@ func (q *Queries) UpdatePurchaseOrder(ctx context.Context, arg *UpdatePurchaseOr
 		&i.CancelledBy,
 		&i.CancelledAt,
 		&i.CancellationReason,
+		&i.WarehouseID,
 	)
 	return &i, err
 }
@@ -541,7 +598,7 @@ const UpdatePurchaseOrderTotal = `-- name: UpdatePurchaseOrderTotal :one
 UPDATE purchase_orders
 SET total_amount = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason
+RETURNING id, po_number, supplier_name, supplier_contact, total_amount, status, order_date, expected_delivery_date, received_date, notes, created_by, created_at, updated_at, cancelled_by, cancelled_at, cancellation_reason, warehouse_id
 `
 
 type UpdatePurchaseOrderTotalParams struct {
@@ -569,6 +626,7 @@ func (q *Queries) UpdatePurchaseOrderTotal(ctx context.Context, arg *UpdatePurch
 		&i.CancelledBy,
 		&i.CancelledAt,
 		&i.CancellationReason,
+		&i.WarehouseID,
 	)
 	return &i, err
 }

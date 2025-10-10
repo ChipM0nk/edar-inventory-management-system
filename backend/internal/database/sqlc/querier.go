@@ -33,6 +33,7 @@ type Querier interface {
 	CreateDocument(ctx context.Context, arg *CreateDocumentParams) (*Document, error)
 	CreateProduct(ctx context.Context, arg *CreateProductParams) (*Product, error)
 	CreatePurchaseOrder(ctx context.Context, arg *CreatePurchaseOrderParams) (*PurchaseOrder, error)
+	CreatePurchaseOrderItem(ctx context.Context, arg *CreatePurchaseOrderItemParams) (*PurchaseOrderItem, error)
 	CreateSalesOrder(ctx context.Context, arg *CreateSalesOrderParams) (*SalesOrder, error)
 	CreateStockLevel(ctx context.Context, arg *CreateStockLevelParams) (*StockLevel, error)
 	CreateStockMovement(ctx context.Context, arg *CreateStockMovementParams) (*StockMovement, error)

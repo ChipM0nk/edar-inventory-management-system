@@ -38,6 +38,7 @@ func (s *PurchaseOrderService) CreatePurchaseOrder(req models.CreatePurchaseOrde
 		ExpectedDeliveryDate: utils.TimeToPgxDatePtr(expectedDeliveryDate),
 		Notes:                req.Notes,
 		CreatedBy:            utils.UUIDToPgxUUID(uuid.MustParse(req.CreatedBy)),
+		WarehouseID:          utils.OptionalUUIDToPgxUUID(utils.OptionalStringToUUIDPtr(req.WarehouseID)),
 	})
 	if err != nil {
 		return nil, err
@@ -102,6 +103,16 @@ func (s *PurchaseOrderService) GetPurchaseOrder(id string) (*models.PurchaseOrde
 		fmt.Printf("  CancelledBy is not valid, leaving fields as nil\n")
 	}
 
+	// Get purchase order items
+	items, err := s.GetPurchaseOrderItems(id)
+	if err != nil {
+		fmt.Printf("Warning: Failed to get purchase order items: %v\n", err)
+		// Don't fail the entire operation, just set empty items
+		items = []models.PurchaseOrderItem{}
+	}
+
+	// Warehouse information is now stored directly in the purchase order
+
 	result := &models.PurchaseOrder{
 		ID:                   utils.PgxUUIDToUUID(po.ID).String(),
 		PoNumber:             po.PoNumber,
@@ -123,6 +134,15 @@ func (s *PurchaseOrderService) GetPurchaseOrder(id string) (*models.PurchaseOrde
 		CancellationReason:   po.CancellationReason,
 		CreatedAt:            utils.PgxTimestamptzToTime(po.CreatedAt),
 		UpdatedAt:            utils.PgxTimestamptzToTime(po.UpdatedAt),
+		Items:                items, // Include items in the response
+		WarehouseID: func() *string {
+			if po.WarehouseID.Valid {
+				id := utils.PgxUUIDToUUID(po.WarehouseID).String()
+				return &id
+			}
+			return nil
+		}(),
+		WarehouseName: po.WarehouseName,
 	}
 
 	// Log the final result
@@ -204,6 +224,14 @@ func (s *PurchaseOrderService) ListPurchaseOrders(limit, offset int32) ([]models
 			CancellationReason:   po.CancellationReason,
 			CreatedAt:            utils.PgxTimestamptzToTime(po.CreatedAt),
 			UpdatedAt:            utils.PgxTimestamptzToTime(po.UpdatedAt),
+			WarehouseID: func() *string {
+				if po.WarehouseID.Valid {
+					id := utils.PgxUUIDToUUID(po.WarehouseID).String()
+					return &id
+				}
+				return nil
+			}(),
+			WarehouseName: po.WarehouseName,
 		}
 
 		// Log the final result for this PO
@@ -246,6 +274,37 @@ func (s *PurchaseOrderService) UpdatePurchaseOrder(id string, req models.UpdateP
 		CreatedAt:            utils.PgxTimestamptzToTime(po.CreatedAt),
 		UpdatedAt:            utils.PgxTimestamptzToTime(po.UpdatedAt),
 	}, nil
+}
+
+// GetPurchaseOrderItems returns items for a given purchase order
+func (s *PurchaseOrderService) GetPurchaseOrderItems(id string) ([]models.PurchaseOrderItem, error) {
+	ctx := context.Background()
+	poID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.GetPurchaseOrderItems(ctx, utils.UUIDToPgxUUID(poID))
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]models.PurchaseOrderItem, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, models.PurchaseOrderItem{
+			ID:               utils.PgxUUIDToUUID(r.ID).String(),
+			PurchaseOrderID:  utils.PgxUUIDToUUID(r.PurchaseOrderID).String(),
+			ProductID:        utils.PgxUUIDToUUID(r.ProductID).String(),
+			ProductName:      r.ProductName,
+			SKU:              r.Sku,
+			Quantity:         r.Quantity,
+			UnitPrice:        utils.PgxNumericToFloat64(r.UnitPrice),
+			TotalPrice:       utils.PgxNumericToFloat64(r.TotalPrice),
+			ReceivedQuantity: r.ReceivedQuantity,
+		})
+	}
+
+	return items, nil
 }
 
 func (s *PurchaseOrderService) CancelPurchaseOrder(id string, reason string, userID uuid.UUID) (*models.PurchaseOrder, error) {

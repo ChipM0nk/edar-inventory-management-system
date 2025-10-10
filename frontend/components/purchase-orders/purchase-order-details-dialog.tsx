@@ -32,46 +32,15 @@ import {
   Hash, 
   Building, 
   Clock, 
-  Trash2, 
+  Trash2,
+  Warehouse, 
   FileImage
 } from 'lucide-react'
 import { getStatusDisplayText } from '@/lib/utils'
 import api from '@/lib/api'
 import { DocumentsSection } from '@/components/documents'
 import { useNotice } from '@/hooks/use-notice'
-import { PurchaseOrder as GlobalPurchaseOrder } from '@/lib/types'
-
-interface PurchaseOrderProduct {
-  product_id: string
-  product_name: string
-  product_sku: string
-  quantity: number
-  cost_price: number
-  total_amount: number
-  warehouse_name: string
-}
-
-interface PurchaseOrder {
-  id?: string
-  reference_id: string
-  reference_number?: string
-  reference_type: string
-  status?: 'received' | 'cancelled'
-  total_quantity: number
-  total_amount: number
-  processed_by: string
-  processed_date: string
-  created_at: string
-  supplier_name?: string
-  cancelled_by?: string
-  cancelled_by_first_name?: string
-  cancelled_by_last_name?: string
-  cancelled_at?: string
-  cancellation_reason?: string
-  products: PurchaseOrderProduct[]
-}
-
-// Document type and UI handled by DocumentsSection
+import { PurchaseOrder as GlobalPurchaseOrder, PurchaseOrderItem } from '@/lib/types'
 
 interface PurchaseOrderDetailsDialogProps {
   order: GlobalPurchaseOrder | null
@@ -86,6 +55,8 @@ export function PurchaseOrderDetailsDialog({
   onClose,
   onOrderUpdated 
 }: PurchaseOrderDetailsDialogProps) {
+  // Use items from the order object directly
+  const items = order?.items || []
   // Documents handled by DocumentsSection
   
   // Cancel confirmation state
@@ -174,7 +145,7 @@ export function PurchaseOrderDetailsDialog({
     try {
       setIsCancelling(true)
       
-      await api.post(`/purchase-orders/${order.reference_id}/cancel`, {
+      await api.post(`/purchase-orders/${order.id}/cancel`, {
         reason: cancellationReason
       })
       
@@ -222,15 +193,15 @@ export function PurchaseOrderDetailsDialog({
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Purchase Order Details
-              {order.status === 'cancelled' && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  CANCELLED
+              {order.received_date && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Received: {formatDate(order.received_date)}
                 </span>
               )}
-              {order.status === 'received' && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  COMPLETED
-            </span>
+              {!order.received_date && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  Not Received
+                </span>
               )}
           </DialogTitle>
             <DialogDescription>
@@ -301,23 +272,15 @@ export function PurchaseOrderDetailsDialog({
                       <Hash className="h-4 w-4 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium">Reference ID</p>
-                        <p className="text-sm text-gray-600 font-mono">{order.reference_number || order.reference_id}</p>
+                        <p className="text-sm text-gray-600 font-mono">{order.po_number || 'N/A'}</p>
                   </div>
                 </div>
                     <div className="flex items-center gap-3">
-                      <div className="h-4 w-4 flex items-center justify-center">
-                        <div className={`w-3 h-3 rounded-full ${
-                          order.status === 'cancelled' 
-                            ? 'bg-red-500' 
-                            : order.status === 'received'
-                            ? 'bg-green-500'
-                            : 'bg-gray-500'
-                        }`}></div>
-                      </div>
+                      <Calendar className="h-4 w-4 text-gray-500" />
                       <div>
-                        <p className="text-sm font-medium">Status</p>
-                        <p className="text-sm text-gray-600 capitalize">
-                          {getStatusDisplayText(order.status)}
+                        <p className="text-sm font-medium">Received Date</p>
+                        <p className="text-sm text-gray-600">
+                          {order.received_date ? formatDate(order.received_date) : 'Not received'}
                         </p>
                   </div>
                 </div>
@@ -325,14 +288,14 @@ export function PurchaseOrderDetailsDialog({
                       <Calendar className="h-4 w-4 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium">Purchase Date</p>
-                        <p className="text-sm text-gray-600">{formatDate(order.processed_date)}</p>
+                        <p className="text-sm text-gray-600">{order.order_date ? formatDate(order.order_date) : 'N/A'}</p>
                   </div>
                 </div>
                     <div className="flex items-center gap-3">
                       <User className="h-4 w-4 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium">Processed By</p>
-                        <p className="text-sm text-gray-600">{order.processed_by}</p>
+                        <p className="text-sm text-gray-600">{order.created_by_first_name && order.created_by_last_name ? `${order.created_by_first_name} ${order.created_by_last_name}` : 'Unknown'}</p>
                   </div>
                 </div>
                     <div className="flex items-center gap-3">
@@ -349,6 +312,16 @@ export function PurchaseOrderDetailsDialog({
                         <p className="text-sm text-gray-600">{order.supplier_name || 'Not specified'}</p>
                       </div>
                     </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <Warehouse className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm font-medium">Warehouse</p>
+                        <p className="text-sm text-gray-600">
+                          {order.warehouse_name || 'Not specified'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -362,30 +335,23 @@ export function PurchaseOrderDetailsDialog({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-2 mb-2">
-                        <Package className="h-5 w-5 text-blue-500" />
-                        <p className="text-sm font-medium text-gray-600">Total Quantity</p>
-                      </div>
-                      <p className="text-2xl font-bold text-green-600">{order.total_quantity}</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-2 mb-2">
                         <DollarSign className="h-5 w-5 text-green-500" />
                         <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                  </div>
+                      </div>
                       <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.total_amount)}</p>
                     </div>
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-2 mb-2">
-                        <Package2 className="h-5 w-5 text-purple-500" />
-                        <p className="text-sm font-medium text-gray-600">Products</p>
-                  </div>
-                      <p className="text-2xl font-bold text-purple-600">{order.products.length}</p>
+                        <Calendar className="h-5 w-5 text-blue-500" />
+                        <p className="text-sm font-medium text-gray-600">Received Date</p>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-700">{order.received_date ? formatDate(order.received_date) : '-'}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Products Table */}
+              {/* Products Table - load from API */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Products</CardTitle>
@@ -397,28 +363,34 @@ export function PurchaseOrderDetailsDialog({
                         <TableRow>
                           <TableHead>Product</TableHead>
                           <TableHead>SKU</TableHead>
-                          <TableHead>Warehouse</TableHead>
                           <TableHead>Quantity</TableHead>
                           <TableHead>Unit Price</TableHead>
                           <TableHead>Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {order.products.map((product, index) => (
-                          <TableRow key={index}>
-                            <TableCell className="font-medium">{product.product_name}</TableCell>
-                            <TableCell className="font-mono text-sm">{product.product_sku}</TableCell>
-                            <TableCell className="text-sm">{product.warehouse_name}</TableCell>
-                            <TableCell className="font-medium">{product.quantity}</TableCell>
-                            <TableCell className="font-mono text-sm">{formatCurrency(product.cost_price)}</TableCell>
-                            <TableCell className="font-mono text-sm font-medium">{formatCurrency(product.total_amount)}</TableCell>
+                        {items.length > 0 ? (
+                          items.map((product, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium">{product.product_name}</TableCell>
+                              <TableCell className="font-mono text-sm">{product.sku}</TableCell>
+                              <TableCell className="font-medium">{product.quantity}</TableCell>
+                              <TableCell className="font-mono text-sm">{formatCurrency(product.unit_price)}</TableCell>
+                              <TableCell className="font-mono text-sm font-medium">{formatCurrency(product.total_price)}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={5} className="h-24 text-center text-gray-500">
+                              No products found for this purchase order.
+                            </TableCell>
                           </TableRow>
-                        ))}
+                        )}
                       </TableBody>
                     </Table>
-              </div>
-            </CardContent>
-          </Card>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Documents Section (reusable) */}
               <DocumentsSection

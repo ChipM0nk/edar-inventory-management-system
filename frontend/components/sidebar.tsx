@@ -96,7 +96,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       items: [
         {
           name: 'Purchase Orders',
-          href: '/inventory/purchase',
+          href: '/orders/purchase',
           icon: FileText,
         },
         {

@@ -59,7 +59,7 @@ export function Navigation() {
             <Link href="/inventory/stock-history">
               <Button variant="ghost">Stock History</Button>
             </Link>
-            <Link href="/inventory/purchase">
+            <Link href="/orders/purchase">
               <Button variant="ghost">Purchase Orders</Button>
             </Link>
             <Link href="/inventory/adjustments">
