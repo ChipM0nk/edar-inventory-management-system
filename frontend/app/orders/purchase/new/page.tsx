@@ -104,10 +104,10 @@ export default function NewStockMovementPage() {
     defaultValues: {
       supplier_id: '',
       warehouse_id: '',
-      received_date: new Date().toISOString().split('T')[0],
+      received_date: '',
       processed_by: user ? user.id : '',
       reference_number: '',
-      po_date: new Date().toISOString().split('T')[0],
+      po_date: '',
       notes: '',
     },
   })
@@ -1167,175 +1167,209 @@ export default function NewStockMovementPage() {
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmationDialog} onOpenChange={setShowConfirmationDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-gray-900">Confirm Purchase Order</DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Review the details below before creating your purchase order
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6">
-            {/* PO Summary */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Package className="h-5 w-5 text-blue-600" />
-                Purchase Order Summary
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <div className="bg-white p-3 rounded-lg border border-blue-100">
-                  <span className="font-medium text-gray-700 block mb-1">PO Reference:</span>
-                  <p className="text-gray-900 font-mono">{pendingFormData?.reference_number || 'Not specified'}</p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-blue-100">
-                  <span className="font-medium text-gray-700 block mb-1">PO Date:</span>
-                  <p className="text-gray-900">{pendingFormData?.po_date || 'Not specified'}</p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-blue-100">
-                  <span className="font-medium text-gray-700 block mb-1">Received Date:</span>
-                  <p className="text-gray-900">{pendingFormData?.received_date}</p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-blue-100">
-                  <span className="font-medium text-gray-700 block mb-1">Total Products:</span>
-                  <p className="text-gray-900 font-semibold">{selectedItems.filter(item => item.selected && item.quantity > 0).length}</p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-blue-100">
-                  <span className="font-medium text-gray-700 block mb-1">Supplier:</span>
-                  <p className="text-gray-900">
-                    {pendingFormData?.supplier_id 
-                      ? suppliers.find(s => s.id === pendingFormData.supplier_id)?.name || 'Unknown Supplier'
-                      : 'Not specified'
-                    }
-                  </p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-blue-100">
-                  <span className="font-medium text-gray-700 block mb-1">Warehouse:</span>
-                  <p className="text-gray-900">
-                    {pendingFormData?.warehouse_id 
-                      ? warehouses.find(w => w.id === pendingFormData.warehouse_id)?.name || 'Unknown Warehouse'
-                      : 'Not specified'
-                    }
-                  </p>
+        <DialogContent className="w-[95vw] max-w-5xl max-h-[85vh] overflow-hidden flex flex-col [&>button]:hidden">
+          <DialogHeader className="sticky top-0 bg-white z-50 border-b border-gray-300 pb-2 mb-2 shadow-sm flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                  <div className="w-6 h-6 bg-amber-100 rounded-md flex items-center justify-center">
+                    <Package className="h-4 w-4 text-amber-600" />
+                  </div>
+                  Confirm Purchase Order
+                </DialogTitle>
+                <DialogDescription className="text-gray-600 mt-1 text-sm">
+                  Review the details below before creating your purchase order
+                </DialogDescription>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
+                  <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                  Review Mode
                 </div>
               </div>
             </div>
-
-            {/* Products Table */}
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Package className="h-5 w-5 text-green-600" />
-                Products to Add:
-              </h3>
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-green-50">
-                    <TableRow>
-                      <TableHead className="font-semibold text-gray-900">Product</TableHead>
-                      <TableHead className="font-semibold text-gray-900">SKU</TableHead>
-                      <TableHead className="font-semibold text-gray-900 text-center">Quantity</TableHead>
-                      <TableHead className="font-semibold text-gray-900 text-right">Unit Price</TableHead>
-                      <TableHead className="font-semibold text-gray-900 text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedItems.filter(item => item.selected && item.quantity > 0).map((item, index) => (
-                      <TableRow key={index} className="hover:bg-gray-50 transition-colors">
-                        <TableCell className="font-medium text-gray-900">
-                          {item.product_name}
-                        </TableCell>
-                        <TableCell className="font-mono text-gray-600">
-                          {item.product_sku}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {item.quantity}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-gray-700">
-                          ${item.cost_price.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-gray-900">
-                          ${(item.quantity * item.cost_price).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              
-              {/* Total Summary */}
-              <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <div className="flex justify-end">
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600">Total Items: {selectedItems.filter(item => item.selected && item.quantity > 0).length}</p>
-                    <p className="text-lg font-semibold text-gray-900">
-                      Grand Total: ${selectedItems
-                        .filter(item => item.selected && item.quantity > 0)
-                        .reduce((sum, item) => sum + (item.quantity * item.cost_price), 0)
-                        .toFixed(2)
-                      }
-                    </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden relative z-10">
+            <div className="space-y-6 p-1">
+              {/* Order Overview - Simplified without card */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 border-b border-gray-200 pb-1">
+                  <Package className="h-5 w-5" />
+                  Purchase Order Summary
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">PO Reference</span>
+                      <span className="text-gray-900 font-mono">: {pendingFormData?.reference_number || 'Not specified'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">PO Date</span>
+                      <span className="text-gray-900">: {pendingFormData?.po_date || 'Not specified'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Received Date</span>
+                      <span className="text-gray-900">: {pendingFormData?.received_date || 'Not specified'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Total Products</span>
+                      <span className="text-gray-900">: {selectedItems.filter(item => item.selected && item.quantity > 0).length}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Supplier</span>
+                      <span className="text-gray-900">: {pendingFormData?.supplier_id 
+                        ? suppliers.find(s => s.id === pendingFormData.supplier_id)?.name || 'Unknown Supplier'
+                        : 'Not specified'
+                      }</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Warehouse</span>
+                      <span className="text-gray-900">: {pendingFormData?.warehouse_id 
+                        ? warehouses.find(w => w.id === pendingFormData.warehouse_id)?.name || 'Unknown Warehouse'
+                        : 'Not specified'
+                      }</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Documents */}
-            {uploadedDocuments.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-purple-600" />
-                  Documents to Upload:
-                </h3>
-                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                  <div className="space-y-2">
+              {/* Products Table - Enhanced visibility */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 border-b border-gray-200 pb-1">
+                  <Package className="h-5 w-5" />
+                  Products ({selectedItems.filter(item => item.selected && item.quantity > 0).length})
+                </div>
+                <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm overflow-x-auto">
+                  <Table className="min-w-full">
+                    <TableHeader className="bg-gray-100">
+                      <TableRow className="border-b border-gray-300">
+                        <TableHead className="font-semibold text-gray-900 text-left py-2 px-3 text-xs">Product Name</TableHead>
+                        <TableHead className="font-semibold text-gray-900 text-left py-2 px-3 text-xs">SKU</TableHead>
+                        <TableHead className="font-semibold text-gray-900 text-center py-2 px-3 text-xs">Qty</TableHead>
+                        <TableHead className="font-semibold text-gray-900 text-right py-2 px-3 text-xs">Unit Price</TableHead>
+                        <TableHead className="font-semibold text-gray-900 text-right py-2 px-3 text-xs">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedItems.filter(item => item.selected && item.quantity > 0).length > 0 ? (
+                        selectedItems.filter(item => item.selected && item.quantity > 0).map((item, index) => (
+                          <TableRow 
+                            key={index} 
+                            className={`border-b border-gray-200 ${
+                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                            }`}
+                          >
+                            <TableCell className="py-2 px-3 text-sm">
+                              <span className="font-medium text-gray-900">
+                                {item.product_name}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-2 px-3 text-sm">
+                              <span className="font-mono text-gray-600 text-xs">
+                                {item.product_sku}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-2 px-3 text-center text-sm">
+                              <span className="font-medium text-gray-900">
+                                {item.quantity}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-2 px-3 text-right text-sm">
+                              <span className="font-mono text-gray-900 text-xs">
+                                ${item.cost_price.toFixed(2)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-2 px-3 text-right text-sm">
+                              <span className="font-mono font-semibold text-gray-900 text-xs">
+                                ${(item.quantity * item.cost_price).toFixed(2)}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="h-16 text-center text-sm text-gray-500">
+                            No products selected for this purchase order.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                  
+                  {/* Total Amount - Inline */}
+                  {selectedItems.filter(item => item.selected && item.quantity > 0).length > 0 && (
+                    <div className="bg-white border-t border-gray-300 px-3 py-2">
+                      <div className="flex justify-end">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-600">Total:</span>
+                          <span className="text-base font-bold text-gray-900">
+                            ${selectedItems
+                              .filter(item => item.selected && item.quantity > 0)
+                              .reduce((sum, item) => sum + (item.quantity * item.cost_price), 0)
+                              .toFixed(2)
+                            }
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Documents Section - Compact with Actions */}
+              {uploadedDocuments.length > 0 && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-base font-semibold text-gray-900 border-b border-gray-200 pb-1">
+                    <FileText className="h-4 w-4" />
+                    Documents ({uploadedDocuments.length})
+                  </div>
+                  <div className="space-y-0.5">
                     {uploadedDocuments.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <FileText className="h-4 w-4 text-purple-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{file.name}</p>
-                            <p className="text-sm text-gray-500">{formatFileSize(file.size)}</p>
+                      <div key={index} className="flex items-center justify-between p-2 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-2 flex-1">
+                          <FileText className="h-4 w-4 text-green-500" />
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900 text-sm">{file.name}</p>
+                            <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                onClick={() => {
-                  setShowConfirmationDialog(false)
-                  setPendingFormData(null)
-                }}
-                className="px-8"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleConfirmSubmit}
-                disabled={isSubmitting}
-                size="lg"
-                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-8 shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Creating...
-                  </div>
-                ) : (
-                  'Confirm & Create PO'
-                )}
-              </Button>
+              {/* Action Buttons - Report Style */}
+              <div className="flex justify-center items-center pt-4 border-t border-gray-300 bg-gray-50 -mx-6 px-6 py-3">
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={() => {
+                      setShowConfirmationDialog(false)
+                      setPendingFormData(null)
+                    }}
+                    className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow hover:shadow-md transition-all duration-200 flex items-center gap-2 text-sm"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleConfirmSubmit}
+                    disabled={isSubmitting}
+                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow hover:shadow-md transition-all duration-200 flex items-center gap-2 text-sm"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Creating...
+                      </>
+                    ) : (
+                      'Confirm & Create PO'
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </DialogContent>
