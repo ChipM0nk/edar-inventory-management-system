@@ -24,15 +24,11 @@ import {
   User,
   Hash,
   FileText,
-  Upload,
-  X,
-  Eye,
-  File,
-  FileImage,
   Trash2
 } from 'lucide-react'
 import api from '@/lib/api'
 import { useNotice } from '@/hooks/use-notice'
+import { DocumentsSection } from '@/components/documents'
 
 interface AdjustmentItem {
   product_id: string
@@ -45,16 +41,6 @@ interface AdjustmentItem {
   reason: string
 }
 
-interface Document {
-  id: string
-  reference_type: string
-  reference_id: string
-  file_name: string
-  file_path: string
-  file_size: number
-  file_type: string
-  uploaded_at: string
-}
 
 interface Adjustment {
   id: string
@@ -85,12 +71,6 @@ export function AdjustmentDetailsDialog({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [fullAdjustment, setFullAdjustment] = useState<Adjustment | null>(null)
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
-  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
-  const [documentUrl, setDocumentUrl] = useState<string | null>(null)
   
   // Cancel functionality state
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -101,7 +81,6 @@ export function AdjustmentDetailsDialog({
   useEffect(() => {
     if (isOpen && adjustment) {
       loadAdjustmentDetails()
-      loadDocuments()
     }
   }, [isOpen, adjustment])
 
@@ -147,20 +126,6 @@ export function AdjustmentDetailsDialog({
     }
   }
 
-  const loadDocuments = async () => {
-    if (!adjustment) return
-    
-    try {
-      setIsLoadingDocuments(true)
-      const response = await api.get(`/documents/by-reference/adjustment/${adjustment.id}`)
-      setDocuments(response.data || [])
-    } catch (error) {
-      console.error('Error loading documents:', error)
-      setDocuments([])
-    } finally {
-      setIsLoadingDocuments(false)
-    }
-  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -182,130 +147,10 @@ export function AdjustmentDetailsDialog({
     })
   }
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
 
-  const getFileIcon = (fileType: string) => {
-    const type = fileType.toLowerCase()
-    if (type.includes('image')) {
-      return <FileImage className="w-5 h-5 text-green-500" />
-    } else if (type.includes('pdf')) {
-      return <File className="w-5 h-5 text-red-500" />
-    } else {
-      return <FileText className="w-5 h-5 text-gray-400" />
-    }
-  }
 
-  const isViewable = (fileType: string) => {
-    const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
-    return viewableTypes.includes(fileType.toLowerCase())
-  }
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || [])
-    setUploadedFiles(prev => [...prev, ...files])
-  }
 
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const uploadDocuments = async () => {
-    if (!adjustment || uploadedFiles.length === 0) return
-
-    try {
-      setIsUploadingDocuments(true)
-      const formData = new FormData()
-      
-      uploadedFiles.forEach((file) => {
-        formData.append('documents', file)
-      })
-      formData.append('reference_type', 'adjustment')
-      formData.append('reference_id', adjustment.id)
-
-      await api.post('/documents/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-
-      await loadDocuments()
-      setUploadedFiles([])
-      setShowDocumentUpload(false)
-      
-      await notice({
-        title: 'Upload complete',
-        description: 'Documents uploaded successfully!',
-        variant: 'success',
-      })
-    } catch (error) {
-      console.error('Error uploading documents:', error)
-      await notice({
-        title: 'Upload failed',
-        description: 'Error uploading documents. Please try again.',
-        variant: 'warning',
-      })
-    } finally {
-      setIsUploadingDocuments(false)
-    }
-  }
-
-  const viewDocument = async (document: Document) => {
-    try {
-      if (!isViewable(document.file_type)) {
-        await notice({
-          title: 'Cannot preview file',
-          description: `This file type (${document.file_type}) cannot be viewed in the browser. Please download it instead.`,
-          variant: 'info',
-        })
-        return
-      }
-      
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      const blob = new Blob([response.data], { type: document.file_type })
-      const url = window.URL.createObjectURL(blob)
-      setDocumentUrl(url)
-    } catch (error: any) {
-      console.error('Error viewing document:', error)
-      await notice({
-        title: 'View failed',
-        description: 'Error viewing document. Please try again.',
-        variant: 'warning',
-      })
-    }
-  }
-
-  const downloadDocument = async (document: Document) => {
-    try {
-      const response = await api.get(`/documents/${document.id}/download`, {
-        responseType: 'blob'
-      })
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = window.document.createElement('a')
-      link.href = url
-      link.setAttribute('download', document.file_name)
-      window.document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error downloading document:', error)
-      await notice({
-        title: 'Download failed',
-        description: 'Error downloading document. Please try again.',
-        variant: 'warning',
-      })
-    }
-  }
 
   // Handle cancel adjustment
   const handleCancelAdjustment = async () => {
@@ -354,10 +199,6 @@ export function AdjustmentDetailsDialog({
 
   const handleClose = () => {
     setFullAdjustment(null)
-    setDocuments([])
-    setUploadedFiles([])
-    setShowDocumentUpload(false)
-    setDocumentUrl(null)
     setDetailsError(null)
     setShowCancelDialog(false)
     setCancellationReason('')
@@ -533,140 +374,21 @@ export function AdjustmentDetailsDialog({
               </CardContent>
             </Card>
 
-            {/* Documents Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
+              {/* Documents Section - Compact with Actions */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-base font-semibold text-gray-900 border-b border-gray-200 pb-1">
+                  <FileText className="h-4 w-4" />
                   Documents
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Upload Documents */}
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Button
-                      onClick={() => setShowDocumentUpload(!showDocumentUpload)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Add Documents
-                    </Button>
-                  </div>
-                  
-                  {showDocumentUpload && (
-                    <div className="border rounded-lg p-4 bg-gray-50">
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select documents to upload
-                          </label>
-                          <input
-                            type="file"
-                            multiple
-                            accept=".pdf,.png,.jpg,.jpeg"
-                            onChange={handleFileSelect}
-                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                          />
-                        </div>
-                        
-                        {uploadedFiles.length > 0 && (
-                          <div>
-                            <p className="text-sm font-medium text-gray-700 mb-2">Selected files:</p>
-                            <ul className="space-y-1">
-                              {uploadedFiles.map((file, index) => (
-                                <li key={index} className="flex items-center justify-between text-sm text-gray-600 bg-white p-2 rounded">
-                                  <span>{file.name} ({formatFileSize(file.size)})</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeFile(index)}
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </Button>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={uploadDocuments}
-                            disabled={uploadedFiles.length === 0 || isUploadingDocuments}
-                            size="sm"
-                          >
-                            {isUploadingDocuments ? 'Uploading...' : 'Upload'}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setShowDocumentUpload(false)
-                              setUploadedFiles([])
-                            }}
-                            size="sm"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
-
-                {/* Existing Documents */}
-                {isLoadingDocuments ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-2 text-gray-600">Loading documents...</p>
-                  </div>
-                ) : documents.length > 0 ? (
-                  <div className="space-y-3">
-                    {documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                        <div className="flex items-center gap-3">
-                          {getFileIcon(doc.file_type)}
-                          <div>
-                            <p className="font-medium text-sm">{doc.file_name}</p>
-                            <p className="text-xs text-gray-500">
-                              {formatFileSize(doc.file_size)} • Uploaded {formatDateTime(doc.uploaded_at)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isViewable(doc.file_type) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => viewDocument(doc)}
-                              className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50"
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => downloadDocument(doc)}
-                            className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
-                          >
-                            Download
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <p>No documents uploaded yet</p>
-                    <p className="text-sm">Click "Add Documents" to upload supporting files</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                <div className="border border-gray-200 rounded p-1">
+                  <DocumentsSection
+                    referenceType="adjustment"
+                    referenceId={displayAdjustment.id!}
+                    title=""
+                    showValidation={true}
+                  />
+                </div>
+              </div>
 
             {/* Action Buttons */}
             <div className="flex justify-between">
@@ -690,23 +412,6 @@ export function AdjustmentDetailsDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Document Viewer Dialog */}
-      <Dialog open={!!documentUrl} onOpenChange={() => setDocumentUrl(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Document Viewer</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            {documentUrl && (
-              <iframe
-                src={documentUrl}
-                className="w-full h-[70vh] border-0"
-                title="Document Viewer"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Cancel Adjustment Confirmation Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
