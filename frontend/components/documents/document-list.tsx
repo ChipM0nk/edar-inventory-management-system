@@ -43,10 +43,11 @@ export function DocumentList({
 
   if (documents.length === 0) {
     return (
-      <div className={`text-center py-8 text-gray-500 ${className}`}>
-        <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-        <p>{emptyStateTitle}</p>
-        <p className="text-sm">{emptyStateDescription}</p>
+      <div className={`flex items-center justify-between py-2 text-gray-500 ${className}`}>
+        <div>
+          <p className="text-sm">{emptyStateTitle}</p>
+          <p className="text-xs">{emptyStateDescription}</p>
+        </div>
       </div>
     )
   }

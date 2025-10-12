@@ -230,34 +230,65 @@ export function DocumentsSection({
   return (
     <>
       <Card className={className}>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            {title}
-          </CardTitle>
-        </CardHeader>
+        {title && (
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {title}
+            </CardTitle>
+          </CardHeader>
+        )}
         <CardContent className="space-y-4">
-          {/* Upload Section */}
-          <DocumentUpload
-            uploadedFiles={uploadedFiles}
-            onFilesChange={setUploadedFiles}
-            onUpload={uploadDocuments}
-            isUploading={isUploadingDocuments}
-            showUploadSection={showDocumentUpload}
-            onToggleUpload={setShowDocumentUpload}
-          />
+          {/* Upload Section and Documents List in same row when empty */}
+          {documents.length === 0 && !isLoadingDocuments ? (
+            <div className="flex items-center justify-between">
+              <div className="mr-4">
+                <DocumentUpload
+                  uploadedFiles={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  onUpload={uploadDocuments}
+                  isUploading={isUploadingDocuments}
+                  showUploadSection={showDocumentUpload}
+                  onToggleUpload={setShowDocumentUpload}
+                />
+              </div>
+              <DocumentList
+                documents={documents}
+                isLoading={isLoadingDocuments}
+                isValidating={isValidating}
+                showValidation={showValidation}
+                onValidate={handleValidate}
+                onView={viewDocument}
+                onDownload={downloadDocument}
+                onDelete={deleteDocument}
+                className="flex-1"
+              />
+            </div>
+          ) : (
+            <>
+              {/* Upload Section */}
+              <DocumentUpload
+                uploadedFiles={uploadedFiles}
+                onFilesChange={setUploadedFiles}
+                onUpload={uploadDocuments}
+                isUploading={isUploadingDocuments}
+                showUploadSection={showDocumentUpload}
+                onToggleUpload={setShowDocumentUpload}
+              />
 
-          {/* Documents List */}
-          <DocumentList
-            documents={documents}
-            isLoading={isLoadingDocuments}
-            isValidating={isValidating}
-            showValidation={showValidation}
-            onValidate={handleValidate}
-            onView={viewDocument}
-            onDownload={downloadDocument}
-            onDelete={deleteDocument}
-          />
+              {/* Documents List */}
+              <DocumentList
+                documents={documents}
+                isLoading={isLoadingDocuments}
+                isValidating={isValidating}
+                showValidation={showValidation}
+                onValidate={handleValidate}
+                onView={viewDocument}
+                onDownload={downloadDocument}
+                onDelete={deleteDocument}
+              />
+            </>
+          )}
         </CardContent>
       </Card>
 
