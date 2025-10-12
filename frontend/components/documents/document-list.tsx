@@ -53,7 +53,7 @@ export function DocumentList({
   }
 
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div className={`space-y-0.5 ${className}`}>
       {documents.map((document) => (
         <div key={document.id} className="relative">
           <DocumentCard

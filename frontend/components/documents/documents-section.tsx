@@ -229,16 +229,16 @@ export function DocumentsSection({
 
   return (
     <>
-      <Card className={className}>
+      <Card className={`border-0 shadow-none ${className}`}>
         {title && (
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileText className="h-5 w-5" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
               {title}
             </CardTitle>
           </CardHeader>
         )}
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-1">
           {/* Upload Section and Documents List in same row when empty */}
           {documents.length === 0 && !isLoadingDocuments ? (
             <div className="flex items-center justify-between">
@@ -265,7 +265,7 @@ export function DocumentsSection({
               />
             </div>
           ) : (
-            <>
+            <div className="space-y-1">
               {/* Upload Section */}
               <DocumentUpload
                 uploadedFiles={uploadedFiles}
@@ -287,7 +287,7 @@ export function DocumentsSection({
                 onDownload={downloadDocument}
                 onDelete={deleteDocument}
               />
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

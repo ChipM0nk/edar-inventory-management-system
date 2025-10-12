@@ -62,99 +62,104 @@ export function DocumentUpload({
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Upload Button */}
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() => onToggleUpload(!showUploadSection)}
-          variant="outline"
-          size="sm"
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          Add Documents
-        </Button>
-        {uploadedFiles.length > 0 && (
-          <span className="text-sm text-gray-600">
-            {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} selected
-          </span>
-        )}
-      </div>
-      
-      {/* Upload Section */}
-      {showUploadSection && (
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select documents to upload
-              </label>
+    <div className={`space-y-1 pt-1 pb-1 ${className}`}>
+      {/* Upload Section - All in one row when expanded */}
+      {showUploadSection ? (
+        <div className="p-2">
+          {/* Error Message */}
+          {error && (
+            <div className="text-xs text-red-600 bg-red-50 p-1 rounded mb-1">
+              {error}
+            </div>
+          )}
+          
+          {/* Main row: Choose files with max info, selected files with action buttons */}
+          <div className="flex items-center gap-2">
+            {/* Max Info and Choose Files */}
+            <div className="flex items-center gap-2">
+              {/* Max info - Two lines to the left of Choose Files */}
+              <div className="text-xs text-gray-500 leading-tight" style={{ fontSize: '0.65rem' }}>
+                <div>Max {maxFiles} files</div>
+                <div>Max {formatFileSize(maxFileSize)}</div>
+              </div>
+              
               <input
                 type="file"
                 multiple
                 accept={accept}
                 onChange={handleFileSelect}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                className="hidden"
+                id="file-input"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Max {maxFiles} files, {formatFileSize(maxFileSize)} per file
-              </p>
+              <label
+                htmlFor="file-input"
+                className="inline-flex items-center px-3 py-1 text-xs font-semibold bg-blue-50 text-blue-700 rounded cursor-pointer hover:bg-blue-100 border border-blue-200"
+              >
+                Choose files
+              </label>
             </div>
             
-            {/* Error Message */}
-            {error && (
-              <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                {error}
-              </div>
-            )}
-            
-            {/* Selected Files */}
-            {uploadedFiles.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Selected files:</p>
-                <div className="space-y-2">
-                  {uploadedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between text-sm text-gray-600 bg-white p-2 rounded border">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        <span>{file.name} ({formatFileSize(file.size)})</span>
-                      </div>
+            {/* Selected Files and Action Buttons */}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Selected Files Display */}
+                {uploadedFiles.length === 0 ? (
+                  <span className="text-xs text-gray-600">No file chosen</span>
+                ) : (
+                  uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center gap-1 text-xs text-gray-600 bg-white px-2 py-1 rounded border">
+                      <FileText className="w-3 h-3" />
+                      <span className="max-w-32 truncate">{file.name}</span>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => removeFile(index)}
-                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="h-4 w-4 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3 h-3" />
                       </Button>
                     </div>
-                  ))}
+                  ))
+                )}
+                
+                {/* Action Buttons beside document names */}
+                <div className="flex gap-1">
+                  {uploadedFiles.length > 0 && (
+                    <Button
+                      onClick={onUpload}
+                      disabled={isUploading}
+                      size="sm"
+                      className="h-7 px-3 text-xs"
+                    >
+                      {isUploading ? 'Uploading...' : 'Upload'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onToggleUpload(false)
+                      onFilesChange([])
+                      setError(null)
+                    }}
+                    size="sm"
+                    className="h-7 px-3 text-xs"
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </div>
-            )}
-            
-            {/* Upload Actions */}
-            <div className="flex gap-2">
-              <Button
-                onClick={onUpload}
-                disabled={uploadedFiles.length === 0 || isUploading}
-                size="sm"
-              >
-                {isUploading ? 'Uploading...' : 'Upload'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  onToggleUpload(false)
-                  onFilesChange([])
-                  setError(null)
-                }}
-                size="sm"
-              >
-                Cancel
-              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      ) : (
+        /* Add Documents Button when collapsed */
+        <Button
+          onClick={() => onToggleUpload(!showUploadSection)}
+          className="bg-blue-600 hover:bg-blue-700 text-white border-0 px-3 py-1 text-xs font-medium mt-2 mb-2"
+        >
+          <Upload className="w-3 h-3 mr-1" />
+          Add Documents
+        </Button>
       )}
     </div>
   )

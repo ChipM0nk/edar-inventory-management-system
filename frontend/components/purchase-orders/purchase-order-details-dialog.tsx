@@ -187,7 +187,7 @@ export function PurchaseOrderDetailsDialog({
     <>
       {/* Main Order Details Dialog */}
       <Dialog open={isOpen && !showCancelDialog} onOpenChange={handleClose}>
-        <DialogContent className="w-[90vw] max-w-6xl max-h-[85vh] overflow-hidden flex flex-col [&>button]:hidden">
+        <DialogContent className="w-[95vw] max-w-5xl max-h-[85vh] overflow-hidden flex flex-col [&>button]:hidden">
           <DialogHeader className="sticky top-0 bg-white z-50 border-b border-gray-300 pb-4 mb-4 shadow-sm flex-shrink-0">
             <div className="flex items-center justify-between">
               <div>
@@ -266,7 +266,7 @@ export function PurchaseOrderDetailsDialog({
           )}
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto relative z-10">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden relative z-10">
             <div className="space-y-6 p-1">
               {/* Order Overview - Simplified without card */}
               <div className="space-y-4">
@@ -320,8 +320,8 @@ export function PurchaseOrderDetailsDialog({
                   <Package2 className="h-5 w-5" />
                   Products ({items.length})
                 </div>
-                <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
-                  <Table>
+                <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm overflow-x-auto">
+                  <Table className="min-w-full">
                     <TableHeader className="bg-gray-100">
                       <TableRow className="border-b border-gray-300">
                         <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">Product Name</TableHead>

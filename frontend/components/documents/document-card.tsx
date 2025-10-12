@@ -73,25 +73,25 @@ export function DocumentCard({
   const getFileIcon = (fileType: string) => {
     const type = fileType.toLowerCase()
     if (type.includes('image')) {
-      return <FileImage className="h-5 w-5 text-green-500" />
+      return <FileImage className="h-4 w-4 text-green-500" />
     } else if (type.includes('pdf')) {
-      return <File className="h-5 w-5 text-red-500" />
+      return <File className="h-4 w-4 text-red-500" />
     } else {
-      return <File className="h-5 w-5 text-gray-400" />
+      return <File className="h-4 w-4 text-gray-400" />
     }
   }
 
   return (
-    <div className={`flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors ${className}`}>
-      <div className="flex items-center gap-3 flex-1">
+    <div className={`flex items-center justify-between p-2 hover:bg-gray-50 transition-colors ${className}`}>
+      <div className="flex items-center gap-2 flex-1">
         {getFileIcon(document.file_type)}
         <div className="flex-1">
-          <p className="font-medium text-gray-900">{document.file_name}</p>
-          <p className="text-sm text-gray-500">
+          <p className="font-medium text-gray-900 text-sm">{document.file_name}</p>
+          <p className="text-xs text-gray-500">
             {formatFileSize(document.file_size)} • Uploaded {formatDate(document.uploaded_at)}
           </p>
           {showValidation && document.validation_status && (
-            <Badge className={`${getValidationStatusColor(document.validation_status)} flex items-center gap-1 mt-1 w-fit`}>
+            <Badge className={`${getValidationStatusColor(document.validation_status)} flex items-center gap-1 mt-1 w-fit text-xs px-1 py-0`}>
               {getValidationIconComponent(document.validation_status)}
               {document.validation_status}
             </Badge>
@@ -99,19 +99,19 @@ export function DocumentCard({
         </div>
       </div>
       
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         {showValidation && document.validation_status === 'pending' && onValidate && (
           <Button
             size="sm"
             variant="outline"
             onClick={() => onValidate(document)}
             disabled={isValidating}
-            className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
+            className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50 h-7 px-2 text-xs"
           >
             {isValidating ? (
-              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
             ) : (
-              <RefreshCw className="h-4 w-4 mr-1" />
+              <RefreshCw className="h-3 w-3 mr-1" />
             )}
             Validate
           </Button>
@@ -120,18 +120,18 @@ export function DocumentCard({
           size="sm"
           variant="outline"
           onClick={() => onView(document)}
-          className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50"
+          className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50 h-7 px-2 text-xs"
         >
-          <Eye className="h-4 w-4 mr-1" />
+          <Eye className="h-3 w-3 mr-1" />
           View
         </Button>
         <Button
           size="sm"
           variant="outline"
           onClick={() => onDownload(document)}
-          className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50"
+          className="text-blue-600 hover:text-blue-700 border-blue-300 hover:bg-blue-50 h-7 px-2 text-xs"
         >
-          <Download className="h-4 w-4 mr-1" />
+          <Download className="h-3 w-3 mr-1" />
           Download
         </Button>
         {onOpenInNewTab && (
@@ -139,9 +139,9 @@ export function DocumentCard({
             size="sm"
             variant="outline"
             onClick={() => onOpenInNewTab(document)}
-            className="text-purple-600 hover:text-purple-700 border-purple-300 hover:bg-purple-50"
+            className="text-purple-600 hover:text-purple-700 border-purple-300 hover:bg-purple-50 h-7 px-2 text-xs"
           >
-            <ExternalLink className="h-4 w-4 mr-1" />
+            <ExternalLink className="h-3 w-3 mr-1" />
             Open
           </Button>
         )}
@@ -149,9 +149,9 @@ export function DocumentCard({
           size="sm"
           variant="outline"
           onClick={() => onDelete(document)}
-          className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
+          className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50 h-7 px-2 text-xs"
         >
-          <Trash2 className="h-4 w-4 mr-1" />
+          <Trash2 className="h-3 w-3 mr-1" />
           Delete
         </Button>
       </div>
