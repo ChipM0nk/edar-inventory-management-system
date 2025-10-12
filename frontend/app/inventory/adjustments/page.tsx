@@ -2,19 +2,19 @@
 
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { AppLayout } from '@/components/app-layout'
 import { AdjustmentDetailsDialog, AdjustmentReviewDialog } from '@/components/adjustments'
-import { DocumentsSection } from '@/components/documents'
+import { DocumentUpload } from '@/components/documents'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, FileText, Hash, AlertTriangle, Upload, X, File, FileImage } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Plus, Search, RefreshCw, ArrowLeft, Package, Calendar, User, DollarSign, FileText, Hash, AlertTriangle, Upload, X } from 'lucide-react'
 import api from '@/lib/api'
 import { useConfirm } from '@/hooks/use-confirm'
 import { useNotice } from '@/hooks/use-notice'
@@ -118,13 +118,23 @@ export default function AdjustmentsPage() {
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [showProductDropdown, setShowProductDropdown] = useState(false)
+  const [selectedProductIndex, setSelectedProductIndex] = useState(-1)
   
   // Document upload state
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
+  const [showDocumentUpload, setShowDocumentUpload] = useState(true)
+  const [adjustmentNotes, setAdjustmentNotes] = useState('')
   
-  // Document display state (for Create Adjustment Modal only)
-  const [documentUrl, setDocumentUrl] = useState<string | null>(null)
+  // Close warning state
+  const [showCloseWarning, setShowCloseWarning] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  
+  // Refs for form inputs
+  const productSearchInputRef = useRef<HTMLInputElement>(null)
+  const addRadioRef = useRef<HTMLInputElement>(null)
+  const subtractRadioRef = useRef<HTMLInputElement>(null)
+  
   
   // Reference fields for PO/SO connections
   const [referenceType, setReferenceType] = useState<string>('')
@@ -152,6 +162,23 @@ export default function AdjustmentsPage() {
       loadSalesOrders()
     }
   }, [user])
+
+  // Handle browser beforeunload event (back button, close tab, etc.)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges()) {
+        e.preventDefault()
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?'
+        return 'You have unsaved changes. Are you sure you want to leave?'
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [adjustmentItems, uploadedFiles, selectedWarehouse, selectedProduct, adjustmentQuantity, adjustmentCostPrice, adjustmentNotes])
 
   // Filter products based on search term
   useEffect(() => {
@@ -359,6 +386,9 @@ export default function AdjustmentsPage() {
     setSelectedWarehouse(null)
     setCurrentStockLevel(null)
     setGeneratedReferenceNumber(null)
+    setAdjustmentNotes('')
+    setUploadedFiles([])
+    setShowDocumentUpload(false)
     // Reset reference fields
     setReferenceType('')
     setReferenceId('')
@@ -466,30 +496,62 @@ export default function AdjustmentsPage() {
     setCurrentStockLevel(null)
     setProductSearchTerm('')
     setShowProductDropdown(false)
+    
+    // Focus back to product search input
+    setTimeout(() => {
+      if (productSearchInputRef.current) {
+        productSearchInputRef.current.focus()
+      }
+    }, 100)
   }
 
   const handleRemoveItem = (index: number) => {
     setAdjustmentItems(adjustmentItems.filter((_, i) => i !== index))
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files) {
-      const newFiles = Array.from(files)
-      setUploadedFiles(prev => [...prev, ...newFiles])
+  const handleDocumentUpload = async () => {
+    if (uploadedFiles.length === 0) {
+      await notice({
+        title: 'No files',
+        description: 'Please select files to upload',
+        variant: 'warning',
+      })
+      return
+    }
+
+    try {
+      setIsUploadingDocuments(true)
+      // For adjustment creation, we keep files in state until adjustment is created
+      // This simulates upload success
+      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate upload delay
+      
+      await notice({
+        title: 'Files ready',
+        description: `${uploadedFiles.length} file(s) ready for upload with adjustment`,
+        variant: 'success',
+      })
+      
+      // Hide the upload section after "upload"
+      setShowDocumentUpload(false)
+    } catch (error) {
+      console.error('Upload error:', error)
+      await notice({
+        title: 'Upload failed',
+        description: 'Failed to prepare files for upload',
+        variant: 'warning',
+      })
+    } finally {
+      setIsUploadingDocuments(false)
     }
   }
 
-  const handleRemoveFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = () => {
+    const hasFormData = selectedWarehouse || selectedProduct || adjustmentQuantity || adjustmentCostPrice || adjustmentNotes
+    const hasAdjustmentItems = adjustmentItems.length > 0
+    const hasUploadedDocs = uploadedFiles.length > 0
+    
+    return hasFormData || hasAdjustmentItems || hasUploadedDocs
   }
 
   // Document helper functions
@@ -503,22 +565,32 @@ export default function AdjustmentsPage() {
     })
   }
 
-  // Get file type icon
-  const getFileIcon = (fileType: string) => {
-    const type = fileType.toLowerCase()
-    if (type.includes('image')) {
-      return <FileImage className="w-5 h-5 text-green-500" />
-    } else if (type.includes('pdf')) {
-      return <File className="w-5 h-5 text-red-500" />
-    } else {
-      return <FileText className="w-5 h-5 text-gray-400" />
+
+
+  // Handle close warning dialog
+  const handleCloseWarning = (confirmed: boolean) => {
+    setShowCloseWarning(false)
+    if (confirmed) {
+      if (pendingNavigation) {
+        // Navigation was requested
+        router.push(pendingNavigation)
+      } else {
+        // Dialog closing was requested
+        setIsCreateModalOpen(false)
+        resetForm()
+      }
     }
+    setPendingNavigation(null)
   }
 
-  // Check if file is viewable
-  const isViewable = (fileType: string) => {
-    const viewableTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/html', 'text/css', 'text/javascript']
-    return viewableTypes.includes(fileType.toLowerCase())
+  // Handle navigation with warning
+  const handleNavigation = (path: string) => {
+    if (hasUnsavedChanges()) {
+      setPendingNavigation(path)
+      setShowCloseWarning(true)
+    } else {
+      router.push(path)
+    }
   }
 
   const handleCreateAdjustment = async () => {
@@ -556,6 +628,7 @@ export default function AdjustmentsPage() {
         reason: 'Inventory adjustment',
         status: 'completed',
         created_by: user.id,
+        notes: adjustmentNotes || null,
         // Reference fields for PO/SO connections
         reference_type: referenceType || null,
         reference_id: referenceId || null,
@@ -828,10 +901,16 @@ export default function AdjustmentsPage() {
 
       {/* Create Adjustment Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
-        setIsCreateModalOpen(open)
         if (!open) {
+          // Check for unsaved changes before closing
+          if (hasUnsavedChanges()) {
+            setPendingNavigation(null) // No navigation, just closing dialog
+            setShowCloseWarning(true)
+            return // Don't close the dialog yet
+          }
           resetForm() // Clear form and success message when modal is closed
         }
+        setIsCreateModalOpen(open)
       }}>
         {ConfirmDialog}
         {NoticeDialog}
@@ -887,6 +966,7 @@ export default function AdjustmentsPage() {
                     value={adjustmentDate}
                     onChange={(e) => setAdjustmentDate(e.target.value)}
                     className="mt-1"
+                    tabIndex={1}
                   />
                 </div>
                 <div>
@@ -916,6 +996,9 @@ export default function AdjustmentsPage() {
                           setAdjustmentType('add')
                           setAdjustmentReason('')
                           setAdjustmentReasonOther('')
+                          setAdjustmentNotes('')
+                          setUploadedFiles([])
+                          setShowDocumentUpload(false)
                         }
                       } else {
                         setSelectedWarehouse(warehouse)
@@ -929,6 +1012,9 @@ export default function AdjustmentsPage() {
                         setAdjustmentType('add')
                         setAdjustmentReason('')
                         setAdjustmentReasonOther('')
+                        setAdjustmentNotes('')
+                        setUploadedFiles([])
+                        setShowDocumentUpload(false)
                       }
                     } else {
                       setSelectedWarehouse(warehouse || null)
@@ -942,9 +1028,12 @@ export default function AdjustmentsPage() {
                       setAdjustmentType('add')
                       setAdjustmentReason('')
                       setAdjustmentReasonOther('')
+                      setAdjustmentNotes('')
+                      setUploadedFiles([])
+                      setShowDocumentUpload(false)
                     }
                   }}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1" tabIndex={2}>
                       <SelectValue placeholder="Select warehouse" />
                     </SelectTrigger>
                     <SelectContent>
@@ -984,16 +1073,59 @@ export default function AdjustmentsPage() {
                     <Label className="text-xs font-medium text-gray-600">Product *</Label>
                     <div className="relative mt-1">
                       <Input
+                        ref={productSearchInputRef}
                         value={selectedProduct ? `${selectedProduct.name} (${selectedProduct.sku})` : productSearchTerm}
+                        tabIndex={3}
                         onChange={(e) => {
                           const value = e.target.value
                           setProductSearchTerm(value)
                           setSelectedProduct(null)
                           setShowProductDropdown(true)
                           setCurrentStockLevel(null)
+                          setSelectedProductIndex(-1)
+                        }}
+                        onKeyDown={(e) => {
+                          if (!showProductDropdown || filteredProducts.length === 0) return
+
+                          switch (e.key) {
+                            case 'ArrowDown':
+                              e.preventDefault()
+                              setSelectedProductIndex(prev => 
+                                prev < filteredProducts.length - 1 ? prev + 1 : 0
+                              )
+                              break
+                            case 'ArrowUp':
+                              e.preventDefault()
+                              setSelectedProductIndex(prev => 
+                                prev > 0 ? prev - 1 : filteredProducts.length - 1
+                              )
+                              break
+                            case 'Enter':
+                              e.preventDefault()
+                              if (selectedProductIndex >= 0 && selectedProductIndex < filteredProducts.length) {
+                                const product = filteredProducts[selectedProductIndex]
+                                setSelectedProduct(product)
+                                setProductSearchTerm('')
+                                setShowProductDropdown(false)
+                                setSelectedProductIndex(-1)
+                                
+                                // Focus on the Add radio button after product selection
+                                setTimeout(() => {
+                                  if (addRadioRef.current) {
+                                    addRadioRef.current.focus()
+                                  }
+                                }, 100)
+                              }
+                              break
+                            case 'Escape':
+                              setShowProductDropdown(false)
+                              setSelectedProductIndex(-1)
+                              break
+                          }
                         }}
                         onFocus={() => {
                           setShowProductDropdown(true)
+                          setSelectedProductIndex(-1)
                         }}
                         onBlur={() => {
                           // Delay hiding dropdown to allow for selection
@@ -1007,18 +1139,31 @@ export default function AdjustmentsPage() {
                       {/* Dropdown with filtered products */}
                       {showProductDropdown && filteredProducts.length > 0 && (
                         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                          {filteredProducts.map((product) => (
+                          {filteredProducts.map((product, index) => (
                             <div
                               key={product.id}
-                              className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              className={`px-3 py-2 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                                index === selectedProductIndex 
+                                  ? 'bg-blue-100 text-blue-900' 
+                                  : 'hover:bg-gray-50'
+                              }`}
+                              tabIndex={-1}
                               onClick={() => {
                                 setSelectedProduct(product)
                                 setProductSearchTerm('')
                                 setShowProductDropdown(false)
+                                setSelectedProductIndex(-1)
+                                
+                                // Focus on the Add radio button after product selection
+                                setTimeout(() => {
+                                  if (addRadioRef.current) {
+                                    addRadioRef.current.focus()
+                                  }
+                                }, 100)
                               }}
                             >
-                              <div className="font-medium text-gray-900 text-sm">{product.name}</div>
-                              <div className="text-xs text-gray-500">SKU: {product.sku}</div>
+                              <div className="font-medium text-sm">{product.name}</div>
+                              <div className="text-xs opacity-75">SKU: {product.sku}</div>
                             </div>
                           ))}
                         </div>
@@ -1061,23 +1206,27 @@ export default function AdjustmentsPage() {
                         <div className="flex gap-3">
                           <label className="flex items-center space-x-1">
                             <input
+                              ref={addRadioRef}
                               type="radio"
                               name="adjustmentType"
                               value="add"
                               checked={adjustmentType === 'add'}
                               onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'subtract')}
                               className="text-green-600"
+                              tabIndex={4}
                             />
                             <span className="text-green-600 text-sm font-medium">Add</span>
                           </label>
                           <label className="flex items-center space-x-1">
                             <input
+                              ref={subtractRadioRef}
                               type="radio"
                               name="adjustmentType"
                               value="subtract"
                               checked={adjustmentType === 'subtract'}
                               onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'subtract')}
                               className="text-red-600"
+                              tabIndex={5}
                             />
                             <span className="text-red-600 text-sm font-medium">Subtract</span>
                           </label>
@@ -1106,11 +1255,19 @@ export default function AdjustmentsPage() {
                           }}
                           placeholder="Enter quantity"
                           className="mt-1"
+                          tabIndex={6}
                         />
                       </div>
                       
                       <div>
-                        <Label htmlFor="cost_price" className="text-xs font-medium text-gray-600">Cost Price *</Label>
+                        <Label htmlFor="cost_price" className="text-xs font-medium text-gray-600">
+                          Cost Price *
+                          {selectedProduct && (
+                            <span className="ml-2 text-gray-500 font-normal">
+                              (Unit Price: ₱{selectedProduct.unit_price.toFixed(2)})
+                            </span>
+                          )}
+                        </Label>
                         <Input
                           id="cost_price"
                           type="number"
@@ -1126,13 +1283,19 @@ export default function AdjustmentsPage() {
                           }}
                           placeholder="Enter cost price"
                           className="mt-1"
+                          tabIndex={7}
                         />
+                        {selectedProduct && adjustmentCostPrice && parseFloat(adjustmentCostPrice) >= selectedProduct.unit_price && (
+                          <p className="text-red-500 text-xs mt-1">
+                            ⚠️ Cost price should be less than unit price.
+                          </p>
+                        )}
                       </div>
                       
                       <div>
                         <Label htmlFor="reason" className="text-xs font-medium text-gray-600">Reason *</Label>
                         <Select value={adjustmentReason} onValueChange={setAdjustmentReason}>
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="mt-1" tabIndex={8}>
                             <SelectValue placeholder="Select reason" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1200,6 +1363,7 @@ export default function AdjustmentsPage() {
                     onClick={handleAddItem} 
                     disabled={isCheckingStock || (adjustmentType === 'subtract' && currentStockLevel !== null && currentStockLevel < parseInt(adjustmentQuantity))}
                     className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    tabIndex={9}
                   >
                     {isCheckingStock ? 'Checking Stock...' : 'Add Item'}
                   </Button>
@@ -1222,51 +1386,89 @@ export default function AdjustmentsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    {adjustmentItems.map((item, index) => (
-                      <div key={`${item.product_id}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm text-gray-900 truncate">
-                                {item.product_name}
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[30%]">Product</TableHead>
+                          <TableHead className="w-[15%]">SKU</TableHead>
+                          <TableHead className="w-[15%]">Quantity</TableHead>
+                          <TableHead className="w-[15%]">Unit Price</TableHead>
+                          <TableHead className="w-[15%]">Total</TableHead>
+                          <TableHead className="w-[10%]">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {adjustmentItems.map((item, index) => (
+                          <TableRow key={`${item.product_id}-${index}`}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium text-sm text-gray-900">
+                                  {item.product_name}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1">
+                                  Reason: {item.reason}
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-500 font-mono">
-                                SKU: {item.product_sku}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm">
-                              <div className={`font-medium ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-sm text-gray-600">
+                                {item.product_sku}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`font-medium text-sm ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {item.quantity > 0 ? '+' : ''}{item.quantity}
-                              </div>
-                              <div className="text-gray-600">
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-gray-900">
                                 ₱{item.cost_price.toFixed(2)}
-                              </div>
-                              <div className="font-semibold text-gray-900">
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-semibold text-sm text-gray-900">
                                 ₱{(Math.abs(item.quantity) * item.cost_price).toFixed(2)}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-600 mt-1">
-                            Reason: {item.reason}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveItem(index)}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50 ml-2"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveItem(index)}
+                                className="text-red-600 hover:text-red-800 hover:bg-red-50 h-8 w-8 p-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Document Upload Section - Compact */}
+            {/* Notes Section - Separate */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                <h3 className="text-base font-semibold text-gray-900">Notes (Optional)</h3>
+              </div>
+              <textarea
+                id="adjustment-notes"
+                value={adjustmentNotes}
+                onChange={(e) => setAdjustmentNotes(e.target.value)}
+                placeholder="Add any additional notes or comments for this adjustment..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none focus:border-blue-500"
+                rows={3}
+                tabIndex={10}
+                autoFocus={false}
+              />
+            </div>
+
+            {/* Document Upload Section - Using Shared Component */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -1275,51 +1477,23 @@ export default function AdjustmentsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
-                  <input
-                    type="file"
-                    multiple
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="document-upload"
-                  />
-                  <label htmlFor="document-upload" className="cursor-pointer">
-                    <Upload className="h-6 w-6 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm font-medium text-gray-600">Click to upload documents</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      PDF, Images, Word, Excel (Max 10MB each)
-                    </p>
-                  </label>
-                </div>
-
-                {/* Uploaded Files List */}
-                {uploadedFiles.length > 0 && (
-                  <div className="mt-3 space-y-1">
-                    <Label className="text-xs font-medium text-gray-600">Uploaded Files ({uploadedFiles.length})</Label>
-                    <div className="space-y-1 max-h-24 overflow-y-auto">
-                      {uploadedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <File className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                              <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveFile(index)}
-                            className="text-red-600 hover:text-red-800 h-6 w-6 p-0 flex-shrink-0"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <DocumentUpload
+                  uploadedFiles={uploadedFiles}
+                  onFilesChange={(files) => {
+                    console.log('Files changed:', files)
+                    setUploadedFiles(files)
+                  }}
+                  onUpload={handleDocumentUpload}
+                  isUploading={isUploadingDocuments}
+                  showUploadSection={showDocumentUpload}
+                  onToggleUpload={(show) => {
+                    console.log('Toggle upload section:', show)
+                    setShowDocumentUpload(show)
+                  }}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                  maxFiles={10}
+                  maxFileSize={10 * 1024 * 1024} // 10MB
+                />
               </CardContent>
             </Card>
 
@@ -1334,6 +1508,12 @@ export default function AdjustmentsPage() {
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => {
+                  // Check for unsaved changes before closing
+                  if (hasUnsavedChanges()) {
+                    setPendingNavigation(null) // No navigation, just closing dialog
+                    setShowCloseWarning(true)
+                    return // Don't close the dialog yet
+                  }
                   resetForm()
                   setIsCreateModalOpen(false)
                 }}>
@@ -1363,23 +1543,41 @@ export default function AdjustmentsPage() {
         warehouseName={selectedWarehouse?.name || ''}
       />
 
-      {/* Document Viewer Dialog */}
-      <Dialog open={!!documentUrl} onOpenChange={() => setDocumentUrl(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Document Viewer</DialogTitle>
+      {/* Close Warning Dialog */}
+      <Dialog open={showCloseWarning} onOpenChange={() => setShowCloseWarning(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <DialogTitle className="text-xl font-semibold text-gray-900">Unsaved Changes</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              You have unsaved changes that will be lost if you close this dialog. Are you sure you want to continue?
+            </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            {documentUrl && (
-              <iframe
-                src={documentUrl}
-                className="w-full h-[70vh] border-0"
-                title="Document Viewer"
-              />
-            )}
+          
+          <div className="flex justify-center gap-3 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleCloseWarning(false)}
+              className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg"
+            >
+              Keep Editing
+            </Button>
+            <Button
+              type="button"
+              onClick={() => handleCloseWarning(true)}
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
+            >
+              Close Anyway
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
+
     </AppLayout>
   )
 }

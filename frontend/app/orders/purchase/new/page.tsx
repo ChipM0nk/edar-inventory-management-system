@@ -97,6 +97,8 @@ export default function NewStockMovementPage() {
   const [showErrorDialog, setShowErrorDialog] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [errorTitle, setErrorTitle] = useState('')
+  const [showCloseWarning, setShowCloseWarning] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
 
   // Refs
   const poReferenceInputRef = useRef<HTMLInputElement>(null)
@@ -123,6 +125,23 @@ export default function NewStockMovementPage() {
       router.push('/login')
     }
   }, [user, isLoading, router])
+
+  // Handle browser beforeunload event (back button, close tab, etc.)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges()) {
+        e.preventDefault()
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?'
+        return 'You have unsaved changes. Are you sure you want to leave?'
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [stockInItems, uploadedDocuments, form])
 
   // Update processed_by when user loads
   useEffect(() => {
@@ -372,6 +391,16 @@ export default function NewStockMovementPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = () => {
+    const formValues = form.getValues()
+    const hasFormData = formValues.reference_number || formValues.supplier_id || formValues.po_date || formValues.received_date || formValues.notes
+    const hasSelectedItems = stockInItems.some(item => item.selected && item.quantity > 0)
+    const hasUploadedDocs = uploadedDocuments.length > 0
+    
+    return hasFormData || hasSelectedItems || hasUploadedDocs
+  }
+
   // Check if purchase order can be cancelled (within 30 days)
   const canCancelPurchaseOrder = (createdDate: string) => {
     const created = new Date(createdDate)
@@ -546,7 +575,7 @@ export default function NewStockMovementPage() {
   // Handle success dialog actions
   const handleViewPurchaseOrder = () => {
     setShowSuccessDialog(false)
-    router.push('/orders/purchase')
+    handleNavigation('/orders/purchase')
   }
 
   const handleCreateAnother = () => {
@@ -559,6 +588,25 @@ export default function NewStockMovementPage() {
         poReferenceInputRef.current.focus()
       }
     }, 100)
+  }
+
+  // Handle close warning dialog
+  const handleCloseWarning = (confirmed: boolean) => {
+    setShowCloseWarning(false)
+    if (confirmed && pendingNavigation) {
+      router.push(pendingNavigation)
+    }
+    setPendingNavigation(null)
+  }
+
+  // Handle navigation with warning
+  const handleNavigation = (path: string) => {
+    if (hasUnsavedChanges()) {
+      setPendingNavigation(path)
+      setShowCloseWarning(true)
+    } else {
+      router.push(path)
+    }
   }
 
   if (isLoading) {
@@ -1471,6 +1519,41 @@ export default function NewStockMovementPage() {
               className="px-8 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
             >
               OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close Warning Dialog */}
+      <Dialog open={showCloseWarning} onOpenChange={() => setShowCloseWarning(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <DialogTitle className="text-xl font-semibold text-gray-900">Unsaved Changes</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              You have unsaved changes that will be lost if you leave this page. Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex justify-center gap-3 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleCloseWarning(false)}
+              className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg"
+            >
+              Stay on Page
+            </Button>
+            <Button
+              type="button"
+              onClick={() => handleCloseWarning(true)}
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
+            >
+              Leave Anyway
             </Button>
           </div>
         </DialogContent>
