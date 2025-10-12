@@ -93,6 +93,10 @@ export default function NewStockMovementPage() {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [createdPurchaseOrderId, setCreatedPurchaseOrderId] = useState<string>('')
+  const [createdPurchaseOrderNumber, setCreatedPurchaseOrderNumber] = useState<string>('')
+  const [showErrorDialog, setShowErrorDialog] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [errorTitle, setErrorTitle] = useState('')
 
   // Refs
   const poReferenceInputRef = useRef<HTMLInputElement>(null)
@@ -491,23 +495,49 @@ export default function NewStockMovementPage() {
       setShowConfirmationDialog(false)
       setPendingFormData(null)
       setCreatedPurchaseOrderId(purchaseOrderId)
+      setCreatedPurchaseOrderNumber(data.reference_number)
       setShowSuccessDialog(true)
     } catch (error: any) {
       console.error('Error creating purchase order:', error)
       
-      let errorMessage = 'Error creating purchase order. Please try again.'
+      let errorMessage = 'An error occurred while creating the purchase order. Please try again.'
+      let errorTitle = 'Purchase Order Creation Failed'
       
       if (error.response?.data?.error) {
-        errorMessage = error.response.data.error
+        const backendError = error.response.data.error
+        
+        // Handle specific error types with user-friendly messages
+        if (backendError.includes('duplicate key value violates unique constraint') || 
+            backendError.includes('Purchase Order number already exists')) {
+          errorTitle = 'Duplicate Purchase Order Number'
+          errorMessage = 'The Purchase Order number you entered already exists. Please use a different reference number.'
+        } else if (backendError.includes('violates foreign key constraint')) {
+          errorTitle = 'Invalid Selection'
+          errorMessage = 'One or more of your selections are invalid. Please check your supplier, warehouse, or product selections.'
+        } else if (error.response?.status === 409) {
+          errorTitle = 'Duplicate Purchase Order Number'
+          errorMessage = 'The Purchase Order number you entered already exists. Please use a different reference number.'
+        } else {
+          errorMessage = backendError
+        }
       } else if (error.response?.status === 400) {
-        errorMessage = 'Invalid data provided. Please check your inputs.'
+        errorTitle = 'Invalid Information'
+        errorMessage = 'Please check all required fields and ensure your information is correct.'
       } else if (error.response?.status === 401) {
-        errorMessage = 'You are not authorized. Please log in again.'
+        errorTitle = 'Authentication Required'
+        errorMessage = 'Your session has expired. Please log in again to continue.'
       } else if (error.response?.status === 500) {
-        errorMessage = 'Server error. Please try again later.'
+        errorTitle = 'System Error'
+        errorMessage = 'A system error occurred. Please try again later or contact support if the problem persists.'
+      } else if (!error.response) {
+        errorTitle = 'Connection Error'
+        errorMessage = 'Unable to connect to the server. Please check your internet connection and try again.'
       }
       
-      alert(errorMessage)
+      // Show error dialog instead of alert
+      setErrorMessage(errorMessage)
+      setErrorTitle(errorTitle)
+      setShowErrorDialog(true)
     } finally {
       setIsSubmitting(false)
     }
@@ -522,6 +552,7 @@ export default function NewStockMovementPage() {
   const handleCreateAnother = () => {
     setShowSuccessDialog(false)
     setCreatedPurchaseOrderId('')
+    setCreatedPurchaseOrderNumber('')
     // Form is already reset, just focus on PO reference
     setTimeout(() => {
       if (poReferenceInputRef.current) {
@@ -1393,9 +1424,9 @@ export default function NewStockMovementPage() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800">Purchase Order ID:</span>
+              <span className="text-sm font-medium text-green-800">Purchase Order Reference:</span>
             </div>
-            <p className="text-sm text-green-700 font-mono mt-1">{createdPurchaseOrderId}</p>
+            <p className="text-sm text-green-700 font-mono mt-1">{createdPurchaseOrderNumber}</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
@@ -1413,6 +1444,33 @@ export default function NewStockMovementPage() {
               className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
             >
               View Purchase Orders
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Dialog */}
+      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <DialogTitle className="text-xl font-semibold text-gray-900">{errorTitle}</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              {errorMessage}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex justify-center mt-6">
+            <Button
+              type="button"
+              onClick={() => setShowErrorDialog(false)}
+              className="px-8 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
+            >
+              OK
             </Button>
           </div>
         </DialogContent>

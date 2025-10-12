@@ -49,7 +49,13 @@ func (h *PurchaseOrderHandler) CreatePurchaseOrder(c *gin.Context) {
 
 	purchaseOrder, err := h.purchaseOrderService.CreatePurchaseOrder(req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create purchase order"})
+		// Check for specific error types and return appropriate status codes
+		if err.Error() == "duplicate key value violates unique constraint \"purchase_orders_po_number_key\"" || 
+		   err.Error() == "pq: duplicate key value violates unique constraint \"purchase_orders_po_number_key\"" {
+			c.JSON(http.StatusConflict, gin.H{"error": "The Purchase Order number you entered already exists. Please use a different reference number."})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "An unexpected error occurred while creating the purchase order. Please try again later."})
+		}
 		return
 	}
 

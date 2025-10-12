@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -212,106 +211,114 @@ export function AdjustmentDetailsDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Adjustment Details
-              {displayAdjustment.status === 'cancelled' && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  Cancelled
-                </span>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              Complete information about this inventory adjustment
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-6">
-            {/* Cancelled Banner */}
-            {displayAdjustment.status === 'cancelled' && (
-              <div className="border border-red-200 bg-red-50 text-red-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <svg className="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.721-1.36 3.486 0l6.518 11.59c.75 1.335-.213 2.986-1.742 2.986H3.48c-1.53 0-2.492-1.651-1.742-2.986l6.518-11.59zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V7a1 1 0 00-1-1z" clipRule="evenodd"/>
+        <DialogContent className="w-[95vw] max-w-5xl max-h-[85vh] overflow-hidden flex flex-col [&>button]:hidden">
+          <DialogHeader className="sticky top-0 bg-white z-20 pb-2 mb-2 border-b border-gray-200 shadow-sm flex-shrink-0">
+            <div className="flex items-start justify-between">
+              <div>
+                <DialogTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <AlertTriangle className="h-6 w-6 text-gray-700" />
+                  Adjustment Details
+                </DialogTitle>
+                <DialogDescription className="text-gray-600 mt-2">
+                  Complete information about this inventory adjustment
+                </DialogDescription>
+              </div>
+              <div>
+                {displayAdjustment && displayAdjustment.status !== 'cancelled' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCancelDialog(true)}
+                    className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400 text-sm px-3 py-1"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Cancel Adjustment
+                  </Button>
+                )}
+              </div>
+            </div>
+        
+            {/* Status Warning - Moved into header */}
+          {displayAdjustment.status === 'cancelled' && (
+              <div className="mt-3 bg-red-50 border-l-4 border-red-400 p-3 rounded-r">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <div>
-                    <p className="font-semibold">This adjustment has been cancelled</p>
-                    <p className="text-sm opacity-90">No further actions can be taken on this adjustment.</p>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm text-red-700 font-medium">This adjustment has been cancelled</p>
+                    <p className="text-xs text-red-600 mt-1">No further actions can be taken on this adjustment</p>
+                    
+                    {/* Show cancellation details if available */}
+                    {displayAdjustment.notes && (
+                      <div className="mt-3 pt-3 border-t border-red-200">
+                        <div className="flex items-start gap-2">
+                          <FileText className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                          <span className="text-xs text-red-600">
+                            <span className="font-medium">Reason:</span>{' '}
+                            <span className="italic">{displayAdjustment.notes}</span>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+              </div>
+            </div>
+          )}
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto overflow-x-hidden relative z-10">
+            <div className="space-y-8 p-1">
+              {/* Adjustment Overview - Simplified without card */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 border-b border-gray-200 pb-1">
+                  <AlertTriangle className="h-5 w-5" />
+                  Adjustment Overview
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Reference</span>
+                      <span className="text-gray-900 font-mono">: {displayAdjustment.reference_id}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Processed Date</span>
+                      <span className="text-gray-900">: {formatDate(displayAdjustment.processed_date)}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Total Quantity</span>
+                      <span className="text-gray-900">: {displayAdjustment.total_quantity}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Processed By</span>
+                      <span className="text-gray-900">: {displayAdjustment.processed_by}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Status</span>
+                      <span className="text-gray-900">: {displayAdjustment.status === 'cancelled' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          Cancelled
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Active
+                        </span>
+                      )}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
 
-            {/* Adjustment Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Adjustment Overview</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <Hash className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">Reference Number</p>
-                      <p className="text-sm text-gray-600 font-mono">{displayAdjustment.reference_id}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {displayAdjustment.status === 'cancelled' ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        Cancelled
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">Processed Date</p>
-                      <p className="text-sm text-gray-600">{formatDate(displayAdjustment.processed_date)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <User className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">Processed By</p>
-                      <p className="text-sm text-gray-600">{displayAdjustment.processed_by}</p>
-                    </div>
-                  </div>
+              {/* Adjustment Items - Enhanced visibility */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Adjustment Items ({displayAdjustment.items?.length || 0})
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Cancellation Info */}
-            {displayAdjustment.status === 'cancelled' && displayAdjustment.notes && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Cancellation</CardTitle>
-                  <CardDescription>Details of the cancellation</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="text-sm text-gray-700">
-                    <span className="font-medium">Reason: </span>
-                    {displayAdjustment.notes}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Adjustment Items */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Adjustment Items</CardTitle>
-                <CardDescription>Complete list of items in this adjustment</CardDescription>
-              </CardHeader>
-              <CardContent>
                 {isLoadingDetails ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
@@ -340,39 +347,51 @@ export function AdjustmentDetailsDialog({
                     <p className="text-gray-500">No items found for this adjustment</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Warehouse</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Cost Price</TableHead>
-                          <TableHead>Reason</TableHead>
+                  <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm overflow-x-auto">
+                    <Table className="min-w-full">
+                      <TableHeader className="bg-gray-100">
+                        <TableRow className="border-b border-gray-300">
+                          <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">Product Name</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">SKU</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">Warehouse</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-center py-3 px-4 text-sm">Quantity</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-right py-3 px-4 text-sm">Cost Price</TableHead>
+                          <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">Reason</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {displayAdjustment.items
                           .filter(item => item != null)
                           .map((item, index) => (
-                            <TableRow key={`${item.product_id}-${index}`}>
-                              <TableCell className="font-medium">{item.product_name}</TableCell>
-                              <TableCell className="font-mono text-sm">{item.product_sku}</TableCell>
-                              <TableCell>{item.warehouse_name}</TableCell>
-                              <TableCell className={`font-medium ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <TableRow 
+                              key={`${item.product_id}-${index}`}
+                              className={`border-b border-gray-200 ${
+                                index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                              }`}
+                            >
+                              <TableCell className="py-3 px-4 text-sm">
+                                <span className="font-medium text-gray-900">
+                                  {item.product_name}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-sm">
+                                <span className="font-mono text-gray-600">
+                                  {item.product_sku}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-sm text-gray-700">{item.warehouse_name}</TableCell>
+                              <TableCell className={`py-3 px-4 text-sm text-center font-semibold ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {item.quantity > 0 ? '+' : ''}{item.quantity}
                               </TableCell>
-                              <TableCell className="font-medium">₱{item.cost_price.toFixed(2)}</TableCell>
-                              <TableCell className="text-sm">{item.reason}</TableCell>
+                              <TableCell className="py-3 px-4 text-sm text-right font-mono text-gray-900">₱{item.cost_price.toFixed(2)}</TableCell>
+                              <TableCell className="py-3 px-4 text-sm text-gray-700">{item.reason}</TableCell>
                             </TableRow>
                           ))}
                       </TableBody>
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
 
               {/* Documents Section - Compact with Actions */}
               <div className="space-y-1">
@@ -389,24 +408,6 @@ export function AdjustmentDetailsDialog({
                   />
                 </div>
               </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-between">
-              <div>
-                {displayAdjustment && displayAdjustment.status !== 'cancelled' && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCancelDialog(true)}
-                    className="text-red-600 border-red-300 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Cancel Adjustment
-                  </Button>
-                )}
-              </div>
-              <Button variant="outline" onClick={handleClose}>
-                Close
-              </Button>
             </div>
           </div>
         </DialogContent>
