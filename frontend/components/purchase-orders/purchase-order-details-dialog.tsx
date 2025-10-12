@@ -269,47 +269,44 @@ export function PurchaseOrderDetailsDialog({
           <div className="flex-1 overflow-y-auto overflow-x-hidden relative z-10">
             <div className="space-y-6 p-1">
               {/* Order Overview - Simplified without card */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 border-b border-gray-200 pb-1">
                   <Package className="h-5 w-5" />
                   Order Overview
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-medium w-32">Reference:</span>
-                      <span className="text-gray-900 font-mono">{order.po_number || 'N/A'}</span>
+                      <span className="text-gray-600 font-bold w-32">Reference</span>
+                      <span className="text-gray-900 font-mono">: {order.po_number || 'N/A'}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-medium w-32">Purchase Date:</span>
-                      <span className="text-gray-900">{order.order_date ? formatDate(order.order_date) : 'N/A'}</span>
+                      <span className="text-gray-600 font-bold w-32">Purchase Date</span>
+                      <span className="text-gray-900">: {order.order_date ? formatDate(order.order_date) : 'N/A'}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-medium w-32">Received Date:</span>
-                      <span className="text-gray-900">{order.received_date ? formatDate(order.received_date) : 'Not received'}</span>
+                      <span className="text-gray-600 font-bold w-32">Received Date</span>
+                      <span className="text-gray-900">: {order.received_date ? formatDate(order.received_date) : 'Not received'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-32">Created At</span>
+                      <span className="text-gray-900">: {formatDateTime(order.created_at)}</span>
                     </div>
                   </div>
                   
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-medium w-32">Processed By:</span>
-                      <span className="text-gray-900">{order.created_by_first_name && order.created_by_last_name ? `${order.created_by_first_name} ${order.created_by_last_name}` : 'Unknown'}</span>
+                      <span className="text-gray-600 font-bold w-32">Processed By</span>
+                      <span className="text-gray-900">: {order.created_by_first_name && order.created_by_last_name ? `${order.created_by_first_name} ${order.created_by_last_name}` : 'Unknown'}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-medium w-32">Supplier:</span>
-                      <span className="text-gray-900">{order.supplier_name || 'Not specified'}</span>
+                      <span className="text-gray-600 font-bold w-32">Supplier</span>
+                      <span className="text-gray-900">: {order.supplier_name || 'Not specified'}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-medium w-32">Warehouse:</span>
-                      <span className="text-gray-900">{order.warehouse_name || 'Not specified'}</span>
+                      <span className="text-gray-600 font-bold w-32">Warehouse</span>
+                      <span className="text-gray-900">: {order.warehouse_name || 'Not specified'}</span>
                     </div>
-                  </div>
-                </div>
-                
-                <div className="pt-3 border-t border-gray-200">
-                  <div className="flex items-center text-sm">
-                    <span className="text-gray-600 font-medium w-32">Created At:</span>
-                    <span className="text-gray-900">{formatDateTime(order.created_at)}</span>
                   </div>
                 </div>
               </div>
