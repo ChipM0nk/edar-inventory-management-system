@@ -264,8 +264,16 @@ export function AdjustmentDetailsDialog({
                         <div className="flex items-start gap-2">
                           <FileText className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
                           <span className="text-xs text-red-600">
-                            <span className="font-medium">Reason:</span>{' '}
-                            <span className="italic">{displayAdjustment.notes}</span>
+                            <span className="font-medium">Cancellation Reason:</span>{' '}
+                            <span className="italic">
+                              {(() => {
+                                const notes = displayAdjustment.notes
+                                // Extract cancellation reason from mixed notes
+                                return notes.includes('| Cancelled:') 
+                                  ? notes.split('| Cancelled:')[1]?.trim() || 'No reason provided'
+                                  : notes
+                              })()}
+                            </span>
                           </span>
                         </div>
                       </div>
@@ -300,20 +308,16 @@ export function AdjustmentDetailsDialog({
                       <span className="text-gray-600 font-bold w-40">Warehouse</span>
                       <span className="text-gray-900">: {displayAdjustment.warehouse_name || 'Unknown'}</span>
                     </div>
-                    <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-40">Processed Date</span>
-                      <span className="text-gray-900">: {formatDate(displayAdjustment.processed_date)}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-40">Total Quantity</span>
-                      <span className="text-gray-900">: {displayAdjustment.total_quantity}</span>
-                    </div>
                   </div>
                   
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <span className="text-gray-600 font-bold w-40">Processed By</span>
                       <span className="text-gray-900">: {displayAdjustment.processed_by}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-40">Processed Date</span>
+                      <span className="text-gray-900">: {formatDate(displayAdjustment.processed_date)}</span>
                     </div>
                     <div className="flex items-center">
                       <span className="text-gray-600 font-bold w-40">Status</span>
@@ -409,13 +413,20 @@ export function AdjustmentDetailsDialog({
                 )}
               </div>
 
-              {/* Notes Section */}
+              {/* Notes Section - Simple text under the table */}
               {displayAdjustment.notes && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-600 font-semibold text-sm">NOTE:</span>
-                    <span className="text-gray-700 text-sm">{displayAdjustment.notes}</span>
-                  </div>
+                <div className="mt-2">
+                  <span className="text-red-600 font-semibold text-sm">NOTE:</span>
+                  <span className="text-gray-700 text-sm ml-2">
+                    {(() => {
+                      const notes = displayAdjustment.notes
+                      // For cancelled adjustments, extract original notes if they contain cancellation info
+                      if (displayAdjustment.status === 'cancelled' && notes.includes('| Cancelled:')) {
+                        return notes.split('| Cancelled:')[0].trim()
+                      }
+                      return notes
+                    })()}
+                  </span>
                 </div>
               )}
 
