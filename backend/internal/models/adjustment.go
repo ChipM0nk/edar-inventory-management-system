@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -17,19 +18,20 @@ type Adjustment struct {
 	ProcessedBy       *uuid.UUID `json:"processed_by,omitempty" db:"processed_by"`
 	ProcessedDate     *time.Time `json:"processed_date,omitempty" db:"processed_date"`
 	Notes             *string    `json:"notes,omitempty" db:"notes"`
+	ExternalReference *string    `json:"external_reference,omitempty" db:"external_reference"`
 	// Reference fields for PO/SO connections
-	ReferenceType     *string    `json:"reference_type,omitempty" db:"reference_type"`
-	ReferenceID       *uuid.UUID `json:"reference_id,omitempty" db:"reference_id"`
-	AdjustmentReason  *string    `json:"adjustment_reason,omitempty" db:"adjustment_reason"`
-	CreatedAt         time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at" db:"updated_at"`
+	ReferenceType    *string    `json:"reference_type,omitempty" db:"reference_type"`
+	ReferenceID      *uuid.UUID `json:"reference_id,omitempty" db:"reference_id"`
+	AdjustmentReason *string    `json:"adjustment_reason,omitempty" db:"adjustment_reason"`
+	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
 	// Joined fields
-	CreatedByFirstName  *string `json:"created_by_first_name,omitempty" db:"created_by_first_name"`
-	CreatedByLastName   *string `json:"created_by_last_name,omitempty" db:"created_by_last_name"`
+	CreatedByFirstName   *string `json:"created_by_first_name,omitempty" db:"created_by_first_name"`
+	CreatedByLastName    *string `json:"created_by_last_name,omitempty" db:"created_by_last_name"`
 	ProcessedByFirstName *string `json:"processed_by_first_name,omitempty" db:"processed_by_first_name"`
 	ProcessedByLastName  *string `json:"processed_by_last_name,omitempty" db:"processed_by_last_name"`
 	// Items
-	Items               []AdjustmentItem `json:"items,omitempty"`
+	Items []AdjustmentItem `json:"items,omitempty"`
 }
 
 type AdjustmentItem struct {
@@ -48,18 +50,19 @@ type AdjustmentItem struct {
 }
 
 type CreateAdjustmentRequest struct {
-	ReferenceNumber string     `json:"reference_number" validate:"required"`
-	AdjustmentDate  time.Time  `json:"adjustment_date" validate:"required"`
-	TotalQuantity   int        `json:"total_quantity" validate:"min=0"`
-	Reason          *string    `json:"reason,omitempty"`
-	Status          string     `json:"status" validate:"oneof=pending approved completed cancelled"`
-	Notes           *string    `json:"notes,omitempty"`
-	CreatedBy       uuid.UUID  `json:"created_by" validate:"required"`
+	ReferenceNumber   string    `json:"reference_number" validate:"required"`
+	AdjustmentDate    time.Time `json:"adjustment_date" validate:"required"`
+	TotalQuantity     int       `json:"total_quantity" validate:"min=0"`
+	Reason            *string   `json:"reason,omitempty"`
+	Status            string    `json:"status" validate:"oneof=pending approved completed cancelled"`
+	Notes             *string   `json:"notes,omitempty"`
+	ExternalReference *string   `json:"external_reference,omitempty"`
+	CreatedBy         uuid.UUID `json:"created_by" validate:"required"`
 	// Reference fields for PO/SO connections
-	ReferenceType    *string `json:"reference_type,omitempty" validate:"omitempty,oneof=purchase_order sales_order cycle_count damage theft expired transfer other"`
-	ReferenceID      *uuid.UUID `json:"reference_id,omitempty"`
-	AdjustmentReason *string `json:"adjustment_reason,omitempty" validate:"omitempty,oneof=receiving_discrepancy damaged_goods quality_issue short_shipment over_shipment customer_return defective_return exchange warranty_replacement cycle_count_correction theft_loss expired_product storage_damage transfer_correction other"`
-	Items           []CreateAdjustmentItemRequest `json:"items" validate:"required,min=1"`
+	ReferenceType    *string                       `json:"reference_type,omitempty" validate:"omitempty,oneof=purchase_order sales_order cycle_count damage theft expired transfer other"`
+	ReferenceID      *uuid.UUID                    `json:"reference_id,omitempty"`
+	AdjustmentReason *string                       `json:"adjustment_reason,omitempty" validate:"omitempty,oneof=receiving_discrepancy damaged_goods quality_issue short_shipment over_shipment customer_return defective_return exchange warranty_replacement cycle_count_correction theft_loss expired_product storage_damage transfer_correction other"`
+	Items            []CreateAdjustmentItemRequest `json:"items" validate:"required,min=1"`
 }
 
 type CreateAdjustmentItemRequest struct {
@@ -82,13 +85,13 @@ type UpdateAdjustmentRequest struct {
 }
 
 type AdjustmentFilter struct {
-	Page           int        `json:"page"`
-	Limit          int        `json:"limit"`
-	ReferenceNumber *string   `json:"reference_number,omitempty"`
-	Status         *string    `json:"status,omitempty"`
-	CreatedBy      *uuid.UUID `json:"created_by,omitempty"`
-	DateFrom       *time.Time `json:"date_from,omitempty"`
-	DateTo         *time.Time `json:"date_to,omitempty"`
+	Page            int        `json:"page"`
+	Limit           int        `json:"limit"`
+	ReferenceNumber *string    `json:"reference_number,omitempty"`
+	Status          *string    `json:"status,omitempty"`
+	CreatedBy       *uuid.UUID `json:"created_by,omitempty"`
+	DateFrom        *time.Time `json:"date_from,omitempty"`
+	DateTo          *time.Time `json:"date_to,omitempty"`
 }
 
 type AdjustmentListResponse struct {

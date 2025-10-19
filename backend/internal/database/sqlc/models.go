@@ -27,6 +27,8 @@ type Adjustment struct {
 	Notes         *string            `json:"notes"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	// External reference number (PO, SO, Transfer, etc.) provided by user
+	ExternalReference *string `json:"external_reference"`
 }
 
 // Individual items within an adjustment - normalized table with only necessary fields

@@ -1,15 +1,16 @@
 package services
 
 import (
-    "context"
-    "fmt"
-    "time"
+	"context"
+	"fmt"
+	"time"
 
-    "github.com/google/uuid"
-    "inventory-system/internal/database"
-    sqlc "inventory-system/internal/database/sqlc"
-    "inventory-system/internal/models"
-    "inventory-system/internal/utils"
+	"inventory-system/internal/database"
+	sqlc "inventory-system/internal/database/sqlc"
+	"inventory-system/internal/models"
+	"inventory-system/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 type AdjustmentService struct {
@@ -27,7 +28,7 @@ func NewAdjustmentService(db *database.DB, stockService *StockService) *Adjustme
 // CreateAdjustment creates a new adjustment with items
 func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest) (*models.Adjustment, error) {
 	ctx := context.Background()
-	
+
 	// Start a transaction
 	tx, err := s.db.BeginTx(ctx)
 	if err != nil {
@@ -37,15 +38,16 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 
 	// Create the adjustment
 	adjustmentParams := sqlc.CreateAdjustmentParams{
-		ReferenceNumber:  req.ReferenceNumber,
-		AdjustmentDate:   utils.TimeToPgxDate(req.AdjustmentDate),
-		TotalQuantity:    int32(req.TotalQuantity),
-		Reason:           req.Reason,
-		Status:           "completed", // Auto-complete adjustments
-		CreatedBy:        utils.UUIDToPgxUUID(req.CreatedBy),
-		ProcessedBy:      utils.UUIDToPgxUUID(req.CreatedBy), // Set processed by to creator
-		ProcessedDate:    utils.TimeToPgxTimestamptz(req.AdjustmentDate),
-		Notes:            req.Notes,
+		ReferenceNumber:   req.ReferenceNumber,
+		AdjustmentDate:    utils.TimeToPgxDate(req.AdjustmentDate),
+		TotalQuantity:     int32(req.TotalQuantity),
+		Reason:            req.Reason,
+		Status:            "completed", // Auto-complete adjustments
+		CreatedBy:         utils.UUIDToPgxUUID(req.CreatedBy),
+		ProcessedBy:       utils.UUIDToPgxUUID(req.CreatedBy), // Set processed by to creator
+		ProcessedDate:     utils.TimeToPgxTimestamptz(req.AdjustmentDate),
+		Notes:             req.Notes,
+		ExternalReference: req.ExternalReference,
 	}
 
 	adjustment, err := s.db.Queries.WithTx(tx).CreateAdjustment(ctx, &adjustmentParams)
@@ -56,12 +58,12 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 	// Create adjustment items
 	for _, item := range req.Items {
 		itemParams := sqlc.CreateAdjustmentItemParams{
-			AdjustmentID:     adjustment.ID,
-			ProductID:        utils.UUIDToPgxUUID(item.ProductID),
-			WarehouseID:      utils.UUIDToPgxUUID(item.WarehouseID),
-			Quantity:         int32(item.Quantity),
-			Reason:           item.Reason,
-			CostPrice:        utils.Float64ToPgxNumeric(item.CostPrice),
+			AdjustmentID: adjustment.ID,
+			ProductID:    utils.UUIDToPgxUUID(item.ProductID),
+			WarehouseID:  utils.UUIDToPgxUUID(item.WarehouseID),
+			Quantity:     int32(item.Quantity),
+			Reason:       item.Reason,
+			CostPrice:    utils.Float64ToPgxNumeric(item.CostPrice),
 		}
 
 		_, err := s.db.Queries.WithTx(tx).CreateAdjustmentItem(ctx, &itemParams)
@@ -84,7 +86,7 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 			MovementType:  "adjustment",
 			Quantity:      item.Quantity, // This will be positive for additions, negative for subtractions
 			CostPrice:     &item.CostPrice,
-			ReferenceType: stringPtr("adjustment"),
+			ReferenceType: utils.StringPtr("adjustment"),
 			ReferenceID:   &adjustmentID,
 		}
 
@@ -117,7 +119,7 @@ func (s *AdjustmentService) GetAdjustment(id uuid.UUID) (*models.Adjustment, err
 	}
 
 	adjustmentModel := s.convertToAdjustmentModel(*adjustment)
-	
+
 	// Convert items to models
 	adjustmentItems := make([]models.AdjustmentItem, len(items))
 	for i, item := range items {
@@ -135,7 +137,7 @@ func (s *AdjustmentService) GetAdjustment(id uuid.UUID) (*models.Adjustment, err
 			WarehouseName: &item.WarehouseName,
 		}
 	}
-	
+
 	adjustmentModel.Items = adjustmentItems
 	return adjustmentModel, nil
 }
@@ -213,91 +215,92 @@ func (s *AdjustmentService) DeleteAdjustment(id uuid.UUID) error {
 
 // CancelAdjustment sets an adjustment to cancelled, stores cancellation info, and reverses stock movements
 func (s *AdjustmentService) CancelAdjustment(adjustmentID uuid.UUID, cancelledBy uuid.UUID, reason string) (*models.Adjustment, error) {
-    ctx := context.Background()
+	ctx := context.Background()
 
-    // Load current adjustment and items
-    adjRow, err := s.db.Queries.GetAdjustment(ctx, utils.UUIDToPgxUUID(adjustmentID))
-    if err != nil {
-        return nil, fmt.Errorf("failed to load adjustment: %w", err)
-    }
-    if adjRow.Status == "cancelled" {
-        return nil, fmt.Errorf("adjustment is already cancelled")
-    }
+	// Load current adjustment and items
+	adjRow, err := s.db.Queries.GetAdjustment(ctx, utils.UUIDToPgxUUID(adjustmentID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load adjustment: %w", err)
+	}
+	if adjRow.Status == "cancelled" {
+		return nil, fmt.Errorf("adjustment is already cancelled")
+	}
 
-    items, err := s.db.Queries.GetAdjustmentItems(ctx, utils.UUIDToPgxUUID(adjustmentID))
-    if err != nil {
-        return nil, fmt.Errorf("failed to load adjustment items: %w", err)
-    }
+	items, err := s.db.Queries.GetAdjustmentItems(ctx, utils.UUIDToPgxUUID(adjustmentID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load adjustment items: %w", err)
+	}
 
-    // Build cancellation note appended to existing notes
-    notePrefix := "Cancelled"
-    if reason != "" {
-        notePrefix = notePrefix + ": " + reason
-    }
-    var updatedNotes *string
-    if adjRow.Notes != nil && *adjRow.Notes != "" {
-        combined := *adjRow.Notes + " | " + notePrefix
-        updatedNotes = &combined
-    } else {
-        updatedNotes = &notePrefix
-    }
+	// Build cancellation note appended to existing notes
+	notePrefix := "Cancelled"
+	if reason != "" {
+		notePrefix = notePrefix + ": " + reason
+	}
+	var updatedNotes *string
+	if adjRow.Notes != nil && *adjRow.Notes != "" {
+		combined := *adjRow.Notes + " | " + notePrefix
+		updatedNotes = &combined
+	} else {
+		updatedNotes = &notePrefix
+	}
 
-    // Update adjustment as cancelled
-    updated, err := s.db.Queries.UpdateAdjustment(ctx, &sqlc.UpdateAdjustmentParams{
-        ID:              adjRow.ID,
-        ReferenceNumber: adjRow.ReferenceNumber,
-        AdjustmentDate:  adjRow.AdjustmentDate,
-        TotalQuantity:   adjRow.TotalQuantity,
-        Reason:          adjRow.Reason,
-        Status:          "cancelled",
-        ProcessedBy:     utils.UUIDToPgxUUID(cancelledBy),
-        ProcessedDate:   utils.TimeToPgxTimestamptz(time.Now()),
-        Notes:           updatedNotes,
-    })
-    if err != nil {
-        return nil, fmt.Errorf("failed to cancel adjustment: %w", err)
-    }
+	// Update adjustment as cancelled
+	updated, err := s.db.Queries.UpdateAdjustment(ctx, &sqlc.UpdateAdjustmentParams{
+		ID:              adjRow.ID,
+		ReferenceNumber: adjRow.ReferenceNumber,
+		AdjustmentDate:  adjRow.AdjustmentDate,
+		TotalQuantity:   adjRow.TotalQuantity,
+		Reason:          adjRow.Reason,
+		Status:          "cancelled",
+		ProcessedBy:     utils.UUIDToPgxUUID(cancelledBy),
+		ProcessedDate:   utils.TimeToPgxTimestamptz(time.Now()),
+		Notes:           updatedNotes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to cancel adjustment: %w", err)
+	}
 
-    // Reverse stock movements for all items
-    adjUUID := utils.PgxUUIDToUUID(updated.ID)
-    for _, it := range items {
-        // Reverse quantity
-        reverseQty := -int(it.Quantity)
-        stockReq := models.CreateStockMovementRequest{
-            ProductID:     utils.PgxUUIDToUUID(it.ProductID),
-            WarehouseID:   utils.PgxUUIDToUUID(it.WarehouseID),
-            MovementType:  "adjustment",
-            Quantity:      reverseQty,
-            CostPrice:     nil, // cost not required for reversal effect on quantity
-            ReferenceType: stringPtr("adjustment_cancellation"),
-            ReferenceID:   &adjUUID,
-        }
+	// Reverse stock movements for all items
+	adjUUID := utils.PgxUUIDToUUID(updated.ID)
+	for _, it := range items {
+		// Reverse quantity
+		reverseQty := -int(it.Quantity)
+		stockReq := models.CreateStockMovementRequest{
+			ProductID:     utils.PgxUUIDToUUID(it.ProductID),
+			WarehouseID:   utils.PgxUUIDToUUID(it.WarehouseID),
+			MovementType:  "adjustment",
+			Quantity:      reverseQty,
+			CostPrice:     nil, // cost not required for reversal effect on quantity
+			ReferenceType: utils.StringPtr("adjustment_cancellation"),
+			ReferenceID:   &adjUUID,
+		}
 
-        if _, err := s.stockService.CreateStockMovement(ctx, stockReq, &cancelledBy); err != nil {
-            return nil, fmt.Errorf("failed to create reversal stock movement: %w", err)
-        }
-    }
+		if _, err := s.stockService.CreateStockMovement(ctx, stockReq, &cancelledBy); err != nil {
+			return nil, fmt.Errorf("failed to create reversal stock movement: %w", err)
+		}
+	}
 
-    return s.convertToAdjustmentModelFromAdjustment(updated), nil
+	return s.convertToAdjustmentModelFromAdjustment(updated), nil
 }
 
 // convertToAdjustmentModel converts database model to API model
 func (s *AdjustmentService) convertToAdjustmentModel(adj sqlc.GetAdjustmentRow) *models.Adjustment {
 	return &models.Adjustment{
-		ID:                utils.PgxUUIDToUUID(adj.ID),
-		ReferenceNumber:   adj.ReferenceNumber,
-		AdjustmentDate:    utils.PgxDateToTime(adj.AdjustmentDate),
-		TotalQuantity:     int(adj.TotalQuantity),
-		Reason:            adj.Reason,
-		Status:            adj.Status,
-		CreatedBy:         utils.PgxUUIDToUUID(adj.CreatedBy),
-		ProcessedBy:       utils.OptionalPgxUUIDToUUID(adj.ProcessedBy),
-		ProcessedDate:     utils.OptionalPgxTimestamptzToTimePtr(adj.ProcessedDate),
-		Notes:             adj.Notes,
-		CreatedAt:         utils.PgxTimestamptzToTime(adj.CreatedAt),
-		UpdatedAt:         utils.PgxTimestamptzToTime(adj.UpdatedAt),
-		CreatedByFirstName:  adj.CreatedByFirstName,
-		CreatedByLastName:   adj.CreatedByLastName,
+		ID:                   utils.PgxUUIDToUUID(adj.ID),
+		ReferenceNumber:      adj.ReferenceNumber,
+		AdjustmentDate:       utils.PgxDateToTime(adj.AdjustmentDate),
+		TotalQuantity:        int(adj.TotalQuantity),
+		Reason:               adj.Reason,
+		Status:               adj.Status,
+		CreatedBy:            utils.PgxUUIDToUUID(adj.CreatedBy),
+		ProcessedBy:          utils.OptionalPgxUUIDToUUID(adj.ProcessedBy),
+		ProcessedDate:        utils.OptionalPgxTimestamptzToTimePtr(adj.ProcessedDate),
+		Notes:                adj.Notes,
+		ExternalReference:    adj.ExternalReference,
+		CreatedAt:            utils.PgxTimestamptzToTime(adj.CreatedAt),
+		UpdatedAt:            utils.PgxTimestamptzToTime(adj.UpdatedAt),
+		CreatedByFirstName:   adj.CreatedByFirstName,
+		CreatedByLastName:    adj.CreatedByLastName,
 		ProcessedByFirstName: adj.ProcessedByFirstName,
 		ProcessedByLastName:  adj.ProcessedByLastName,
 	}
@@ -306,20 +309,21 @@ func (s *AdjustmentService) convertToAdjustmentModel(adj sqlc.GetAdjustmentRow) 
 // convertToAdjustmentModelFromAdjustment converts database Adjustment model to API model
 func (s *AdjustmentService) convertToAdjustmentModelFromAdjustment(adj *sqlc.Adjustment) *models.Adjustment {
 	return &models.Adjustment{
-		ID:                utils.PgxUUIDToUUID(adj.ID),
-		ReferenceNumber:   adj.ReferenceNumber,
-		AdjustmentDate:    utils.PgxDateToTime(adj.AdjustmentDate),
-		TotalQuantity:     int(adj.TotalQuantity),
-		Reason:            adj.Reason,
-		Status:            adj.Status,
-		CreatedBy:         utils.PgxUUIDToUUID(adj.CreatedBy),
-		ProcessedBy:       utils.OptionalPgxUUIDToUUID(adj.ProcessedBy),
-		ProcessedDate:     utils.OptionalPgxTimestamptzToTimePtr(adj.ProcessedDate),
-		Notes:             adj.Notes,
-		CreatedAt:         utils.PgxTimestamptzToTime(adj.CreatedAt),
-		UpdatedAt:         utils.PgxTimestamptzToTime(adj.UpdatedAt),
-		CreatedByFirstName:  nil, // Not available in basic Adjustment model
-		CreatedByLastName:   nil,
+		ID:                   utils.PgxUUIDToUUID(adj.ID),
+		ReferenceNumber:      adj.ReferenceNumber,
+		AdjustmentDate:       utils.PgxDateToTime(adj.AdjustmentDate),
+		TotalQuantity:        int(adj.TotalQuantity),
+		Reason:               adj.Reason,
+		Status:               adj.Status,
+		CreatedBy:            utils.PgxUUIDToUUID(adj.CreatedBy),
+		ProcessedBy:          utils.OptionalPgxUUIDToUUID(adj.ProcessedBy),
+		ProcessedDate:        utils.OptionalPgxTimestamptzToTimePtr(adj.ProcessedDate),
+		Notes:                adj.Notes,
+		ExternalReference:    adj.ExternalReference,
+		CreatedAt:            utils.PgxTimestamptzToTime(adj.CreatedAt),
+		UpdatedAt:            utils.PgxTimestamptzToTime(adj.UpdatedAt),
+		CreatedByFirstName:   nil, // Not available in basic Adjustment model
+		CreatedByLastName:    nil,
 		ProcessedByFirstName: nil,
 		ProcessedByLastName:  nil,
 	}
@@ -328,26 +332,22 @@ func (s *AdjustmentService) convertToAdjustmentModelFromAdjustment(adj *sqlc.Adj
 // convertToAdjustmentModelFromListRow converts database ListAdjustmentsRow model to API model
 func (s *AdjustmentService) convertToAdjustmentModelFromListRow(adj sqlc.ListAdjustmentsRow) *models.Adjustment {
 	return &models.Adjustment{
-		ID:                utils.PgxUUIDToUUID(adj.ID),
-		ReferenceNumber:   adj.ReferenceNumber,
-		AdjustmentDate:    utils.PgxDateToTime(adj.AdjustmentDate),
-		TotalQuantity:     int(adj.TotalQuantity),
-		Reason:            adj.Reason,
-		Status:            adj.Status,
-		CreatedBy:         utils.PgxUUIDToUUID(adj.CreatedBy),
-		ProcessedBy:       utils.OptionalPgxUUIDToUUID(adj.ProcessedBy),
-		ProcessedDate:     utils.OptionalPgxTimestamptzToTimePtr(adj.ProcessedDate),
-		Notes:             adj.Notes,
-		CreatedAt:         utils.PgxTimestamptzToTime(adj.CreatedAt),
-		UpdatedAt:         utils.PgxTimestamptzToTime(adj.UpdatedAt),
-		CreatedByFirstName:  adj.CreatedByFirstName,
-		CreatedByLastName:   adj.CreatedByLastName,
+		ID:                   utils.PgxUUIDToUUID(adj.ID),
+		ReferenceNumber:      adj.ReferenceNumber,
+		AdjustmentDate:       utils.PgxDateToTime(adj.AdjustmentDate),
+		TotalQuantity:        int(adj.TotalQuantity),
+		Reason:               adj.Reason,
+		Status:               adj.Status,
+		CreatedBy:            utils.PgxUUIDToUUID(adj.CreatedBy),
+		ProcessedBy:          utils.OptionalPgxUUIDToUUID(adj.ProcessedBy),
+		ProcessedDate:        utils.OptionalPgxTimestamptzToTimePtr(adj.ProcessedDate),
+		Notes:                adj.Notes,
+		ExternalReference:    adj.ExternalReference,
+		CreatedAt:            utils.PgxTimestamptzToTime(adj.CreatedAt),
+		UpdatedAt:            utils.PgxTimestamptzToTime(adj.UpdatedAt),
+		CreatedByFirstName:   adj.CreatedByFirstName,
+		CreatedByLastName:    adj.CreatedByLastName,
 		ProcessedByFirstName: adj.ProcessedByFirstName,
 		ProcessedByLastName:  adj.ProcessedByLastName,
 	}
-}
-
-// Helper function to create string pointer
-func stringPtr(s string) *string {
-	return &s
 }
