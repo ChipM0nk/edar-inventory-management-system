@@ -390,6 +390,16 @@ export function PurchaseOrderDetailsDialog({
                 </div>
               </div>
 
+              {/* Notes Section - Simple text below table */}
+              {order.notes && (
+                <div className="flex items-center gap-2 text-sm mt-1">
+                  <span className="text-red-600 font-semibold">NOTE:</span>
+                  <span className="text-gray-700">
+                    {order.notes}
+                  </span>
+                </div>
+              )}
+
               {/* Documents Section - Compact with Actions */}
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-base font-semibold text-gray-900 border-b border-gray-200 pb-1">

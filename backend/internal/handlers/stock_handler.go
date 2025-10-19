@@ -1,9 +1,10 @@
 package handlers
 
 import (
-	"net/http"
 	"inventory-system/internal/models"
 	"inventory-system/internal/services"
+	"inventory-system/internal/utils"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -284,19 +285,40 @@ func (h *StockHandler) GetSOHReport(c *gin.Context) {
 func (h *StockHandler) CreateBulkStockMovement(c *gin.Context) {
 	var req models.BulkStockMovementRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.DebugLog("CreateBulkStockMovement", "JSON binding error", map[string]interface{}{
+			"error": err.Error(),
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Debug logging for request data
+	utils.DebugLog("CreateBulkStockMovement", "Request received", map[string]interface{}{
+		"supplier_id":       req.SupplierID,
+		"reference_number":  req.ReferenceNumber,
+		"processed_by":      req.ProcessedBy,
+		"processed_date":    req.ProcessedDate,
+		"purchase_order_id": req.PurchaseOrderID,
+		"items_count":       len(req.Items),
+		"items":             req.Items,
+	})
+
 	// Get user ID from context (set by auth middleware)
 	userID, exists := c.Get("user_id")
 	if !exists {
+		utils.DebugLog("CreateBulkStockMovement", "Authentication error", map[string]interface{}{
+			"error": "User not authenticated",
+		})
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
 	userUUID, ok := userID.(uuid.UUID)
 	if !ok {
+		utils.DebugLog("CreateBulkStockMovement", "Invalid user ID", map[string]interface{}{
+			"user_id": userID,
+			"error":   "Invalid user ID format",
+		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
 		return
 	}
@@ -304,18 +326,43 @@ func (h *StockHandler) CreateBulkStockMovement(c *gin.Context) {
 	// Set processed_by to current user if not provided
 	if req.ProcessedBy == uuid.Nil {
 		req.ProcessedBy = userUUID
+		utils.DebugLog("CreateBulkStockMovement", "Set processed_by to current user", map[string]interface{}{
+			"processed_by": userUUID,
+		})
 	}
 
 	// Set processed_date to current time if not provided
 	if req.ProcessedDate.IsZero() {
 		req.ProcessedDate = time.Now()
+		utils.DebugLog("CreateBulkStockMovement", "Set processed_date to current time", map[string]interface{}{
+			"processed_date": req.ProcessedDate,
+		})
 	}
+
+	utils.DebugLog("CreateBulkStockMovement", "Calling service", map[string]interface{}{
+		"supplier_id":       req.SupplierID,
+		"reference_number":  req.ReferenceNumber,
+		"purchase_order_id": req.PurchaseOrderID,
+		"items_count":       len(req.Items),
+	})
 
 	stockMovements, err := h.stockService.CreateBulkStockMovement(c.Request.Context(), req, &userUUID)
 	if err != nil {
+		utils.DebugLog("CreateBulkStockMovement", "Service error", map[string]interface{}{
+			"error":             err.Error(),
+			"supplier_id":       req.SupplierID,
+			"reference_number":  req.ReferenceNumber,
+			"purchase_order_id": req.PurchaseOrderID,
+		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	utils.DebugLog("CreateBulkStockMovement", "Success", map[string]interface{}{
+		"created_movements": len(stockMovements),
+		"supplier_id":       req.SupplierID,
+		"reference_number":  req.ReferenceNumber,
+	})
 
 	c.JSON(http.StatusCreated, gin.H{"stock_movements": stockMovements})
 }

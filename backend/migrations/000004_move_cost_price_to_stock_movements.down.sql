@@ -24,3 +24,4 @@ ALTER TABLE stock_movements DROP COLUMN IF EXISTS cost_price;
 
 
 
+

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"inventory-system/internal/models"
 	"inventory-system/internal/services"
+	"inventory-system/internal/utils"
 	"io"
 	"net/http"
 	"os"
@@ -19,7 +20,7 @@ import (
 func isViewableFileType(fileType string) bool {
 	viewableTypes := []string{
 		"image/jpeg",
-		"image/jpg", 
+		"image/jpg",
 		"image/png",
 		"image/gif",
 		"image/webp",
@@ -29,7 +30,7 @@ func isViewableFileType(fileType string) bool {
 		"text/css",
 		"text/javascript",
 	}
-	
+
 	fileType = strings.ToLower(fileType)
 	for _, viewableType := range viewableTypes {
 		if fileType == viewableType {
@@ -54,24 +55,36 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 	referenceType := c.PostForm("reference_type")
 	referenceID := c.PostForm("reference_id")
 	purchaseOrderID := c.PostForm("purchase_order_id")
-	
-	fmt.Printf("Document upload parameters - reference_type: '%s', reference_id: '%s', purchase_order_id: '%s'\n", 
-		referenceType, referenceID, purchaseOrderID)
-	
+
+	utils.DebugLog("UploadDocuments", "Request received", map[string]interface{}{
+		"reference_type":    referenceType,
+		"reference_id":      referenceID,
+		"purchase_order_id": purchaseOrderID,
+	})
+
 	// Support legacy purchase_order_id parameter for backward compatibility
 	if referenceType == "" && referenceID == "" {
 		if purchaseOrderID != "" {
 			referenceType = "purchase_order"
 			referenceID = purchaseOrderID
-			fmt.Printf("Using legacy purchase_order_id parameter: %s\n", purchaseOrderID)
+			utils.DebugLog("UploadDocuments", "Using legacy purchase_order_id parameter", map[string]interface{}{
+				"purchase_order_id": purchaseOrderID,
+				"reference_type":    referenceType,
+				"reference_id":      referenceID,
+			})
 		}
 	}
-	
+
 	if referenceType == "" || referenceID == "" {
+		utils.DebugLog("UploadDocuments", "Validation error", map[string]interface{}{
+			"error":          "Reference type and ID are required",
+			"reference_type": referenceType,
+			"reference_id":   referenceID,
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Reference type and ID are required (or purchase_order_id for legacy support)"})
 		return
 	}
-	
+
 	// Validate reference type
 	validTypes := []string{"purchase_order", "adjustment", "transfer", "sales_order"}
 	isValidType := false
@@ -82,21 +95,38 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		}
 	}
 	if !isValidType {
+		utils.DebugLog("UploadDocuments", "Invalid reference type", map[string]interface{}{
+			"reference_type": referenceType,
+			"valid_types":    validTypes,
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reference type. Must be one of: purchase_order, adjustment, transfer, sales_order"})
 		return
 	}
 
 	form, err := c.MultipartForm()
 	if err != nil {
+		utils.DebugLog("UploadDocuments", "Multipart form error", map[string]interface{}{
+			"error": err.Error(),
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse multipart form"})
 		return
 	}
 
 	files := form.File["documents"]
 	if len(files) == 0 {
+		utils.DebugLog("UploadDocuments", "No documents provided", map[string]interface{}{
+			"reference_type": referenceType,
+			"reference_id":   referenceID,
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No documents provided"})
 		return
 	}
+
+	utils.DebugLog("UploadDocuments", "Processing files", map[string]interface{}{
+		"reference_type": referenceType,
+		"reference_id":   referenceID,
+		"file_count":     len(files),
+	})
 
 	var uploadedDocs []string
 
@@ -105,7 +135,7 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		now := time.Now()
 		year := now.Format("2006")
 		month := now.Format("01")
-		
+
 		// Create directory structure based on reference type: /{reference_type}/year/month/
 		// Get current working directory and build path to project root
 		wd, err := os.Getwd()
@@ -117,7 +147,7 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		if filepath.Base(wd) == "backend" {
 			wd = filepath.Dir(wd)
 		}
-		
+
 		// Use appropriate subdirectory based on reference type
 		var subDir string
 		switch referenceType {
@@ -132,7 +162,7 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		default:
 			subDir = "misc"
 		}
-		
+
 		// Use backend/documents directory
 		dirPath := filepath.Join(wd, "backend", "documents", subDir, year, month)
 		if err := os.MkdirAll(dirPath, 0755); err != nil {
@@ -147,13 +177,24 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 		filePath := filepath.Join(dirPath, fileName)
 
 		// Save file
-		fmt.Printf("Attempting to save file to: %s\n", filePath)
+		utils.DebugLog("UploadDocuments", "Saving file", map[string]interface{}{
+			"filename": file.Filename,
+			"filepath": filePath,
+			"size":     file.Size,
+		})
 		if err := c.SaveUploadedFile(file, filePath); err != nil {
-			fmt.Printf("Error saving file: %v\n", err)
+			utils.DebugLog("UploadDocuments", "File save error", map[string]interface{}{
+				"filename": file.Filename,
+				"filepath": filePath,
+				"error":    err.Error(),
+			})
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
 			return
 		}
-		fmt.Printf("File saved successfully to: %s\n", filePath)
+		utils.DebugLog("UploadDocuments", "File saved successfully", map[string]interface{}{
+			"filename": file.Filename,
+			"filepath": filePath,
+		})
 
 		// Save document record to database
 		relativePath := filepath.Join(subDir, year, month, fileName)
@@ -166,15 +207,35 @@ func (h *DocumentHandler) UploadDocuments(c *gin.Context) {
 			FileType:      file.Header.Get("Content-Type"),
 		})
 		if err != nil {
+			utils.DebugLog("UploadDocuments", "Database save error", map[string]interface{}{
+				"filename":       file.Filename,
+				"reference_type": referenceType,
+				"reference_id":   referenceID,
+				"error":          err.Error(),
+			})
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save document record"})
 			return
 		}
 
+		utils.DebugLog("UploadDocuments", "Document record created", map[string]interface{}{
+			"document_id":    doc.ID,
+			"filename":       file.Filename,
+			"reference_type": referenceType,
+			"reference_id":   referenceID,
+		})
+
 		uploadedDocs = append(uploadedDocs, doc.ID)
 	}
 
+	utils.DebugLog("UploadDocuments", "Success", map[string]interface{}{
+		"reference_type": referenceType,
+		"reference_id":   referenceID,
+		"uploaded_count": len(uploadedDocs),
+		"document_ids":   uploadedDocs,
+	})
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Documents uploaded successfully",
+		"message":      "Documents uploaded successfully",
 		"document_ids": uploadedDocs,
 	})
 }
@@ -200,7 +261,7 @@ func (h *DocumentHandler) GetDocuments(c *gin.Context) {
 func (h *DocumentHandler) GetDocumentsByReference(c *gin.Context) {
 	referenceType := c.Param("reference_type")
 	referenceID := c.Param("reference_id")
-	
+
 	if referenceType == "" || referenceID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Reference type and ID are required"})
 		return
@@ -262,14 +323,14 @@ func (h *DocumentHandler) DownloadDocument(c *gin.Context) {
 	// Set headers for file download/viewing
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
-	
+
 	// Use inline disposition for viewable files, attachment for others
 	if isViewableFileType(document.FileType) {
 		c.Header("Content-Disposition", "inline; filename="+document.FileName)
 	} else {
 		c.Header("Content-Disposition", "attachment; filename="+document.FileName)
 	}
-	
+
 	// Use the actual file type from database
 	c.Header("Content-Type", document.FileType)
 
@@ -319,7 +380,6 @@ func (h *DocumentHandler) DeleteDocument(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Document deleted successfully"})
 }
-
 
 // GetDocumentsByType retrieves all documents of a specific type
 func (h *DocumentHandler) GetDocumentsByType(c *gin.Context) {

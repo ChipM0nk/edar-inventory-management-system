@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"inventory-system/internal/models"
 	"inventory-system/internal/services"
+	"inventory-system/internal/utils"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -37,27 +39,69 @@ func NewPurchaseOrderHandler(purchaseOrderService *services.PurchaseOrderService
 func (h *PurchaseOrderHandler) CreatePurchaseOrder(c *gin.Context) {
 	var req models.CreatePurchaseOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.DebugLog("CreatePurchaseOrder", "JSON binding error", map[string]interface{}{
+			"error": err.Error(),
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Debug logging for request data
+	utils.DebugLog("CreatePurchaseOrder", "Request received", map[string]interface{}{
+		"po_number":         req.PoNumber,
+		"supplier_name":     req.SupplierName,
+		"supplier_contact":  req.SupplierContact,
+		"order_date":        req.OrderDate,
+		"expected_delivery": req.ExpectedDeliveryDate,
+		"notes":             req.Notes,
+		"created_by":        req.CreatedBy,
+		"warehouse_id":      req.WarehouseID,
+	})
+
 	// Validate required fields
 	if req.PoNumber == "" {
+		utils.DebugLog("CreatePurchaseOrder", "Validation error", map[string]interface{}{
+			"error": "PO Reference Number is required",
+		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "PO Reference Number is required"})
 		return
 	}
 
+	utils.DebugLog("CreatePurchaseOrder", "Calling service", map[string]interface{}{
+		"po_number": req.PoNumber,
+	})
+
 	purchaseOrder, err := h.purchaseOrderService.CreatePurchaseOrder(req)
 	if err != nil {
+		utils.DebugLog("CreatePurchaseOrder", "Service error", map[string]interface{}{
+			"error":     err.Error(),
+			"po_number": req.PoNumber,
+		})
+
 		// Check for specific error types and return appropriate status codes
-		if err.Error() == "duplicate key value violates unique constraint \"purchase_orders_po_number_key\"" || 
-		   err.Error() == "pq: duplicate key value violates unique constraint \"purchase_orders_po_number_key\"" {
+		errorMsg := err.Error()
+		if strings.Contains(errorMsg, "purchase_orders_po_number_key") ||
+			strings.Contains(errorMsg, "duplicate key value violates unique constraint") ||
+			strings.Contains(errorMsg, "SQLSTATE 23505") {
+			utils.DebugLog("CreatePurchaseOrder", "Duplicate PO number detected", map[string]interface{}{
+				"po_number": req.PoNumber,
+				"error":     errorMsg,
+			})
 			c.JSON(http.StatusConflict, gin.H{"error": "The Purchase Order number you entered already exists. Please use a different reference number."})
 		} else {
+			utils.DebugLog("CreatePurchaseOrder", "Generic error", map[string]interface{}{
+				"po_number": req.PoNumber,
+				"error":     errorMsg,
+			})
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "An unexpected error occurred while creating the purchase order. Please try again later."})
 		}
 		return
 	}
+
+	utils.DebugLog("CreatePurchaseOrder", "Success", map[string]interface{}{
+		"purchase_order_id": purchaseOrder.ID,
+		"po_number":         purchaseOrder.PoNumber,
+	})
 
 	c.JSON(http.StatusCreated, purchaseOrder)
 }

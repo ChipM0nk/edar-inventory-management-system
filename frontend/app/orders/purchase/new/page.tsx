@@ -537,7 +537,9 @@ export default function NewStockMovementPage() {
         
         // Handle specific error types with user-friendly messages
         if (backendError.includes('duplicate key value violates unique constraint') || 
-            backendError.includes('Purchase Order number already exists')) {
+            backendError.includes('Purchase Order number already exists') ||
+            backendError.includes('purchase_orders_po_number_key') ||
+            backendError.includes('SQLSTATE 23505')) {
           errorTitle = 'Duplicate Purchase Order Number'
           errorMessage = 'The Purchase Order number you entered already exists. Please use a different reference number.'
         } else if (backendError.includes('violates foreign key constraint')) {
@@ -1396,6 +1398,14 @@ export default function NewStockMovementPage() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Notes Section - Simple text below table */}
+              <div className="flex items-center gap-2 text-sm mt-1">
+                <span className="text-red-600 font-semibold">NOTE:</span>
+                <span className="text-gray-700">
+                  {pendingFormData?.notes || 'No notes provided'}
+                </span>
               </div>
 
               {/* Documents Section - Compact with Actions */}
