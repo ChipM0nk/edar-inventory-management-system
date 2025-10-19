@@ -33,8 +33,6 @@ interface AdjustmentItem {
   product_id: string
   product_name: string
   product_sku: string
-  warehouse_id: string
-  warehouse_name: string
   quantity: number
   cost_price: number
   reason: string
@@ -44,6 +42,8 @@ interface AdjustmentItem {
 interface Adjustment {
   id: string
   reference_id: string
+  warehouse_id: string
+  warehouse_name?: string
   total_quantity: number
   processed_by: string
   processed_date: string
@@ -51,6 +51,7 @@ interface Adjustment {
   items: AdjustmentItem[]
   status?: string
   notes?: string | null
+  external_reference?: string | null
 }
 
 interface AdjustmentDetailsDialogProps {
@@ -93,9 +94,14 @@ export function AdjustmentDetailsDialog({
       const response = await api.get(`/adjustments/${adjustment.id}`)
       const detailedAdjustment = response.data
       
+      console.log('Received adjustment data:', detailedAdjustment)
+      console.log('External reference:', detailedAdjustment.external_reference)
+      
       const converted: Adjustment = {
         id: detailedAdjustment.id,
         reference_id: detailedAdjustment.reference_number,
+        warehouse_id: detailedAdjustment.warehouse_id,
+        warehouse_name: detailedAdjustment.warehouse_name,
         total_quantity: detailedAdjustment.total_quantity,
         processed_by: detailedAdjustment.processed_by_first_name && detailedAdjustment.processed_by_last_name 
           ? `${detailedAdjustment.processed_by_first_name} ${detailedAdjustment.processed_by_last_name}`
@@ -106,15 +112,17 @@ export function AdjustmentDetailsDialog({
           product_id: item.product_id,
           product_name: item.product_name,
           product_sku: item.product_sku,
-          warehouse_id: item.warehouse_id,
-          warehouse_name: item.warehouse_name,
           quantity: item.quantity,
           cost_price: item.cost_price || 0,
           reason: item.reason || 'No reason provided'
         })),
         status: detailedAdjustment.status,
-        notes: detailedAdjustment.notes
+        notes: detailedAdjustment.notes,
+        external_reference: detailedAdjustment.external_reference
       }
+      
+      console.log('Converted adjustment data:', converted)
+      console.log('Converted external reference:', converted.external_reference)
       
       setFullAdjustment(converted)
     } catch (error: any) {
@@ -279,26 +287,36 @@ export function AdjustmentDetailsDialog({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div className="space-y-2">
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Reference</span>
-                      <span className="text-gray-900 font-mono">: {displayAdjustment.reference_id}</span>
+                      <span className="text-gray-600 font-bold w-40">Reference</span>
+                      <span className="text-gray-900">: {displayAdjustment.reference_id}</span>
+                    </div>
+                    {displayAdjustment.external_reference && (
+                      <div className="flex items-center">
+                        <span className="text-gray-600 font-bold w-40">External Reference</span>
+                        <span className="text-gray-900">: {displayAdjustment.external_reference}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center">
+                      <span className="text-gray-600 font-bold w-40">Warehouse</span>
+                      <span className="text-gray-900">: {displayAdjustment.warehouse_name || 'Unknown'}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Processed Date</span>
+                      <span className="text-gray-600 font-bold w-40">Processed Date</span>
                       <span className="text-gray-900">: {formatDate(displayAdjustment.processed_date)}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Total Quantity</span>
+                      <span className="text-gray-600 font-bold w-40">Total Quantity</span>
                       <span className="text-gray-900">: {displayAdjustment.total_quantity}</span>
                     </div>
                   </div>
                   
                   <div className="space-y-2">
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Processed By</span>
+                      <span className="text-gray-600 font-bold w-40">Processed By</span>
                       <span className="text-gray-900">: {displayAdjustment.processed_by}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Status</span>
+                      <span className="text-gray-600 font-bold w-40">Status</span>
                       <span className="text-gray-900">: {displayAdjustment.status === 'cancelled' ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                           Cancelled
@@ -353,7 +371,6 @@ export function AdjustmentDetailsDialog({
                         <TableRow className="border-b border-gray-300">
                           <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">Product Name</TableHead>
                           <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">SKU</TableHead>
-                          <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">Warehouse</TableHead>
                           <TableHead className="font-semibold text-gray-900 text-center py-3 px-4 text-sm">Quantity</TableHead>
                           <TableHead className="font-semibold text-gray-900 text-right py-3 px-4 text-sm">Cost Price</TableHead>
                           <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">Reason</TableHead>
@@ -379,7 +396,6 @@ export function AdjustmentDetailsDialog({
                                   {item.product_sku}
                                 </span>
                               </TableCell>
-                              <TableCell className="py-3 px-4 text-sm text-gray-700">{item.warehouse_name}</TableCell>
                               <TableCell className={`py-3 px-4 text-sm text-center font-semibold ${item.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {item.quantity > 0 ? '+' : ''}{item.quantity}
                               </TableCell>
@@ -392,6 +408,16 @@ export function AdjustmentDetailsDialog({
                   </div>
                 )}
               </div>
+
+              {/* Notes Section */}
+              {displayAdjustment.notes && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-600 font-semibold text-sm">NOTE:</span>
+                    <span className="text-gray-700 text-sm">{displayAdjustment.notes}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Documents Section - Compact with Actions */}
               <div className="space-y-1">

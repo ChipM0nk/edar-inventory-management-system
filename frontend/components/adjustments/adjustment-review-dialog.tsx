@@ -16,16 +16,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { FileText } from 'lucide-react'
 
 interface AdjustmentItem {
   product_id: string
   product_name: string
   product_sku: string
-  warehouse_id: string
-  warehouse_name: string
   quantity: number
   cost_price: number
   reason: string
+}
+
+interface Document {
+  id: string
+  name: string
+  size: number
+  type: string
 }
 
 interface AdjustmentReviewDialogProps {
@@ -36,6 +42,9 @@ interface AdjustmentReviewDialogProps {
   processedBy: string
   adjustmentDate: string
   warehouseName: string
+  reference?: string
+  notes?: string
+  documents?: Document[]
 }
 
 export function AdjustmentReviewDialog({
@@ -45,7 +54,10 @@ export function AdjustmentReviewDialog({
   items,
   processedBy,
   adjustmentDate,
-  warehouseName
+  warehouseName,
+  reference,
+  notes,
+  documents = []
 }: AdjustmentReviewDialogProps) {
   const totalQuantity = items.reduce((sum, item) => sum + Math.abs(item.quantity), 0)
   const totalAmount = items.reduce((sum, item) => sum + (Math.abs(item.quantity) * item.cost_price), 0)
@@ -60,9 +72,9 @@ export function AdjustmentReviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Summary Info */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div>
               <div className="text-gray-500">Processed By</div>
               <div className="font-medium">{processedBy}</div>
@@ -74,6 +86,10 @@ export function AdjustmentReviewDialog({
             <div>
               <div className="text-gray-500">Warehouse</div>
               <div className="font-medium">{warehouseName || '—'}</div>
+            </div>
+            <div>
+              <div className="text-gray-500">External Reference</div>
+              <div className="font-medium">{reference || '—'}</div>
             </div>
           </div>
 
@@ -107,24 +123,43 @@ export function AdjustmentReviewDialog({
             </Table>
           </div>
 
-          {/* Totals */}
-          <div className="flex justify-end gap-6 text-sm">
-            <div>
-              <div className="text-gray-500">Items</div>
-              <div className="font-medium text-right">{items.length}</div>
+          {/* Notes Section */}
+          {notes && (
+            <div className="flex items-center gap-2 text-sm py-2">
+              <span className="text-red-600 font-semibold">NOTE:</span>
+              <span className="text-gray-700">
+                {notes}
+              </span>
             </div>
-            <div>
-              <div className="text-gray-500">Total Quantity</div>
-              <div className="font-medium text-right">{totalQuantity}</div>
+          )}
+
+          {/* Documents Section */}
+          {documents.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                <FileText className="h-4 w-4" />
+                Documents ({documents.length})
+              </div>
+              <div className="space-y-2">
+                {documents.map((doc, index) => (
+                  <div key={doc.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-4 w-4 text-green-500" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{doc.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {(doc.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div>
-              <div className="text-gray-500">Total Amount</div>
-              <div className="font-semibold text-right">₱{totalAmount.toFixed(2)}</div>
-            </div>
-          </div>
+          )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button variant="outline" onClick={onClose}>
               Back
             </Button>

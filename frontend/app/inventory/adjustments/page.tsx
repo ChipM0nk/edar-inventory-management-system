@@ -51,8 +51,6 @@ interface AdjustmentItem {
   product_id: string
   product_name: string
   product_sku: string
-  warehouse_id: string
-  warehouse_name: string
   quantity: number
   cost_price: number
   reason: string
@@ -72,6 +70,8 @@ interface Document {
 interface Adjustment {
   id: string
   reference_id: string
+  warehouse_id: string
+  warehouse_name?: string
   total_quantity: number
   processed_by: string
   processed_date: string
@@ -139,7 +139,7 @@ export default function AdjustmentsPage() {
   // Reference fields for PO/SO connections
   const [referenceType, setReferenceType] = useState<string>('')
   const [referenceId, setReferenceId] = useState<string>('')
-  const [referenceNumber, setReferenceNumber] = useState<string>('')
+  const [externalReference, setExternalReference] = useState<string>('')
   const [adjustmentReasonType, setAdjustmentReasonType] = useState<string>('')
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
   const [salesOrders, setSalesOrders] = useState<any[]>([])
@@ -282,6 +282,8 @@ export default function AdjustmentsPage() {
         return {
           id: adj.id,
           reference_id: adj.reference_number,
+          warehouse_id: adj.warehouse_id,
+          warehouse_name: adj.warehouse_name || 'N/A',
           total_quantity: adj.total_quantity,
           processed_by: adj.processed_by_first_name && adj.processed_by_last_name 
             ? `${adj.processed_by_first_name} ${adj.processed_by_last_name}`
@@ -392,7 +394,7 @@ export default function AdjustmentsPage() {
     // Reset reference fields
     setReferenceType('')
     setReferenceId('')
-    setReferenceNumber('')
+    setExternalReference('')
     setAdjustmentReasonType('')
     // Reset product search
     setProductSearchTerm('')
@@ -477,8 +479,6 @@ export default function AdjustmentsPage() {
       product_id: selectedProduct.id,
       product_name: selectedProduct.name,
       product_sku: selectedProduct.sku,
-      warehouse_id: selectedWarehouse.id,
-      warehouse_name: selectedWarehouse.name,
       quantity: finalQuantity,
       cost_price: costPrice,
       reason: finalReason
@@ -614,36 +614,42 @@ export default function AdjustmentsPage() {
 
     try {
       // Generate reference number
-      const referenceNumber = generateReferenceNumber()
-      setGeneratedReferenceNumber(referenceNumber)
+      const generatedRef = generateReferenceNumber()
+      setGeneratedReferenceNumber(generatedRef)
 
       // Calculate total quantity
       const totalQuantity = adjustmentItems.reduce((sum, item) => sum + Math.abs(item.quantity), 0)
 
+      // Ensure warehouse is selected
+      if (!selectedWarehouse) {
+        await notice({
+          title: 'No warehouse selected',
+          description: 'Please select a warehouse for the adjustment',
+          variant: 'warning',
+        })
+        return
+      }
+
       // Create adjustment using backend API
       const adjustmentPayload = {
-        reference_number: referenceNumber,
+        reference_number: generatedRef,
         adjustment_date: new Date(adjustmentDate).toISOString(),
+        warehouse_id: selectedWarehouse.id,
         total_quantity: totalQuantity,
         reason: 'Inventory adjustment',
         status: 'completed',
         created_by: user.id,
         notes: adjustmentNotes || null,
+        external_reference: externalReference || null,
         // Reference fields for PO/SO connections
         reference_type: referenceType || null,
         reference_id: referenceId || null,
         adjustment_reason: adjustmentReasonType || null,
         items: adjustmentItems.map(item => ({
           product_id: item.product_id,
-          warehouse_id: item.warehouse_id,
           quantity: item.quantity,
           cost_price: item.cost_price,
           reason: item.reason,
-          // Reference fields for item-level tracking
-          reference_type: referenceType || null,
-          reference_id: referenceId || null,
-          reference_number: referenceNumber || null,
-          adjustment_reason: adjustmentReasonType || null
         }))
       }
 
@@ -693,7 +699,7 @@ export default function AdjustmentsPage() {
       
       await notice({
         title: 'Adjustment created',
-        description: `Reference Number: ${referenceNumber}${uploadedFiles.length > 0 ? `\nDocuments uploaded: ${uploadedFiles.length}` : ''}`,
+        description: `Reference Number: ${externalReference || generatedReferenceNumber}${uploadedFiles.length > 0 ? `\nDocuments uploaded: ${uploadedFiles.length}` : ''}`,
         variant: 'success',
         okText: 'OK',
       })
@@ -733,24 +739,35 @@ export default function AdjustmentsPage() {
                 <h1 className="text-3xl font-bold text-gray-900">Stock Adjustments</h1>
                 <p className="mt-2 text-gray-600">Manage inventory adjustments and corrections</p>
               </div>
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={loadAdjustments}
-                  disabled={isLoadingData}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className={`h-4 w-4 ${isLoadingData ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-                <Button 
-                  className="flex items-center gap-2 bg-[#52a852] hover:bg-[#4a964a] text-white"
-                  onClick={() => setIsCreateModalOpen(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  New Adjustment
-                </Button>
+              <div className="flex items-center gap-4">
+                {/* Processed By - Right side of header */}
+                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">Processed by:</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={loadAdjustments}
+                    disabled={isLoadingData}
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isLoadingData ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                  <Button 
+                    className="flex items-center gap-2 bg-[#52a852] hover:bg-[#4a964a] text-white"
+                    onClick={() => setIsCreateModalOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    New Adjustment
+                  </Button>
+                </div>
               </div>
             </div>
             
@@ -802,11 +819,10 @@ export default function AdjustmentsPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Reference Number</TableHead>
-                          <TableHead>Type</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Processed By</TableHead>
+                          <TableHead>Warehouse</TableHead>
+                          <TableHead>Processed At</TableHead>
                           <TableHead>Date</TableHead>
-                          <TableHead>Items</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -820,25 +836,20 @@ export default function AdjustmentsPage() {
                               {adjustment.reference_id}
                             </TableCell>
                             <TableCell>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                Adjustment
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600">
-                              {adjustment.processed_by}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-500">
-                              {formatDate(adjustment.processed_date)}
-                            </TableCell>
-                            <TableCell>
                               {adjustment.status === 'cancelled' ? (
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Cancelled</span>
                               ) : (
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
                               )}
                             </TableCell>
+                            <TableCell className="text-sm text-gray-600">
+                              {adjustment.warehouse_name || 'N/A'}
+                            </TableCell>
+                            <TableCell className="text-sm text-gray-600">
+                              {adjustment.processed_by}
+                            </TableCell>
                             <TableCell className="text-sm text-gray-500">
-                              {adjustment.items ? adjustment.items.length : 0} item{(adjustment.items ? adjustment.items.length : 0) !== 1 ? 's' : ''}
+                              {formatDate(adjustment.processed_date)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -916,13 +927,25 @@ export default function AdjustmentsPage() {
         {NoticeDialog}
         <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
           <DialogHeader className="pb-4">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Plus className="h-5 w-5" />
-              Create New Adjustment
-            </DialogTitle>
-            <DialogDescription>
-              Add inventory adjustments to correct stock levels
-            </DialogDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Plus className="h-5 w-5" />
+                  Create New Adjustment
+                </DialogTitle>
+                <DialogDescription>
+                  Add inventory adjustments to correct stock levels
+                </DialogDescription>
+              </div>
+              {/* Processed By - Right side of modal header */}
+              <div className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                <User className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">Processed by:</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
+                </span>
+              </div>
+            </div>
           </DialogHeader>
           
           {/* Success Message with Reference Number */}
@@ -937,7 +960,7 @@ export default function AdjustmentsPage() {
                 <div>
                   <h3 className="text-sm font-medium text-green-800">Adjustment Created Successfully!</h3>
                   <p className="text-sm text-green-700">
-                    Reference Number: <span className="font-mono font-semibold">{generatedReferenceNumber}</span>
+                    Reference Number: <span className="font-semibold">{generatedReferenceNumber}</span>
                   </p>
                 </div>
               </div>
@@ -947,15 +970,6 @@ export default function AdjustmentsPage() {
           <div className="space-y-4">
             {/* Header Info - Compact */}
             <div className="p-4 bg-gray-50 rounded-lg">
-              {/* Processed By - Small at top */}
-              <div className="flex items-center gap-2 mb-3 p-2 bg-white rounded border w-fit">
-                <User className="h-3 w-3 text-gray-500" />
-                <span className="text-xs text-gray-600">Processed by:</span>
-                <span className="text-xs font-medium text-gray-900">
-                  {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
-                </span>
-              </div>
-              
               {/* Main form fields */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
@@ -1046,13 +1060,14 @@ export default function AdjustmentsPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="reference" className="text-xs font-medium text-gray-600">Reference</Label>
+                  <Label htmlFor="reference" className="text-xs font-medium text-gray-600">External Reference</Label>
                   <Input
                     id="reference"
-                    value={referenceNumber}
-                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    value={externalReference}
+                    onChange={(e) => setExternalReference(e.target.value)}
                     placeholder="PO, Sales, Transfer, etc."
                     className="mt-1"
+                    tabIndex={3}
                   />
                 </div>
               </div>
@@ -1541,6 +1556,14 @@ export default function AdjustmentsPage() {
         processedBy={user ? `${user.first_name} ${user.last_name}` : ''}
         adjustmentDate={adjustmentDate}
         warehouseName={selectedWarehouse?.name || ''}
+        reference={externalReference}
+        notes={adjustmentNotes}
+        documents={uploadedFiles.map((file, index) => ({
+          id: `file-${index}`,
+          name: file.name,
+          size: file.size,
+          type: file.type
+        }))}
       />
 
       {/* Close Warning Dialog */}

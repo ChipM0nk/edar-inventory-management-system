@@ -64,6 +64,7 @@ export default function TransfersPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
   const transferItemsRef = useRef<HTMLDivElement>(null)
+  const productSelectRef = useRef<HTMLButtonElement>(null)
   
   // State management
   const [transfers, setTransfers] = useState<Transfer[]>([])
@@ -239,6 +240,37 @@ export default function TransfersPage() {
     setShowErrorDialog(true)
   }
 
+  const closeErrorDialog = () => {
+    setShowErrorDialog(false)
+    // Focus back to product selection when error dialog closes
+    setTimeout(() => {
+      console.log('Attempting to focus product select after error dialog closes')
+      
+      // Try multiple methods to ensure focus works
+      const productSelect = document.getElementById('product-select') as HTMLElement
+      if (productSelect) {
+        console.log('Found product select by ID, attempting focus')
+        productSelect.focus()
+        // Also try clicking to ensure it's properly activated
+        productSelect.click()
+      } else {
+        console.log('Product select not found by ID, trying ref')
+        if (productSelectRef.current) {
+          productSelectRef.current.focus()
+          productSelectRef.current.click()
+        } else {
+          console.log('Product select not found by ref, trying tabIndex')
+          // Final fallback: find by tabIndex
+          const productSelectByTab = document.querySelector('[tabindex="5"]') as HTMLElement
+          if (productSelectByTab) {
+            productSelectByTab.focus()
+            productSelectByTab.click()
+          }
+        }
+      }
+    }, 500) // Increased timeout further
+  }
+
   const handleCancelTransfer = () => {
     setShowCancelDialog(true)
   }
@@ -314,9 +346,17 @@ export default function TransfersPage() {
     setCurrentStock(null)
     setQuantityError('')
     
-    // Scroll to the items list after adding
+    // Focus back to product selection for quick adding
     setTimeout(() => {
-      transferItemsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      if (productSelectRef.current) {
+        productSelectRef.current.focus()
+      } else {
+        // Fallback: find the product select by ID
+        const productSelect = document.getElementById('product-select') as HTMLElement
+        if (productSelect) {
+          productSelect.focus()
+        }
+      }
     }, 100)
   }
 
@@ -685,7 +725,7 @@ export default function TransfersPage() {
                       <Hash className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
                         <span className="text-sm font-medium text-gray-700">Reference: </span>
-                        <span className="text-sm text-gray-900 font-mono">{selectedTransfer.reference_id}</span>
+                        <span className="text-sm text-gray-900">{selectedTransfer.reference_id}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -835,6 +875,7 @@ export default function TransfersPage() {
                       type="date"
                       value={transferDate}
                       onChange={(e) => setTransferDate(e.target.value)}
+                      tabIndex={1}
                     />
                   </div>
                   
@@ -845,7 +886,7 @@ export default function TransfersPage() {
                       onValueChange={(value) => handleWarehouseChange('from', value)}
                       disabled={warehousesLocked}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger tabIndex={2}>
                         <SelectValue placeholder="Select source warehouse" />
                       </SelectTrigger>
                       <SelectContent>
@@ -868,7 +909,7 @@ export default function TransfersPage() {
                       onValueChange={(value) => handleWarehouseChange('to', value)}
                       disabled={warehousesLocked}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger tabIndex={3}>
                         <SelectValue placeholder="Select destination warehouse" />
                       </SelectTrigger>
                       <SelectContent>
@@ -894,6 +935,7 @@ export default function TransfersPage() {
                     value={transferReason}
                     onChange={(e) => setTransferReason(e.target.value)}
                     placeholder="e.g., Stock rebalancing, Customer request, etc."
+                    tabIndex={4}
                   />
                 </div>
               </CardContent>
@@ -931,7 +973,11 @@ export default function TransfersPage() {
                       }}
                       disabled={!fromWarehouse}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger 
+                        ref={productSelectRef} 
+                        tabIndex={5}
+                        id="product-select"
+                      >
                         <SelectValue placeholder={fromWarehouse ? "Select a product" : "Select warehouse first"} />
                       </SelectTrigger>
                       <SelectContent>
@@ -972,6 +1018,7 @@ export default function TransfersPage() {
                       }}
                       placeholder="Enter quantity"
                       className={quantityError ? 'border-red-500' : ''}
+                      tabIndex={6}
                     />
                     {quantityError && (
                       <p className="text-sm text-red-600">{quantityError}</p>
@@ -983,6 +1030,7 @@ export default function TransfersPage() {
                   type="button"
                   onClick={handleAddItem} 
                   className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white"
+                  tabIndex={7}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Product to Transfer
@@ -1072,6 +1120,7 @@ export default function TransfersPage() {
                 onClick={handleCreateTransfer}
                 disabled={transferItems.length === 0}
                 className="bg-[#52a852] hover:bg-[#4a964a] text-white"
+                tabIndex={8}
               >
                 Create Transfer
               </Button>
@@ -1216,7 +1265,7 @@ export default function TransfersPage() {
           <div className="space-y-4">
             <div className="p-4 bg-green-50 rounded-lg">
               <p className="text-sm font-medium text-green-800">Reference Number:</p>
-              <p className="text-lg font-mono font-bold text-green-900">{createdTransferRef}</p>
+              <p className="text-lg font-bold text-green-900">{createdTransferRef}</p>
             </div>
             
             <div className="text-sm text-gray-600">
@@ -1235,7 +1284,38 @@ export default function TransfersPage() {
       </Dialog>
 
       {/* Error Dialog */}
-      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+      <Dialog open={showErrorDialog} onOpenChange={(open) => {
+        setShowErrorDialog(open)
+        if (!open) {
+          // Focus back to product selection when error dialog closes
+          setTimeout(() => {
+            console.log('Attempting to focus product select after error dialog closes')
+            
+            // Try multiple methods to ensure focus works
+            const productSelect = document.getElementById('product-select') as HTMLElement
+            if (productSelect) {
+              console.log('Found product select by ID, attempting focus')
+              productSelect.focus()
+              // Also try clicking to ensure it's properly activated
+              productSelect.click()
+            } else {
+              console.log('Product select not found by ID, trying ref')
+              if (productSelectRef.current) {
+                productSelectRef.current.focus()
+                productSelectRef.current.click()
+              } else {
+                console.log('Product select not found by ref, trying tabIndex')
+                // Final fallback: find by tabIndex
+                const productSelectByTab = document.querySelector('[tabindex="5"]') as HTMLElement
+                if (productSelectByTab) {
+                  productSelectByTab.focus()
+                  productSelectByTab.click()
+                }
+              }
+            }
+          }, 500) // Increased timeout further
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
@@ -1252,7 +1332,7 @@ export default function TransfersPage() {
           </div>
 
           <DialogFooter>
-            <Button onClick={() => setShowErrorDialog(false)} className="w-full">
+            <Button onClick={closeErrorDialog} className="w-full">
               Close
             </Button>
           </DialogFooter>
