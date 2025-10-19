@@ -30,6 +30,7 @@ export function useConfirm(): [JSX.Element, ConfirmFn] {
 
   const confirm = useCallback<ConfirmFn>((opts) => {
     return new Promise<boolean>((resolve) => {
+      console.log('Confirm dialog options:', opts)
       setOptions((prev) => ({ ...prev, ...(opts || {}) }))
       setResolver(() => resolve)
       setOpen(true)
@@ -66,7 +67,7 @@ export function useConfirm(): [JSX.Element, ConfirmFn] {
 
   const element = (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose(false)}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md min-w-[400px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {Icon}
@@ -76,14 +77,32 @@ export function useConfirm(): [JSX.Element, ConfirmFn] {
             <DialogDescription>{options.description}</DialogDescription>
           )}
         </DialogHeader>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => handleClose(false)}>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => handleClose(false)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50"
+            style={{ minWidth: '120px' }}
+          >
             {options.cancelText}
-          </Button>
-          <Button className={confirmButtonClass} onClick={() => handleClose(true)}>
+          </button>
+          <button 
+            onClick={() => handleClose(true)}
+            className="flex-1 px-4 py-2 rounded-md text-white"
+            style={{ 
+              minWidth: '120px',
+              backgroundColor: options.variant === 'danger' ? '#dc2626' : options.variant === 'info' ? '#2563eb' : '#d97706'
+            }}
+          >
             {options.confirmText}
-          </Button>
+          </button>
         </div>
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-100 rounded">
+            Debug: cancelText="{options.cancelText}", confirmText="{options.confirmText}"<br/>
+            Buttons rendered: 2 (Cancel + Confirm)
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

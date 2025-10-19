@@ -134,6 +134,7 @@ export default function AdjustmentsPage() {
   const productSearchInputRef = useRef<HTMLInputElement>(null)
   const addRadioRef = useRef<HTMLInputElement>(null)
   const subtractRadioRef = useRef<HTMLInputElement>(null)
+  const warehouseSelectRef = useRef<HTMLButtonElement>(null)
   
   
   // Reference fields for PO/SO connections
@@ -253,6 +254,24 @@ export default function AdjustmentsPage() {
     setFilteredAdjustments(filtered)
     setCurrentPage(1) // Reset to first page when filtering
   }, [searchTerm, adjustments])
+
+  // Auto-focus on warehouse field when create modal opens
+  useEffect(() => {
+    if (isCreateModalOpen) {
+      // Longer delay to ensure the modal is fully rendered and all animations complete
+      const focusTimeout = setTimeout(() => {
+        if (warehouseSelectRef.current) {
+          // Focus on the warehouse select field
+          warehouseSelectRef.current.focus()
+          console.log('Focused warehouse field')
+        } else {
+          console.log('Warehouse ref not available')
+        }
+      }, 500)
+      
+      return () => clearTimeout(focusTimeout)
+    }
+  }, [isCreateModalOpen])
 
   // Pagination logic
   const totalPages = Math.ceil(filteredAdjustments.length / itemsPerPage)
@@ -767,6 +786,21 @@ export default function AdjustmentsPage() {
                     <Plus className="h-4 w-4" />
                     New Adjustment
                   </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={async () => {
+                      const result = await confirm({
+                        title: 'Test Dialog',
+                        description: 'This is a test dialog to check if both buttons appear.',
+                        confirmText: 'Confirm Test',
+                        cancelText: 'Cancel Test',
+                        variant: 'warning',
+                      })
+                      console.log('Test dialog result:', result)
+                    }}
+                  >
+                    Test Confirm
+                  </Button>
                 </div>
               </div>
             </div>
@@ -923,8 +957,6 @@ export default function AdjustmentsPage() {
         }
         setIsCreateModalOpen(open)
       }}>
-        {ConfirmDialog}
-        {NoticeDialog}
         <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
           <DialogHeader className="pb-4">
             <div className="flex justify-between items-start">
@@ -990,6 +1022,7 @@ export default function AdjustmentsPage() {
                     if (warehouse && selectedWarehouse && warehouse.id !== selectedWarehouse.id) {
                       // Show warning before switching warehouse
                       if (adjustmentItems.length > 0) {
+                        console.log('About to show confirm dialog')
                         const confirmed = await confirm({
                           title: 'Change warehouse?',
                           description: 'Changing warehouse will clear all current adjustment items.',
@@ -997,6 +1030,7 @@ export default function AdjustmentsPage() {
                           cancelText: 'Keep Current',
                           variant: 'warning',
                         })
+                        console.log('Confirm dialog result:', confirmed)
                         if (confirmed) {
                           setSelectedWarehouse(warehouse)
                           setAdjustmentItems([]) // Clear all items
@@ -1047,7 +1081,12 @@ export default function AdjustmentsPage() {
                       setShowDocumentUpload(false)
                     }
                   }}>
-                    <SelectTrigger className="mt-1" tabIndex={2}>
+                    <SelectTrigger 
+                      ref={warehouseSelectRef} 
+                      className="mt-1" 
+                      tabIndex={2}
+                      autoFocus={isCreateModalOpen}
+                    >
                       <SelectValue placeholder="Select warehouse" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1600,6 +1639,10 @@ export default function AdjustmentsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Global Dialogs */}
+      {ConfirmDialog}
+      {NoticeDialog}
 
     </AppLayout>
   )
