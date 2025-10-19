@@ -1282,7 +1282,7 @@ export default function NewStockMovementPage() {
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <span className="text-gray-600 font-bold w-32">PO Reference</span>
-                      <span className="text-gray-900 font-mono">: {pendingFormData?.reference_number || 'Not specified'}</span>
+                      <span className="text-gray-900">: {pendingFormData?.reference_number || 'Not specified'}</span>
                     </div>
                     <div className="flex items-center">
                       <span className="text-gray-600 font-bold w-32">PO Date</span>

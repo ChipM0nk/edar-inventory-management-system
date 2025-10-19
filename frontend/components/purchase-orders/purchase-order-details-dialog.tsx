@@ -278,7 +278,7 @@ export function PurchaseOrderDetailsDialog({
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <span className="text-gray-600 font-bold w-32">Reference</span>
-                      <span className="text-gray-900 font-mono ml-2">: {order.po_number || 'N/A'}</span>
+                      <span className="text-gray-900 ml-2">: {order.po_number || 'N/A'}</span>
                     </div>
                     <div className="flex items-center">
                       <span className="text-gray-600 font-bold w-32">Purchase Date</span>

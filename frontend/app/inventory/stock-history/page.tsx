@@ -442,7 +442,7 @@ export default function StockHistoryPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-600">Reference ID</p>
-                      <p className="text-sm text-gray-900 font-mono">{selectedMovement.reference_id || 'N/A'}</p>
+                      <p className="text-sm text-gray-900">{selectedMovement.reference_id || 'N/A'}</p>
                     </div>
                     <div>
                     </div>
