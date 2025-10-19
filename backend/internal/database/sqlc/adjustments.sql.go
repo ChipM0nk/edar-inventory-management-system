@@ -54,14 +54,15 @@ func (q *Queries) CountAdjustmentsWithFilter(ctx context.Context, arg *CountAdju
 }
 
 const CreateAdjustment = `-- name: CreateAdjustment :one
-INSERT INTO adjustments (reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, external_reference)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, created_at, updated_at, external_reference
+INSERT INTO adjustments (reference_number, adjustment_date, warehouse_id, total_quantity, reason, status, created_by, processed_by, processed_date, notes, external_reference)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, created_at, updated_at, external_reference, warehouse_id
 `
 
 type CreateAdjustmentParams struct {
 	ReferenceNumber   string             `json:"reference_number"`
 	AdjustmentDate    pgtype.Date        `json:"adjustment_date"`
+	WarehouseID       pgtype.UUID        `json:"warehouse_id"`
 	TotalQuantity     int32              `json:"total_quantity"`
 	Reason            *string            `json:"reason"`
 	Status            string             `json:"status"`
@@ -76,6 +77,7 @@ func (q *Queries) CreateAdjustment(ctx context.Context, arg *CreateAdjustmentPar
 	row := q.db.QueryRow(ctx, CreateAdjustment,
 		arg.ReferenceNumber,
 		arg.AdjustmentDate,
+		arg.WarehouseID,
 		arg.TotalQuantity,
 		arg.Reason,
 		arg.Status,
@@ -100,20 +102,20 @@ func (q *Queries) CreateAdjustment(ctx context.Context, arg *CreateAdjustmentPar
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ExternalReference,
+		&i.WarehouseID,
 	)
 	return &i, err
 }
 
 const CreateAdjustmentItem = `-- name: CreateAdjustmentItem :one
-INSERT INTO adjustment_items (adjustment_id, product_id, warehouse_id, quantity, reason, cost_price)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, adjustment_id, product_id, warehouse_id, quantity, reason, created_at, cost_price
+INSERT INTO adjustment_items (adjustment_id, product_id, quantity, reason, cost_price)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, adjustment_id, product_id, quantity, reason, created_at, cost_price
 `
 
 type CreateAdjustmentItemParams struct {
 	AdjustmentID pgtype.UUID    `json:"adjustment_id"`
 	ProductID    pgtype.UUID    `json:"product_id"`
-	WarehouseID  pgtype.UUID    `json:"warehouse_id"`
 	Quantity     int32          `json:"quantity"`
 	Reason       *string        `json:"reason"`
 	CostPrice    pgtype.Numeric `json:"cost_price"`
@@ -123,7 +125,6 @@ func (q *Queries) CreateAdjustmentItem(ctx context.Context, arg *CreateAdjustmen
 	row := q.db.QueryRow(ctx, CreateAdjustmentItem,
 		arg.AdjustmentID,
 		arg.ProductID,
-		arg.WarehouseID,
 		arg.Quantity,
 		arg.Reason,
 		arg.CostPrice,
@@ -133,7 +134,6 @@ func (q *Queries) CreateAdjustmentItem(ctx context.Context, arg *CreateAdjustmen
 		&i.ID,
 		&i.AdjustmentID,
 		&i.ProductID,
-		&i.WarehouseID,
 		&i.Quantity,
 		&i.Reason,
 		&i.CreatedAt,
@@ -170,12 +170,14 @@ func (q *Queries) DeleteAdjustmentItemsByAdjustmentId(ctx context.Context, adjus
 }
 
 const GetAdjustment = `-- name: GetAdjustment :one
-SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, a.external_reference, 
+SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, a.external_reference, a.warehouse_id, 
        u.first_name as created_by_first_name, u.last_name as created_by_last_name,
-       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
+       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name,
+       w.name as warehouse_name
 FROM adjustments a
 LEFT JOIN users u ON a.created_by = u.id
 LEFT JOIN users p ON a.processed_by = p.id
+LEFT JOIN warehouses w ON a.warehouse_id = w.id
 WHERE a.id = $1
 `
 
@@ -193,10 +195,12 @@ type GetAdjustmentRow struct {
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 	ExternalReference    *string            `json:"external_reference"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
 	CreatedByFirstName   *string            `json:"created_by_first_name"`
 	CreatedByLastName    *string            `json:"created_by_last_name"`
 	ProcessedByFirstName *string            `json:"processed_by_first_name"`
 	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	WarehouseName        *string            `json:"warehouse_name"`
 }
 
 func (q *Queries) GetAdjustment(ctx context.Context, id pgtype.UUID) (*GetAdjustmentRow, error) {
@@ -216,21 +220,25 @@ func (q *Queries) GetAdjustment(ctx context.Context, id pgtype.UUID) (*GetAdjust
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ExternalReference,
+		&i.WarehouseID,
 		&i.CreatedByFirstName,
 		&i.CreatedByLastName,
 		&i.ProcessedByFirstName,
 		&i.ProcessedByLastName,
+		&i.WarehouseName,
 	)
 	return &i, err
 }
 
 const GetAdjustmentByReferenceNumber = `-- name: GetAdjustmentByReferenceNumber :one
-SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, a.external_reference, 
+SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, a.external_reference, a.warehouse_id, 
        u.first_name as created_by_first_name, u.last_name as created_by_last_name,
-       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
+       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name,
+       w.name as warehouse_name
 FROM adjustments a
 LEFT JOIN users u ON a.created_by = u.id
 LEFT JOIN users p ON a.processed_by = p.id
+LEFT JOIN warehouses w ON a.warehouse_id = w.id
 WHERE a.reference_number = $1
 `
 
@@ -248,10 +256,12 @@ type GetAdjustmentByReferenceNumberRow struct {
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 	ExternalReference    *string            `json:"external_reference"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
 	CreatedByFirstName   *string            `json:"created_by_first_name"`
 	CreatedByLastName    *string            `json:"created_by_last_name"`
 	ProcessedByFirstName *string            `json:"processed_by_first_name"`
 	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	WarehouseName        *string            `json:"warehouse_name"`
 }
 
 func (q *Queries) GetAdjustmentByReferenceNumber(ctx context.Context, referenceNumber string) (*GetAdjustmentByReferenceNumberRow, error) {
@@ -271,37 +281,35 @@ func (q *Queries) GetAdjustmentByReferenceNumber(ctx context.Context, referenceN
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ExternalReference,
+		&i.WarehouseID,
 		&i.CreatedByFirstName,
 		&i.CreatedByLastName,
 		&i.ProcessedByFirstName,
 		&i.ProcessedByLastName,
+		&i.WarehouseName,
 	)
 	return &i, err
 }
 
 const GetAdjustmentItems = `-- name: GetAdjustmentItems :many
-SELECT ai.id, ai.adjustment_id, ai.product_id, ai.warehouse_id, ai.quantity, ai.reason, ai.created_at, ai.cost_price, 
-       p.name as product_name, p.sku as product_sku,
-       w.name as warehouse_name
+SELECT ai.id, ai.adjustment_id, ai.product_id, ai.quantity, ai.reason, ai.created_at, ai.cost_price, 
+       p.name as product_name, p.sku as product_sku
 FROM adjustment_items ai
 JOIN products p ON ai.product_id = p.id
-JOIN warehouses w ON ai.warehouse_id = w.id
 WHERE ai.adjustment_id = $1
 ORDER BY ai.created_at
 `
 
 type GetAdjustmentItemsRow struct {
-	ID            pgtype.UUID        `json:"id"`
-	AdjustmentID  pgtype.UUID        `json:"adjustment_id"`
-	ProductID     pgtype.UUID        `json:"product_id"`
-	WarehouseID   pgtype.UUID        `json:"warehouse_id"`
-	Quantity      int32              `json:"quantity"`
-	Reason        *string            `json:"reason"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	CostPrice     pgtype.Numeric     `json:"cost_price"`
-	ProductName   string             `json:"product_name"`
-	ProductSku    string             `json:"product_sku"`
-	WarehouseName string             `json:"warehouse_name"`
+	ID           pgtype.UUID        `json:"id"`
+	AdjustmentID pgtype.UUID        `json:"adjustment_id"`
+	ProductID    pgtype.UUID        `json:"product_id"`
+	Quantity     int32              `json:"quantity"`
+	Reason       *string            `json:"reason"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	CostPrice    pgtype.Numeric     `json:"cost_price"`
+	ProductName  string             `json:"product_name"`
+	ProductSku   string             `json:"product_sku"`
 }
 
 func (q *Queries) GetAdjustmentItems(ctx context.Context, adjustmentID pgtype.UUID) ([]*GetAdjustmentItemsRow, error) {
@@ -317,14 +325,12 @@ func (q *Queries) GetAdjustmentItems(ctx context.Context, adjustmentID pgtype.UU
 			&i.ID,
 			&i.AdjustmentID,
 			&i.ProductID,
-			&i.WarehouseID,
 			&i.Quantity,
 			&i.Reason,
 			&i.CreatedAt,
 			&i.CostPrice,
 			&i.ProductName,
 			&i.ProductSku,
-			&i.WarehouseName,
 		); err != nil {
 			return nil, err
 		}
@@ -337,12 +343,14 @@ func (q *Queries) GetAdjustmentItems(ctx context.Context, adjustmentID pgtype.UU
 }
 
 const ListAdjustments = `-- name: ListAdjustments :many
-SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, a.external_reference, 
+SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, a.external_reference, a.warehouse_id, 
        u.first_name as created_by_first_name, u.last_name as created_by_last_name,
-       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
+       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name,
+       w.name as warehouse_name
 FROM adjustments a
 LEFT JOIN users u ON a.created_by = u.id
 LEFT JOIN users p ON a.processed_by = p.id
+LEFT JOIN warehouses w ON a.warehouse_id = w.id
 ORDER BY a.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -366,10 +374,12 @@ type ListAdjustmentsRow struct {
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 	ExternalReference    *string            `json:"external_reference"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
 	CreatedByFirstName   *string            `json:"created_by_first_name"`
 	CreatedByLastName    *string            `json:"created_by_last_name"`
 	ProcessedByFirstName *string            `json:"processed_by_first_name"`
 	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	WarehouseName        *string            `json:"warehouse_name"`
 }
 
 func (q *Queries) ListAdjustments(ctx context.Context, arg *ListAdjustmentsParams) ([]*ListAdjustmentsRow, error) {
@@ -395,10 +405,12 @@ func (q *Queries) ListAdjustments(ctx context.Context, arg *ListAdjustmentsParam
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ExternalReference,
+			&i.WarehouseID,
 			&i.CreatedByFirstName,
 			&i.CreatedByLastName,
 			&i.ProcessedByFirstName,
 			&i.ProcessedByLastName,
+			&i.WarehouseName,
 		); err != nil {
 			return nil, err
 		}
@@ -411,12 +423,14 @@ func (q *Queries) ListAdjustments(ctx context.Context, arg *ListAdjustmentsParam
 }
 
 const ListAdjustmentsWithFilter = `-- name: ListAdjustmentsWithFilter :many
-SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, a.external_reference, 
+SELECT a.id, a.reference_number, a.adjustment_date, a.total_quantity, a.reason, a.status, a.created_by, a.processed_by, a.processed_date, a.notes, a.created_at, a.updated_at, a.external_reference, a.warehouse_id, 
        u.first_name as created_by_first_name, u.last_name as created_by_last_name,
-       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name
+       p.first_name as processed_by_first_name, p.last_name as processed_by_last_name,
+       w.name as warehouse_name
 FROM adjustments a
 LEFT JOIN users u ON a.created_by = u.id
 LEFT JOIN users p ON a.processed_by = p.id
+LEFT JOIN warehouses w ON a.warehouse_id = w.id
 WHERE ($1::text IS NULL OR a.reference_number ILIKE '%' || $1 || '%')
   AND ($2::text IS NULL OR a.status = $2)
   AND ($3::uuid IS NULL OR a.created_by = $3)
@@ -450,10 +464,12 @@ type ListAdjustmentsWithFilterRow struct {
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 	ExternalReference    *string            `json:"external_reference"`
+	WarehouseID          pgtype.UUID        `json:"warehouse_id"`
 	CreatedByFirstName   *string            `json:"created_by_first_name"`
 	CreatedByLastName    *string            `json:"created_by_last_name"`
 	ProcessedByFirstName *string            `json:"processed_by_first_name"`
 	ProcessedByLastName  *string            `json:"processed_by_last_name"`
+	WarehouseName        *string            `json:"warehouse_name"`
 }
 
 func (q *Queries) ListAdjustmentsWithFilter(ctx context.Context, arg *ListAdjustmentsWithFilterParams) ([]*ListAdjustmentsWithFilterRow, error) {
@@ -487,10 +503,12 @@ func (q *Queries) ListAdjustmentsWithFilter(ctx context.Context, arg *ListAdjust
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ExternalReference,
+			&i.WarehouseID,
 			&i.CreatedByFirstName,
 			&i.CreatedByLastName,
 			&i.ProcessedByFirstName,
 			&i.ProcessedByLastName,
+			&i.WarehouseName,
 		); err != nil {
 			return nil, err
 		}
@@ -504,16 +522,17 @@ func (q *Queries) ListAdjustmentsWithFilter(ctx context.Context, arg *ListAdjust
 
 const UpdateAdjustment = `-- name: UpdateAdjustment :one
 UPDATE adjustments 
-SET reference_number = $2, adjustment_date = $3, total_quantity = $4, reason = $5, 
-    status = $6, processed_by = $7, processed_date = $8, notes = $9, updated_at = NOW()
+SET reference_number = $2, adjustment_date = $3, warehouse_id = $4, total_quantity = $5, reason = $6, 
+    status = $7, processed_by = $8, processed_date = $9, notes = $10, updated_at = NOW()
 WHERE id = $1
-RETURNING id, reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, created_at, updated_at, external_reference
+RETURNING id, reference_number, adjustment_date, total_quantity, reason, status, created_by, processed_by, processed_date, notes, created_at, updated_at, external_reference, warehouse_id
 `
 
 type UpdateAdjustmentParams struct {
 	ID              pgtype.UUID        `json:"id"`
 	ReferenceNumber string             `json:"reference_number"`
 	AdjustmentDate  pgtype.Date        `json:"adjustment_date"`
+	WarehouseID     pgtype.UUID        `json:"warehouse_id"`
 	TotalQuantity   int32              `json:"total_quantity"`
 	Reason          *string            `json:"reason"`
 	Status          string             `json:"status"`
@@ -527,6 +546,7 @@ func (q *Queries) UpdateAdjustment(ctx context.Context, arg *UpdateAdjustmentPar
 		arg.ID,
 		arg.ReferenceNumber,
 		arg.AdjustmentDate,
+		arg.WarehouseID,
 		arg.TotalQuantity,
 		arg.Reason,
 		arg.Status,
@@ -549,31 +569,30 @@ func (q *Queries) UpdateAdjustment(ctx context.Context, arg *UpdateAdjustmentPar
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ExternalReference,
+		&i.WarehouseID,
 	)
 	return &i, err
 }
 
 const UpdateAdjustmentItem = `-- name: UpdateAdjustmentItem :one
 UPDATE adjustment_items 
-SET product_id = $2, warehouse_id = $3, quantity = $4, reason = $5, cost_price = $6
+SET product_id = $2, quantity = $3, reason = $4, cost_price = $5
 WHERE id = $1
-RETURNING id, adjustment_id, product_id, warehouse_id, quantity, reason, created_at, cost_price
+RETURNING id, adjustment_id, product_id, quantity, reason, created_at, cost_price
 `
 
 type UpdateAdjustmentItemParams struct {
-	ID          pgtype.UUID    `json:"id"`
-	ProductID   pgtype.UUID    `json:"product_id"`
-	WarehouseID pgtype.UUID    `json:"warehouse_id"`
-	Quantity    int32          `json:"quantity"`
-	Reason      *string        `json:"reason"`
-	CostPrice   pgtype.Numeric `json:"cost_price"`
+	ID        pgtype.UUID    `json:"id"`
+	ProductID pgtype.UUID    `json:"product_id"`
+	Quantity  int32          `json:"quantity"`
+	Reason    *string        `json:"reason"`
+	CostPrice pgtype.Numeric `json:"cost_price"`
 }
 
 func (q *Queries) UpdateAdjustmentItem(ctx context.Context, arg *UpdateAdjustmentItemParams) (*AdjustmentItem, error) {
 	row := q.db.QueryRow(ctx, UpdateAdjustmentItem,
 		arg.ID,
 		arg.ProductID,
-		arg.WarehouseID,
 		arg.Quantity,
 		arg.Reason,
 		arg.CostPrice,
@@ -583,7 +602,6 @@ func (q *Queries) UpdateAdjustmentItem(ctx context.Context, arg *UpdateAdjustmen
 		&i.ID,
 		&i.AdjustmentID,
 		&i.ProductID,
-		&i.WarehouseID,
 		&i.Quantity,
 		&i.Reason,
 		&i.CreatedAt,

@@ -28,7 +28,8 @@ type Adjustment struct {
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	// External reference number (PO, SO, Transfer, etc.) provided by user
-	ExternalReference *string `json:"external_reference"`
+	ExternalReference *string     `json:"external_reference"`
+	WarehouseID       pgtype.UUID `json:"warehouse_id"`
 }
 
 // Individual items within an adjustment - normalized table with only necessary fields
@@ -36,7 +37,6 @@ type AdjustmentItem struct {
 	ID           pgtype.UUID `json:"id"`
 	AdjustmentID pgtype.UUID `json:"adjustment_id"`
 	ProductID    pgtype.UUID `json:"product_id"`
-	WarehouseID  pgtype.UUID `json:"warehouse_id"`
 	// Quantity adjustment (positive for add, negative for subtract)
 	Quantity int32 `json:"quantity"`
 	// Reason for this specific item adjustment

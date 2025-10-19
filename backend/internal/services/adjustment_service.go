@@ -40,6 +40,7 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 	adjustmentParams := sqlc.CreateAdjustmentParams{
 		ReferenceNumber:   req.ReferenceNumber,
 		AdjustmentDate:    utils.TimeToPgxDate(req.AdjustmentDate),
+		WarehouseID:       utils.UUIDToPgxUUID(req.WarehouseID),
 		TotalQuantity:     int32(req.TotalQuantity),
 		Reason:            req.Reason,
 		Status:            "completed", // Auto-complete adjustments
@@ -60,7 +61,6 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 		itemParams := sqlc.CreateAdjustmentItemParams{
 			AdjustmentID: adjustment.ID,
 			ProductID:    utils.UUIDToPgxUUID(item.ProductID),
-			WarehouseID:  utils.UUIDToPgxUUID(item.WarehouseID),
 			Quantity:     int32(item.Quantity),
 			Reason:       item.Reason,
 			CostPrice:    utils.Float64ToPgxNumeric(item.CostPrice),
@@ -82,7 +82,7 @@ func (s *AdjustmentService) CreateAdjustment(req models.CreateAdjustmentRequest)
 	for _, item := range req.Items {
 		stockMovementReq := models.CreateStockMovementRequest{
 			ProductID:     item.ProductID,
-			WarehouseID:   item.WarehouseID,
+			WarehouseID:   req.WarehouseID, // Use warehouse from adjustment, not from item
 			MovementType:  "adjustment",
 			Quantity:      item.Quantity, // This will be positive for additions, negative for subtractions
 			CostPrice:     &item.CostPrice,
@@ -124,17 +124,15 @@ func (s *AdjustmentService) GetAdjustment(id uuid.UUID) (*models.Adjustment, err
 	adjustmentItems := make([]models.AdjustmentItem, len(items))
 	for i, item := range items {
 		adjustmentItems[i] = models.AdjustmentItem{
-			ID:            utils.PgxUUIDToUUID(item.ID),
-			AdjustmentID:  utils.PgxUUIDToUUID(item.AdjustmentID),
-			ProductID:     utils.PgxUUIDToUUID(item.ProductID),
-			WarehouseID:   utils.PgxUUIDToUUID(item.WarehouseID),
-			Quantity:      int(item.Quantity),
-			Reason:        item.Reason,
-			CostPrice:     utils.PgxNumericToFloat64(item.CostPrice),
-			CreatedAt:     utils.PgxTimestamptzToTime(item.CreatedAt),
-			ProductName:   &item.ProductName,
-			ProductSKU:    &item.ProductSku,
-			WarehouseName: &item.WarehouseName,
+			ID:           utils.PgxUUIDToUUID(item.ID),
+			AdjustmentID: utils.PgxUUIDToUUID(item.AdjustmentID),
+			ProductID:    utils.PgxUUIDToUUID(item.ProductID),
+			Quantity:     int(item.Quantity),
+			Reason:       item.Reason,
+			CostPrice:    utils.PgxNumericToFloat64(item.CostPrice),
+			CreatedAt:    utils.PgxTimestamptzToTime(item.CreatedAt),
+			ProductName:  &item.ProductName,
+			ProductSKU:   &item.ProductSku,
 		}
 	}
 
@@ -249,6 +247,7 @@ func (s *AdjustmentService) CancelAdjustment(adjustmentID uuid.UUID, cancelledBy
 		ID:              adjRow.ID,
 		ReferenceNumber: adjRow.ReferenceNumber,
 		AdjustmentDate:  adjRow.AdjustmentDate,
+		WarehouseID:     adjRow.WarehouseID,
 		TotalQuantity:   adjRow.TotalQuantity,
 		Reason:          adjRow.Reason,
 		Status:          "cancelled",
@@ -262,12 +261,13 @@ func (s *AdjustmentService) CancelAdjustment(adjustmentID uuid.UUID, cancelledBy
 
 	// Reverse stock movements for all items
 	adjUUID := utils.PgxUUIDToUUID(updated.ID)
+	warehouseID := utils.PgxUUIDToUUID(updated.WarehouseID)
 	for _, it := range items {
 		// Reverse quantity
 		reverseQty := -int(it.Quantity)
 		stockReq := models.CreateStockMovementRequest{
 			ProductID:     utils.PgxUUIDToUUID(it.ProductID),
-			WarehouseID:   utils.PgxUUIDToUUID(it.WarehouseID),
+			WarehouseID:   warehouseID, // Use warehouse from adjustment
 			MovementType:  "adjustment",
 			Quantity:      reverseQty,
 			CostPrice:     nil, // cost not required for reversal effect on quantity
@@ -289,6 +289,7 @@ func (s *AdjustmentService) convertToAdjustmentModel(adj sqlc.GetAdjustmentRow) 
 		ID:                   utils.PgxUUIDToUUID(adj.ID),
 		ReferenceNumber:      adj.ReferenceNumber,
 		AdjustmentDate:       utils.PgxDateToTime(adj.AdjustmentDate),
+		WarehouseID:          utils.PgxUUIDToUUID(adj.WarehouseID),
 		TotalQuantity:        int(adj.TotalQuantity),
 		Reason:               adj.Reason,
 		Status:               adj.Status,
@@ -303,6 +304,7 @@ func (s *AdjustmentService) convertToAdjustmentModel(adj sqlc.GetAdjustmentRow) 
 		CreatedByLastName:    adj.CreatedByLastName,
 		ProcessedByFirstName: adj.ProcessedByFirstName,
 		ProcessedByLastName:  adj.ProcessedByLastName,
+		WarehouseName:        adj.WarehouseName,
 	}
 }
 
@@ -312,6 +314,7 @@ func (s *AdjustmentService) convertToAdjustmentModelFromAdjustment(adj *sqlc.Adj
 		ID:                   utils.PgxUUIDToUUID(adj.ID),
 		ReferenceNumber:      adj.ReferenceNumber,
 		AdjustmentDate:       utils.PgxDateToTime(adj.AdjustmentDate),
+		WarehouseID:          utils.PgxUUIDToUUID(adj.WarehouseID),
 		TotalQuantity:        int(adj.TotalQuantity),
 		Reason:               adj.Reason,
 		Status:               adj.Status,
@@ -335,6 +338,7 @@ func (s *AdjustmentService) convertToAdjustmentModelFromListRow(adj sqlc.ListAdj
 		ID:                   utils.PgxUUIDToUUID(adj.ID),
 		ReferenceNumber:      adj.ReferenceNumber,
 		AdjustmentDate:       utils.PgxDateToTime(adj.AdjustmentDate),
+		WarehouseID:          utils.PgxUUIDToUUID(adj.WarehouseID),
 		TotalQuantity:        int(adj.TotalQuantity),
 		Reason:               adj.Reason,
 		Status:               adj.Status,
@@ -349,5 +353,6 @@ func (s *AdjustmentService) convertToAdjustmentModelFromListRow(adj sqlc.ListAdj
 		CreatedByLastName:    adj.CreatedByLastName,
 		ProcessedByFirstName: adj.ProcessedByFirstName,
 		ProcessedByLastName:  adj.ProcessedByLastName,
+		WarehouseName:        adj.WarehouseName,
 	}
 }

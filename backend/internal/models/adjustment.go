@@ -11,6 +11,7 @@ type Adjustment struct {
 	ID                uuid.UUID  `json:"id" db:"id"`
 	ReferenceNumber   string     `json:"reference_number" db:"reference_number"`
 	AdjustmentDate    time.Time  `json:"adjustment_date" db:"adjustment_date"`
+	WarehouseID       uuid.UUID  `json:"warehouse_id" db:"warehouse_id"`
 	TotalQuantity     int        `json:"total_quantity" db:"total_quantity"`
 	Reason            *string    `json:"reason,omitempty" db:"reason"`
 	Status            string     `json:"status" db:"status"`
@@ -30,6 +31,7 @@ type Adjustment struct {
 	CreatedByLastName    *string `json:"created_by_last_name,omitempty" db:"created_by_last_name"`
 	ProcessedByFirstName *string `json:"processed_by_first_name,omitempty" db:"processed_by_first_name"`
 	ProcessedByLastName  *string `json:"processed_by_last_name,omitempty" db:"processed_by_last_name"`
+	WarehouseName        *string `json:"warehouse_name,omitempty" db:"warehouse_name"`
 	// Items
 	Items []AdjustmentItem `json:"items,omitempty"`
 }
@@ -38,20 +40,19 @@ type AdjustmentItem struct {
 	ID           uuid.UUID `json:"id" db:"id"`
 	AdjustmentID uuid.UUID `json:"adjustment_id" db:"adjustment_id"`
 	ProductID    uuid.UUID `json:"product_id" db:"product_id"`
-	WarehouseID  uuid.UUID `json:"warehouse_id" db:"warehouse_id"`
 	Quantity     int       `json:"quantity" db:"quantity"` // Can be positive (add) or negative (subtract)
 	Reason       *string   `json:"reason,omitempty" db:"reason"`
 	CostPrice    float64   `json:"cost_price" db:"cost_price"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	// Joined fields
-	ProductName   *string `json:"product_name,omitempty" db:"product_name"`
-	ProductSKU    *string `json:"product_sku,omitempty" db:"product_sku"`
-	WarehouseName *string `json:"warehouse_name,omitempty" db:"warehouse_name"`
+	ProductName *string `json:"product_name,omitempty" db:"product_name"`
+	ProductSKU  *string `json:"product_sku,omitempty" db:"product_sku"`
 }
 
 type CreateAdjustmentRequest struct {
 	ReferenceNumber   string    `json:"reference_number" validate:"required"`
 	AdjustmentDate    time.Time `json:"adjustment_date" validate:"required"`
+	WarehouseID       uuid.UUID `json:"warehouse_id" validate:"required"`
 	TotalQuantity     int       `json:"total_quantity" validate:"min=0"`
 	Reason            *string   `json:"reason,omitempty"`
 	Status            string    `json:"status" validate:"oneof=pending approved completed cancelled"`
@@ -66,11 +67,10 @@ type CreateAdjustmentRequest struct {
 }
 
 type CreateAdjustmentItemRequest struct {
-	ProductID   uuid.UUID `json:"product_id" validate:"required"`
-	WarehouseID uuid.UUID `json:"warehouse_id" validate:"required"`
-	Quantity    int       `json:"quantity" validate:"required"`
-	CostPrice   float64   `json:"cost_price" validate:"required,min=0"`
-	Reason      *string   `json:"reason,omitempty"`
+	ProductID uuid.UUID `json:"product_id" validate:"required"`
+	Quantity  int       `json:"quantity" validate:"required"`
+	CostPrice float64   `json:"cost_price" validate:"required,min=0"`
+	Reason    *string   `json:"reason,omitempty"`
 }
 
 type UpdateAdjustmentRequest struct {
