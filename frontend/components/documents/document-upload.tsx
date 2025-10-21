@@ -119,20 +119,25 @@ export function DocumentUpload({
                 {uploadedFiles.length === 0 ? (
                   <span className="text-xs text-gray-600">No file chosen</span>
                 ) : (
-                  uploadedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center gap-1 text-xs text-gray-600 bg-white px-2 py-1 rounded border">
-                      <FileText className="w-3 h-3" />
-                      <span className="max-w-32 truncate">{file.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
-                        className="h-4 w-4 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-green-600 font-medium">
+                      {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} selected
+                    </span>
+                    {uploadedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center gap-1 text-xs text-gray-600 bg-green-50 px-2 py-1 rounded border border-green-200">
+                        <FileText className="w-3 h-3 text-green-600" />
+                        <span className="max-w-32 truncate">{file.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                          className="h-4 w-4 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 )}
                 
                 {/* Action Buttons beside document names */}
@@ -142,9 +147,9 @@ export function DocumentUpload({
                       onClick={onUpload}
                       disabled={isUploading}
                       size="sm"
-                      className="h-7 px-3 text-xs"
+                      className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
                     >
-                      {isUploading ? 'Uploading...' : 'Upload'}
+                      {isUploading ? 'Preparing...' : 'Prepare Files'}
                     </Button>
                   )}
                   <Button

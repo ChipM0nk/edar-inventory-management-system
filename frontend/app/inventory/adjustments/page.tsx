@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import { AppLayout } from '@/components/app-layout'
 import { AdjustmentDetailsDialog, AdjustmentReviewDialog } from '@/components/adjustments'
-import { DocumentUpload } from '@/components/documents'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +17,7 @@ import { Plus, Search, RefreshCw, ArrowLeft, Package, Calendar, User, DollarSign
 import api from '@/lib/api'
 import { useConfirm } from '@/hooks/use-confirm'
 import { useNotice } from '@/hooks/use-notice'
+import { UnifiedDocumentUpload } from '@/components/documents/unified-document-upload'
 
 interface Product {
   id: string
@@ -122,8 +122,6 @@ export default function AdjustmentsPage() {
   
   // Document upload state
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false)
-  const [showDocumentUpload, setShowDocumentUpload] = useState(true)
   const [adjustmentNotes, setAdjustmentNotes] = useState('')
   
   // Close warning state
@@ -409,7 +407,6 @@ export default function AdjustmentsPage() {
     setGeneratedReferenceNumber(null)
     setAdjustmentNotes('')
     setUploadedFiles([])
-    setShowDocumentUpload(false)
     // Reset reference fields
     setReferenceType('')
     setReferenceId('')
@@ -420,7 +417,6 @@ export default function AdjustmentsPage() {
     setShowProductDropdown(false)
     // Reset document upload
     setUploadedFiles([])
-    setIsUploadingDocuments(false)
   }
 
   const handleAdjustmentClick = (adjustment: Adjustment) => {
@@ -528,40 +524,31 @@ export default function AdjustmentsPage() {
     setAdjustmentItems(adjustmentItems.filter((_, i) => i !== index))
   }
 
-  const handleDocumentUpload = async () => {
-    if (uploadedFiles.length === 0) {
-      await notice({
-        title: 'No files',
-        description: 'Please select files to upload',
-        variant: 'warning',
-      })
-      return
+  // Document upload functions
+  const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      const newFiles = Array.from(files)
+      setUploadedFiles(prev => [...prev, ...newFiles])
     }
+  }
 
-    try {
-      setIsUploadingDocuments(true)
-      // For adjustment creation, we keep files in state until adjustment is created
-      // This simulates upload success
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate upload delay
-      
-      await notice({
-        title: 'Files ready',
-        description: `${uploadedFiles.length} file(s) ready for upload with adjustment`,
-        variant: 'success',
-      })
-      
-      // Hide the upload section after "upload"
-      setShowDocumentUpload(false)
-    } catch (error) {
-      console.error('Upload error:', error)
-      await notice({
-        title: 'Upload failed',
-        description: 'Failed to prepare files for upload',
-        variant: 'warning',
-      })
-    } finally {
-      setIsUploadingDocuments(false)
-    }
+  const removeDocument = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  // Handle view document
+  const handleViewDocument = (file: File) => {
+    const url = URL.createObjectURL(file)
+    window.open(url, '_blank')
   }
 
   // Check if there are unsaved changes
@@ -680,8 +667,6 @@ export default function AdjustmentsPage() {
       // Upload documents if any
       if (uploadedFiles.length > 0 && createdAdjustmentId) {
         try {
-          setIsUploadingDocuments(true)
-          
           const formData = new FormData()
           uploadedFiles.forEach((file) => {
             formData.append('documents', file)
@@ -704,8 +689,6 @@ export default function AdjustmentsPage() {
             description: 'Adjustment created, but some documents failed to upload. You can try uploading them later.',
             variant: 'warning',
           })
-        } finally {
-          setIsUploadingDocuments(false)
         }
       }
 
@@ -1046,7 +1029,6 @@ export default function AdjustmentsPage() {
                           setAdjustmentReasonOther('')
                           setAdjustmentNotes('')
                           setUploadedFiles([])
-                          setShowDocumentUpload(false)
                         }
                       } else {
                         setSelectedWarehouse(warehouse)
@@ -1062,7 +1044,6 @@ export default function AdjustmentsPage() {
                         setAdjustmentReasonOther('')
                         setAdjustmentNotes('')
                         setUploadedFiles([])
-                        setShowDocumentUpload(false)
                       }
                     } else {
                       setSelectedWarehouse(warehouse || null)
@@ -1078,7 +1059,6 @@ export default function AdjustmentsPage() {
                       setAdjustmentReasonOther('')
                       setAdjustmentNotes('')
                       setUploadedFiles([])
-                      setShowDocumentUpload(false)
                     }
                   }}>
                     <SelectTrigger 
@@ -1522,34 +1502,15 @@ export default function AdjustmentsPage() {
               />
             </div>
 
-            {/* Document Upload Section - Using Shared Component */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  Supporting Documents (Optional)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <DocumentUpload
-                  uploadedFiles={uploadedFiles}
-                  onFilesChange={(files) => {
-                    console.log('Files changed:', files)
-                    setUploadedFiles(files)
-                  }}
-                  onUpload={handleDocumentUpload}
-                  isUploading={isUploadingDocuments}
-                  showUploadSection={showDocumentUpload}
-                  onToggleUpload={(show) => {
-                    console.log('Toggle upload section:', show)
-                    setShowDocumentUpload(show)
-                  }}
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                  maxFiles={10}
-                  maxFileSize={10 * 1024 * 1024} // 10MB
-                />
-              </CardContent>
-            </Card>
+    {/* Document Upload Section - Unified Component */}
+    <UnifiedDocumentUpload
+      referenceType="adjustment"
+      referenceId=""
+      title="Supporting Documents (Optional)"
+      showDownload={false}
+      showDelete={false}
+      onFilesChange={setUploadedFiles}
+    />
 
             {/* Action Buttons - Compact */}
             <div className="flex justify-between items-center pt-4 border-t">
@@ -1575,11 +1536,11 @@ export default function AdjustmentsPage() {
                 </Button>
                 <Button 
                   onClick={() => setIsReviewOpen(true)}
-                  disabled={adjustmentItems.length === 0 || isUploadingDocuments}
+                  disabled={adjustmentItems.length === 0}
                   className="bg-[#52a852] hover:bg-[#4a964a] text-white"
                   tabIndex={12}
                 >
-                  {isUploadingDocuments ? 'Uploading...' : 'Review & Confirm'}
+                  Review & Confirm
                 </Button>
               </div>
             </div>
