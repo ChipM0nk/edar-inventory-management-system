@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Upload, X, FileText } from 'lucide-react'
@@ -32,6 +32,7 @@ export function DocumentUpload({
   className = ""
 }: DocumentUploadProps) {
   const [error, setError] = useState<string | null>(null)
+  const chooseFilesRef = useRef<HTMLLabelElement>(null)
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || [])
@@ -60,6 +61,16 @@ export function DocumentUpload({
     onFilesChange(newFiles)
     setError(null)
   }
+
+  // Focus on "Choose files" button when upload section becomes visible
+  useEffect(() => {
+    if (showUploadSection && chooseFilesRef.current) {
+      // Small delay to ensure the element is rendered
+      setTimeout(() => {
+        chooseFilesRef.current?.focus()
+      }, 100)
+    }
+  }, [showUploadSection])
 
   return (
     <div className={`space-y-1 pt-1 pb-1 ${className}`}>
@@ -92,8 +103,10 @@ export function DocumentUpload({
                 id="file-input"
               />
               <label
+                ref={chooseFilesRef}
                 htmlFor="file-input"
                 className="inline-flex items-center px-3 py-1 text-xs font-semibold bg-blue-50 text-blue-700 rounded cursor-pointer hover:bg-blue-100 border border-blue-200"
+                tabIndex={0}
               >
                 Choose files
               </label>
@@ -156,6 +169,7 @@ export function DocumentUpload({
         <Button
           onClick={() => onToggleUpload(!showUploadSection)}
           className="bg-blue-600 hover:bg-blue-700 text-white border-0 px-3 py-1 text-xs font-medium mt-2 mb-2"
+          tabIndex={11}
         >
           <Upload className="w-3 h-3 mr-1" />
           Add Documents

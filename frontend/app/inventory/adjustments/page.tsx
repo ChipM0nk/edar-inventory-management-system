@@ -1577,6 +1577,7 @@ export default function AdjustmentsPage() {
                   onClick={() => setIsReviewOpen(true)}
                   disabled={adjustmentItems.length === 0 || isUploadingDocuments}
                   className="bg-[#52a852] hover:bg-[#4a964a] text-white"
+                  tabIndex={12}
                 >
                   {isUploadingDocuments ? 'Uploading...' : 'Review & Confirm'}
                 </Button>
