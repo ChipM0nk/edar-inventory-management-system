@@ -8,3 +8,4 @@ CREATE INDEX idx_adjustments_external_reference ON adjustments(external_referenc
 -- Add comment for clarity
 COMMENT ON COLUMN adjustments.external_reference IS 'External reference number (PO, SO, Transfer, etc.) provided by user';
 
+

@@ -65,6 +65,7 @@ export default function TransfersPage() {
   const router = useRouter()
   const transferItemsRef = useRef<HTMLDivElement>(null)
   const productSelectRef = useRef<HTMLButtonElement>(null)
+  const fromWarehouseRef = useRef<HTMLButtonElement>(null)
   
   // State management
   const [transfers, setTransfers] = useState<Transfer[]>([])
@@ -137,6 +138,16 @@ export default function TransfersPage() {
     setFilteredTransfers(filtered)
     setCurrentPage(1) // Reset to first page when filtering
   }, [searchTerm, transfers])
+
+  // Focus From Warehouse dropdown when modal opens
+  useEffect(() => {
+    if (isCreateModalOpen && fromWarehouseRef.current) {
+      // Small delay to ensure the modal is fully rendered
+      setTimeout(() => {
+        fromWarehouseRef.current?.focus()
+      }, 100)
+    }
+  }, [isCreateModalOpen])
 
   // Pagination logic
   const totalPages = Math.ceil(filteredTransfers.length / itemsPerPage)
@@ -875,7 +886,6 @@ export default function TransfersPage() {
                       type="date"
                       value={transferDate}
                       onChange={(e) => setTransferDate(e.target.value)}
-                      tabIndex={1}
                     />
                   </div>
                   
@@ -886,7 +896,10 @@ export default function TransfersPage() {
                       onValueChange={(value) => handleWarehouseChange('from', value)}
                       disabled={warehousesLocked}
                     >
-                      <SelectTrigger tabIndex={2}>
+                      <SelectTrigger 
+                        ref={fromWarehouseRef}
+                        tabIndex={1}
+                      >
                         <SelectValue placeholder="Select source warehouse" />
                       </SelectTrigger>
                       <SelectContent>
@@ -909,7 +922,7 @@ export default function TransfersPage() {
                       onValueChange={(value) => handleWarehouseChange('to', value)}
                       disabled={warehousesLocked}
                     >
-                      <SelectTrigger tabIndex={3}>
+                      <SelectTrigger tabIndex={2}>
                         <SelectValue placeholder="Select destination warehouse" />
                       </SelectTrigger>
                       <SelectContent>
@@ -935,7 +948,7 @@ export default function TransfersPage() {
                     value={transferReason}
                     onChange={(e) => setTransferReason(e.target.value)}
                     placeholder="e.g., Stock rebalancing, Customer request, etc."
-                    tabIndex={4}
+                    tabIndex={3}
                   />
                 </div>
               </CardContent>
@@ -975,8 +988,18 @@ export default function TransfersPage() {
                     >
                       <SelectTrigger 
                         ref={productSelectRef} 
-                        tabIndex={5}
+                        tabIndex={4}
                         id="product-select"
+                        onFocus={() => {
+                          // Auto-scroll to the Products in Transfer section when product dropdown is focused
+                          if (transferItemsRef.current) {
+                            transferItemsRef.current.scrollIntoView({ 
+                              behavior: 'smooth', 
+                              block: 'start',
+                              inline: 'nearest'
+                            })
+                          }
+                        }}
                       >
                         <SelectValue placeholder={fromWarehouse ? "Select a product" : "Select warehouse first"} />
                       </SelectTrigger>
@@ -1018,7 +1041,7 @@ export default function TransfersPage() {
                       }}
                       placeholder="Enter quantity"
                       className={quantityError ? 'border-red-500' : ''}
-                      tabIndex={6}
+                      tabIndex={5}
                     />
                     {quantityError && (
                       <p className="text-sm text-red-600">{quantityError}</p>
@@ -1030,7 +1053,7 @@ export default function TransfersPage() {
                   type="button"
                   onClick={handleAddItem} 
                   className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white"
-                  tabIndex={7}
+                  tabIndex={6}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Product to Transfer
@@ -1120,7 +1143,7 @@ export default function TransfersPage() {
                 onClick={handleCreateTransfer}
                 disabled={transferItems.length === 0}
                 className="bg-[#52a852] hover:bg-[#4a964a] text-white"
-                tabIndex={8}
+                tabIndex={7}
               >
                 Create Transfer
               </Button>
