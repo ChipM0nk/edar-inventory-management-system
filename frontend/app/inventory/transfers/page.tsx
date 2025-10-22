@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Search, RefreshCw, ArrowLeft, Package, Eye, Calendar, User, DollarSign, FileText, Hash, ArrowRightLeft, CheckCircle, AlertCircle } from 'lucide-react'
 import api from '@/lib/api'
+import { UnifiedDocumentUpload } from '@/components/documents/unified-document-upload'
 
 interface Product {
   id: string
@@ -64,6 +65,7 @@ export default function TransfersPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
   const transferItemsRef = useRef<HTMLDivElement>(null)
+  const addProductsRef = useRef<HTMLDivElement>(null)
   const productSelectRef = useRef<HTMLButtonElement>(null)
   const fromWarehouseRef = useRef<HTMLButtonElement>(null)
   
@@ -87,6 +89,7 @@ export default function TransfersPage() {
   const [toWarehouse, setToWarehouse] = useState<Warehouse | null>(null)
   const [transferQuantity, setTransferQuantity] = useState('')
   const [transferReason, setTransferReason] = useState('')
+  const [transferNotes, setTransferNotes] = useState('')
   const [transferDate, setTransferDate] = useState(new Date().toISOString().split('T')[0])
   const [availableProducts, setAvailableProducts] = useState<StockLevel[]>([])
   const [currentStock, setCurrentStock] = useState<number | null>(null)
@@ -103,6 +106,9 @@ export default function TransfersPage() {
   const [generatedReferenceNumber, setGeneratedReferenceNumber] = useState<string>('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  
+  // Document upload state
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   
   // Close warning state
   const [showCloseWarning, setShowCloseWarning] = useState(false)
@@ -248,11 +254,12 @@ export default function TransfersPage() {
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = () => {
-    const hasFormData = fromWarehouse || toWarehouse || transferReason || transferDate !== new Date().toISOString().split('T')[0]
+    const hasFormData = fromWarehouse || toWarehouse || transferReason || transferNotes || transferDate !== new Date().toISOString().split('T')[0]
     const hasTransferItems = transferItems.length > 0
     const hasSelectedProduct = selectedProduct || transferQuantity
+    const hasUploadedDocs = uploadedFiles.length > 0
     
-    return hasFormData || hasTransferItems || hasSelectedProduct
+    return hasFormData || hasTransferItems || hasSelectedProduct || hasUploadedDocs
   }
 
   const handleTransferClick = (transfer: Transfer) => {
@@ -329,6 +336,7 @@ export default function TransfersPage() {
     setToWarehouse(null)
     setTransferQuantity('')
     setTransferReason('')
+    setTransferNotes('')
     setTransferDate(new Date().toISOString().split('T')[0])
     setAvailableProducts([])
     setCurrentStock(null)
@@ -341,6 +349,7 @@ export default function TransfersPage() {
     setShowErrorDialog(false)
     setPreviewReferenceNumber('')
     setGeneratedReferenceNumber('')
+    setUploadedFiles([])
   }
 
   const confirmCancelTransfer = async () => {
@@ -533,6 +542,7 @@ export default function TransfersPage() {
         from_warehouse_id: fromWarehouse!.id,
         to_warehouse_id: toWarehouse!.id,
         reason: transferReason,
+        notes: transferNotes || null,
         transfer_date: transferDate,
         items: transferItems.map(item => ({
           product_id: item.product_id,
@@ -540,7 +550,29 @@ export default function TransfersPage() {
         }))
       }
 
-      await api.post('/transfers', transferData)
+      const response = await api.post('/transfers', transferData)
+      const createdTransfer = response.data
+
+      // Upload prepared documents if any
+      if (uploadedFiles.length > 0) {
+        try {
+          const formData = new FormData()
+          uploadedFiles.forEach((file) => {
+            formData.append('documents', file)
+          })
+          formData.append('reference_type', 'transfer')
+          formData.append('reference_id', createdTransfer.id)
+
+          await api.post('/documents/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          })
+        } catch (error) {
+          console.error('Error uploading documents:', error)
+          // Don't fail the entire operation if document upload fails
+        }
+      }
 
       // Reset form and close modal
       setTransferItems([])
@@ -549,6 +581,7 @@ export default function TransfersPage() {
       setToWarehouse(null)
       setTransferQuantity('')
       setTransferReason('')
+      setTransferNotes('')
       setTransferDate(new Date().toISOString().split('T')[0])
       setAvailableProducts([])
       setCurrentStock(null)
@@ -558,6 +591,7 @@ export default function TransfersPage() {
       setPendingWarehouseChange(null)
       setIsCreateModalOpen(false)
       setShowReviewDialog(false)
+      setUploadedFiles([])
       
       // Reload transfers
       await loadTransfers()
@@ -919,13 +953,13 @@ export default function TransfersPage() {
           <div className="space-y-6">
             {/* Transfer Information */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Transfer Information</CardTitle>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold">Transfer Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="transfer-date">Transfer Date *</Label>
+                    <Label htmlFor="transfer-date" className="text-sm font-medium">Transfer Date *</Label>
                     <Input
                       id="transfer-date"
                       type="date"
@@ -936,7 +970,7 @@ export default function TransfersPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>From Warehouse *</Label>
+                    <Label className="text-sm font-medium">From Warehouse *</Label>
                     <Select 
                       value={fromWarehouse?.id || ''} 
                       onValueChange={(value) => handleWarehouseChange('from', value)}
@@ -962,7 +996,7 @@ export default function TransfersPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>To Warehouse *</Label>
+                    <Label className="text-sm font-medium">To Warehouse *</Label>
                     <Select 
                       value={toWarehouse?.id || ''} 
                       onValueChange={(value) => handleWarehouseChange('to', value)}
@@ -988,7 +1022,7 @@ export default function TransfersPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="reason">Reason for Transfer *</Label>
+                  <Label htmlFor="reason" className="text-sm font-medium">Reason for Transfer *</Label>
                   <Input
                     id="reason"
                     value={transferReason}
@@ -1001,14 +1035,14 @@ export default function TransfersPage() {
             </Card>
 
             {/* Add Item Form */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Add Products to Transfer</CardTitle>
+            <Card ref={addProductsRef}>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold">Add Products to Transfer</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Product *</Label>
+                    <Label className="text-sm font-medium">Product *</Label>
                     <Select 
                       value={selectedProduct?.id || ''} 
                       onValueChange={(value) => {
@@ -1034,12 +1068,12 @@ export default function TransfersPage() {
                     >
                       <SelectTrigger 
                         ref={productSelectRef} 
-                        tabIndex={4}
+                        tabIndex={6}
                         id="product-select"
                         onFocus={() => {
-                          // Auto-scroll to the Products in Transfer section when product dropdown is focused
-                          if (transferItemsRef.current) {
-                            transferItemsRef.current.scrollIntoView({ 
+                          // Auto-scroll to the Add Products to Transfer section when product dropdown is focused
+                          if (addProductsRef.current) {
+                            addProductsRef.current.scrollIntoView({ 
                               behavior: 'smooth', 
                               block: 'start',
                               inline: 'nearest'
@@ -1065,7 +1099,7 @@ export default function TransfersPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="quantity">Quantity *</Label>
+                    <Label htmlFor="quantity" className="text-sm font-medium">Quantity *</Label>
                     <Input
                       id="quantity"
                       type="number"
@@ -1087,7 +1121,7 @@ export default function TransfersPage() {
                       }}
                       placeholder="Enter quantity"
                       className={quantityError ? 'border-red-500' : ''}
-                      tabIndex={5}
+                      tabIndex={7}
                     />
                     {quantityError && (
                       <p className="text-sm text-red-600">{quantityError}</p>
@@ -1099,7 +1133,7 @@ export default function TransfersPage() {
                   type="button"
                   onClick={handleAddItem} 
                   className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white"
-                  tabIndex={6}
+                  tabIndex={8}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Product to Transfer
@@ -1110,9 +1144,9 @@ export default function TransfersPage() {
             {/* Items List */}
             {transferItems.length > 0 && (
               <Card ref={transferItemsRef}>
-                <CardHeader>
-                  <CardTitle className="text-lg">Products in Transfer ({transferItems.length})</CardTitle>
-                  <CardDescription>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold">Products in Transfer ({transferItems.length})</CardTitle>
+                  <CardDescription className="text-sm">
                     From: <span className="font-semibold">{fromWarehouse?.name}</span> → To: <span className="font-semibold">{toWarehouse?.name}</span>
                   </CardDescription>
                 </CardHeader>
@@ -1120,31 +1154,31 @@ export default function TransfersPage() {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Action</TableHead>
+                        <TableRow className="h-8">
+                          <TableHead className="py-2 text-xs font-medium">Product</TableHead>
+                          <TableHead className="py-2 text-xs font-medium">SKU</TableHead>
+                          <TableHead className="py-2 text-xs font-medium">Quantity</TableHead>
+                          <TableHead className="py-2 text-xs font-medium">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {transferItems.map((item, index) => (
-                          <TableRow key={`${item.product_id}-${index}`}>
-                            <TableCell className="font-medium">
+                          <TableRow key={`${item.product_id}-${index}`} className="h-8">
+                            <TableCell className="py-1 font-medium text-sm">
                               {item.product_name}
                             </TableCell>
-                            <TableCell className="font-mono text-sm text-gray-600">
+                            <TableCell className="py-1 font-mono text-xs text-gray-600">
                               {item.product_sku}
                             </TableCell>
-                            <TableCell className="font-medium text-blue-600">
+                            <TableCell className="py-1 font-medium text-sm text-blue-600">
                               {item.quantity}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="py-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleRemoveItem(index)}
-                                className="text-red-600 hover:text-red-800"
+                                className="text-red-600 hover:text-red-800 h-6 px-2 text-xs"
                               >
                                 Remove
                               </Button>
@@ -1157,6 +1191,42 @@ export default function TransfersPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Notes Section */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold">Notes (Optional)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="transfer-notes" className="text-sm font-medium">Additional Notes</Label>
+                  <Textarea
+                    id="transfer-notes"
+                    value={transferNotes}
+                    onChange={(e) => setTransferNotes(e.target.value)}
+                    placeholder="Add any additional notes or comments for this transfer..."
+                    className="resize-none"
+                    rows={3}
+                    tabIndex={8}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Document Upload Section */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold">Supporting Documents (Optional)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <UnifiedDocumentUpload
+                  referenceType="transfer"
+                  referenceId=""
+                  title=""
+                  onFilesChange={setUploadedFiles}
+                />
+              </CardContent>
+            </Card>
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3">
@@ -1177,7 +1247,7 @@ export default function TransfersPage() {
                 onClick={handleCreateTransfer}
                 disabled={transferItems.length === 0}
                 className="bg-[#52a852] hover:bg-[#4a964a] text-white"
-                tabIndex={7}
+                tabIndex={9}
               >
                 Create Transfer
               </Button>
@@ -1258,6 +1328,12 @@ export default function TransfersPage() {
                   <p className="text-sm font-medium text-gray-500">Reason</p>
                   <p className="text-sm">{transferReason}</p>
                 </div>
+                {transferNotes && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Notes</p>
+                    <p className="text-sm">{transferNotes}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
