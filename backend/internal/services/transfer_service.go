@@ -3,11 +3,11 @@ package services
 import (
 	"context"
 	"errors"
-	"time"
 	"inventory-system/internal/database"
 	sqlc "inventory-system/internal/database/sqlc"
 	"inventory-system/internal/models"
 	"inventory-system/internal/utils"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -41,6 +41,7 @@ func (s *TransferService) CreateTransfer(ctx context.Context, req models.CreateT
 		FromWarehouseID: utils.UUIDToPgxUUID(req.FromWarehouseID),
 		ToWarehouseID:   utils.UUIDToPgxUUID(req.ToWarehouseID),
 		Reason:          req.Reason,
+		Notes:           req.Notes,
 		TransferDate:    utils.TimeToPgxDate(transferDate),
 		CreatedBy:       utils.UUIDToPgxUUID(userID),
 	})
@@ -88,12 +89,12 @@ func (s *TransferService) CreateTransfer(ctx context.Context, req models.CreateT
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Check if we have enough stock
 		if fromStock.Quantity < int32(item.Quantity) {
 			return nil, errors.New("insufficient stock in source warehouse")
 		}
-		
+
 		_, err = s.db.UpdateStockQuantity(ctx, &sqlc.UpdateStockQuantityParams{
 			ProductID:   utils.UUIDToPgxUUID(item.ProductID),
 			WarehouseID: utils.UUIDToPgxUUID(req.FromWarehouseID),
@@ -203,25 +204,25 @@ func (s *TransferService) GetTransfer(ctx context.Context, transferID uuid.UUID)
 	}
 
 	return &models.Transfer{
-		ID:                  utils.PgxUUIDToUUID(transfer.ID),
-		ReferenceNumber:     transfer.ReferenceNumber,
-		FromWarehouseID:     utils.PgxUUIDToUUID(transfer.FromWarehouseID),
-		FromWarehouseName:   transfer.FromWarehouseName,
-		ToWarehouseID:       utils.PgxUUIDToUUID(transfer.ToWarehouseID),
-		ToWarehouseName:     transfer.ToWarehouseName,
-		Reason:              transfer.Reason,
-		TransferDate:        utils.PgxDateToTime(transfer.TransferDate),
-		TotalQuantity:       int(transfer.TotalQuantity),
-		Status:              transfer.Status,
-		CreatedBy:           utils.PgxUUIDToUUID(transfer.CreatedBy),
-		CreatedByName:       createdByName,
-		ProcessedBy:         utils.OptionalPgxUUIDToUUID(transfer.ProcessedBy),
-		ProcessedByName:     "", // Not available in current schema
-		ProcessedDate:       utils.OptionalPgxTimestamptzToTimePtr(transfer.ProcessedDate),
-		Notes:               transfer.Notes,
-		CreatedAt:           utils.PgxTimestamptzToTime(transfer.CreatedAt),
-		UpdatedAt:           utils.PgxTimestamptzToTime(transfer.UpdatedAt),
-		Items:               transferItems,
+		ID:                utils.PgxUUIDToUUID(transfer.ID),
+		ReferenceNumber:   transfer.ReferenceNumber,
+		FromWarehouseID:   utils.PgxUUIDToUUID(transfer.FromWarehouseID),
+		FromWarehouseName: transfer.FromWarehouseName,
+		ToWarehouseID:     utils.PgxUUIDToUUID(transfer.ToWarehouseID),
+		ToWarehouseName:   transfer.ToWarehouseName,
+		Reason:            transfer.Reason,
+		TransferDate:      utils.PgxDateToTime(transfer.TransferDate),
+		TotalQuantity:     int(transfer.TotalQuantity),
+		Status:            transfer.Status,
+		CreatedBy:         utils.PgxUUIDToUUID(transfer.CreatedBy),
+		CreatedByName:     createdByName,
+		ProcessedBy:       utils.OptionalPgxUUIDToUUID(transfer.ProcessedBy),
+		ProcessedByName:   "", // Not available in current schema
+		ProcessedDate:     utils.OptionalPgxTimestamptzToTimePtr(transfer.ProcessedDate),
+		Notes:             transfer.Notes,
+		CreatedAt:         utils.PgxTimestamptzToTime(transfer.CreatedAt),
+		UpdatedAt:         utils.PgxTimestamptzToTime(transfer.UpdatedAt),
+		Items:             transferItems,
 	}, nil
 }
 
@@ -277,25 +278,25 @@ func (s *TransferService) ListTransfers(ctx context.Context, filter models.Trans
 		}
 
 		transferModels[i] = models.Transfer{
-			ID:                  utils.PgxUUIDToUUID(transfer.ID),
-			ReferenceNumber:     transfer.ReferenceNumber,
-			FromWarehouseID:     utils.PgxUUIDToUUID(transfer.FromWarehouseID),
-			FromWarehouseName:   transfer.FromWarehouseName,
-			ToWarehouseID:       utils.PgxUUIDToUUID(transfer.ToWarehouseID),
-			ToWarehouseName:     transfer.ToWarehouseName,
-			Reason:              transfer.Reason,
-			TransferDate:        utils.PgxDateToTime(transfer.TransferDate),
-			TotalQuantity:       int(transfer.TotalQuantity),
-			Status:              transfer.Status,
-			CreatedBy:           utils.PgxUUIDToUUID(transfer.CreatedBy),
-			CreatedByName:       createdByName,
-			ProcessedBy:         utils.OptionalPgxUUIDToUUID(transfer.ProcessedBy),
-			ProcessedByName:     "", // Not available in current schema
-			ProcessedDate:       utils.OptionalPgxTimestamptzToTimePtr(transfer.ProcessedDate),
-			Notes:               transfer.Notes,
-			CreatedAt:           utils.PgxTimestamptzToTime(transfer.CreatedAt),
-			UpdatedAt:           utils.PgxTimestamptzToTime(transfer.UpdatedAt),
-			Items:               transferItems,
+			ID:                utils.PgxUUIDToUUID(transfer.ID),
+			ReferenceNumber:   transfer.ReferenceNumber,
+			FromWarehouseID:   utils.PgxUUIDToUUID(transfer.FromWarehouseID),
+			FromWarehouseName: transfer.FromWarehouseName,
+			ToWarehouseID:     utils.PgxUUIDToUUID(transfer.ToWarehouseID),
+			ToWarehouseName:   transfer.ToWarehouseName,
+			Reason:            transfer.Reason,
+			TransferDate:      utils.PgxDateToTime(transfer.TransferDate),
+			TotalQuantity:     int(transfer.TotalQuantity),
+			Status:            transfer.Status,
+			CreatedBy:         utils.PgxUUIDToUUID(transfer.CreatedBy),
+			CreatedByName:     createdByName,
+			ProcessedBy:       utils.OptionalPgxUUIDToUUID(transfer.ProcessedBy),
+			ProcessedByName:   "", // Not available in current schema
+			ProcessedDate:     utils.OptionalPgxTimestamptzToTimePtr(transfer.ProcessedDate),
+			Notes:             transfer.Notes,
+			CreatedAt:         utils.PgxTimestamptzToTime(transfer.CreatedAt),
+			UpdatedAt:         utils.PgxTimestamptzToTime(transfer.UpdatedAt),
+			Items:             transferItems,
 		}
 	}
 
@@ -342,25 +343,25 @@ func (s *TransferService) GetTransferByReferenceNumber(ctx context.Context, refe
 	}
 
 	return &models.Transfer{
-		ID:                  utils.PgxUUIDToUUID(transfer.ID),
-		ReferenceNumber:     transfer.ReferenceNumber,
-		FromWarehouseID:     utils.PgxUUIDToUUID(transfer.FromWarehouseID),
-		FromWarehouseName:   transfer.FromWarehouseName,
-		ToWarehouseID:       utils.PgxUUIDToUUID(transfer.ToWarehouseID),
-		ToWarehouseName:     transfer.ToWarehouseName,
-		Reason:              transfer.Reason,
-		TransferDate:        utils.PgxDateToTime(transfer.TransferDate),
-		TotalQuantity:       int(transfer.TotalQuantity),
-		Status:              transfer.Status,
-		CreatedBy:           utils.PgxUUIDToUUID(transfer.CreatedBy),
-		CreatedByName:       createdByName,
-		ProcessedBy:         utils.OptionalPgxUUIDToUUID(transfer.ProcessedBy),
-		ProcessedByName:     "", // Not available in current schema
-		ProcessedDate:       utils.OptionalPgxTimestamptzToTimePtr(transfer.ProcessedDate),
-		Notes:               transfer.Notes,
-		CreatedAt:           utils.PgxTimestamptzToTime(transfer.CreatedAt),
-		UpdatedAt:           utils.PgxTimestamptzToTime(transfer.UpdatedAt),
-		Items:               transferItems,
+		ID:                utils.PgxUUIDToUUID(transfer.ID),
+		ReferenceNumber:   transfer.ReferenceNumber,
+		FromWarehouseID:   utils.PgxUUIDToUUID(transfer.FromWarehouseID),
+		FromWarehouseName: transfer.FromWarehouseName,
+		ToWarehouseID:     utils.PgxUUIDToUUID(transfer.ToWarehouseID),
+		ToWarehouseName:   transfer.ToWarehouseName,
+		Reason:            transfer.Reason,
+		TransferDate:      utils.PgxDateToTime(transfer.TransferDate),
+		TotalQuantity:     int(transfer.TotalQuantity),
+		Status:            transfer.Status,
+		CreatedBy:         utils.PgxUUIDToUUID(transfer.CreatedBy),
+		CreatedByName:     createdByName,
+		ProcessedBy:       utils.OptionalPgxUUIDToUUID(transfer.ProcessedBy),
+		ProcessedByName:   "", // Not available in current schema
+		ProcessedDate:     utils.OptionalPgxTimestamptzToTimePtr(transfer.ProcessedDate),
+		Notes:             transfer.Notes,
+		CreatedAt:         utils.PgxTimestamptzToTime(transfer.CreatedAt),
+		UpdatedAt:         utils.PgxTimestamptzToTime(transfer.UpdatedAt),
+		Items:             transferItems,
 	}, nil
 }
 

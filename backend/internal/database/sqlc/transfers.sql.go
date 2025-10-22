@@ -17,10 +17,11 @@ INSERT INTO transfers (
     from_warehouse_id,
     to_warehouse_id,
     reason,
+    notes,
     transfer_date,
     created_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
+    $1, $2, $3, $4, $5, $6, $7
 ) RETURNING id, reference_number, transfer_date, from_warehouse_id, to_warehouse_id, total_quantity, status, reason, created_by, processed_by, processed_date, notes, created_at, updated_at
 `
 
@@ -29,6 +30,7 @@ type CreateTransferParams struct {
 	FromWarehouseID pgtype.UUID `json:"from_warehouse_id"`
 	ToWarehouseID   pgtype.UUID `json:"to_warehouse_id"`
 	Reason          *string     `json:"reason"`
+	Notes           *string     `json:"notes"`
 	TransferDate    pgtype.Date `json:"transfer_date"`
 	CreatedBy       pgtype.UUID `json:"created_by"`
 }
@@ -39,6 +41,7 @@ func (q *Queries) CreateTransfer(ctx context.Context, arg *CreateTransferParams)
 		arg.FromWarehouseID,
 		arg.ToWarehouseID,
 		arg.Reason,
+		arg.Notes,
 		arg.TransferDate,
 		arg.CreatedBy,
 	)
@@ -287,6 +290,7 @@ SELECT
     t.from_warehouse_id,
     t.to_warehouse_id,
     t.reason,
+    t.notes,
     t.transfer_date,
     t.total_quantity,
     t.status,
@@ -316,6 +320,7 @@ type GetTransferWithItemsRow struct {
 	FromWarehouseID       pgtype.UUID        `json:"from_warehouse_id"`
 	ToWarehouseID         pgtype.UUID        `json:"to_warehouse_id"`
 	Reason                *string            `json:"reason"`
+	Notes                 *string            `json:"notes"`
 	TransferDate          pgtype.Date        `json:"transfer_date"`
 	TotalQuantity         int32              `json:"total_quantity"`
 	Status                string             `json:"status"`
@@ -347,6 +352,7 @@ func (q *Queries) GetTransferWithItems(ctx context.Context) ([]*GetTransferWithI
 			&i.FromWarehouseID,
 			&i.ToWarehouseID,
 			&i.Reason,
+			&i.Notes,
 			&i.TransferDate,
 			&i.TotalQuantity,
 			&i.Status,

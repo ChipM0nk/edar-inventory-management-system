@@ -4,10 +4,11 @@ INSERT INTO transfers (
     from_warehouse_id,
     to_warehouse_id,
     reason,
+    notes,
     transfer_date,
     created_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
+    $1, $2, $3, $4, $5, $6, $7
 ) RETURNING *;
 
 -- name: CreateTransferItem :one
@@ -88,6 +89,7 @@ SELECT
     t.from_warehouse_id,
     t.to_warehouse_id,
     t.reason,
+    t.notes,
     t.transfer_date,
     t.total_quantity,
     t.status,
