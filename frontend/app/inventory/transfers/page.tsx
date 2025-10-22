@@ -103,6 +103,10 @@ export default function TransfersPage() {
   const [generatedReferenceNumber, setGeneratedReferenceNumber] = useState<string>('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  
+  // Close warning state
+  const [showCloseWarning, setShowCloseWarning] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -141,11 +145,17 @@ export default function TransfersPage() {
 
   // Focus From Warehouse dropdown when modal opens
   useEffect(() => {
-    if (isCreateModalOpen && fromWarehouseRef.current) {
-      // Small delay to ensure the modal is fully rendered
-      setTimeout(() => {
-        fromWarehouseRef.current?.focus()
-      }, 100)
+    if (isCreateModalOpen) {
+      // Use requestAnimationFrame to ensure focus happens after all rendering
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (fromWarehouseRef.current) {
+            fromWarehouseRef.current.focus()
+            // Also try clicking to ensure it's properly activated
+            fromWarehouseRef.current.click()
+          }
+        }, 100)
+      })
     }
   }, [isCreateModalOpen])
 
@@ -236,6 +246,15 @@ export default function TransfersPage() {
     })
   }
 
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = () => {
+    const hasFormData = fromWarehouse || toWarehouse || transferReason || transferDate !== new Date().toISOString().split('T')[0]
+    const hasTransferItems = transferItems.length > 0
+    const hasSelectedProduct = selectedProduct || transferQuantity
+    
+    return hasFormData || hasTransferItems || hasSelectedProduct
+  }
+
   const handleTransferClick = (transfer: Transfer) => {
     setSelectedTransfer(transfer)
     setIsModalOpen(true)
@@ -284,6 +303,44 @@ export default function TransfersPage() {
 
   const handleCancelTransfer = () => {
     setShowCancelDialog(true)
+  }
+
+  // Handle close warning dialog
+  const handleCloseWarning = (confirmed: boolean) => {
+    setShowCloseWarning(false)
+    if (confirmed) {
+      if (pendingNavigation) {
+        // Navigation was requested
+        router.push(pendingNavigation)
+      } else {
+        // Dialog closing was requested
+        setIsCreateModalOpen(false)
+        resetForm()
+      }
+    }
+    setPendingNavigation(null)
+  }
+
+  // Reset form function
+  const resetForm = () => {
+    setTransferItems([])
+    setSelectedProduct(null)
+    setFromWarehouse(null)
+    setToWarehouse(null)
+    setTransferQuantity('')
+    setTransferReason('')
+    setTransferDate(new Date().toISOString().split('T')[0])
+    setAvailableProducts([])
+    setCurrentStock(null)
+    setQuantityError('')
+    setWarehousesLocked(false)
+    setShowWarehouseChangeWarning(false)
+    setPendingWarehouseChange(null)
+    setShowReviewDialog(false)
+    setShowSuccessDialog(false)
+    setShowErrorDialog(false)
+    setPreviewReferenceNumber('')
+    setGeneratedReferenceNumber('')
   }
 
   const confirmCancelTransfer = async () => {
@@ -837,28 +894,16 @@ export default function TransfersPage() {
 
       {/* Create Transfer Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
-        setIsCreateModalOpen(open)
         if (!open) {
-          // Reset form state when closing
-          setTransferItems([])
-          setSelectedProduct(null)
-          setFromWarehouse(null)
-          setToWarehouse(null)
-          setTransferQuantity('')
-          setTransferReason('')
-          setTransferDate(new Date().toISOString().split('T')[0])
-          setAvailableProducts([])
-          setCurrentStock(null)
-          setQuantityError('')
-          setWarehousesLocked(false)
-          setShowWarehouseChangeWarning(false)
-          setPendingWarehouseChange(null)
-          setShowReviewDialog(false)
-          setShowSuccessDialog(false)
-          setShowErrorDialog(false)
-          setPreviewReferenceNumber('')
-          setGeneratedReferenceNumber('')
+          // Check for unsaved changes before closing
+          if (hasUnsavedChanges()) {
+            setPendingNavigation(null) // No navigation, just closing dialog
+            setShowCloseWarning(true)
+            return // Don't close the dialog yet
+          }
+          resetForm() // Clear form when modal is closed
         }
+        setIsCreateModalOpen(open)
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -886,6 +931,7 @@ export default function TransfersPage() {
                       type="date"
                       value={transferDate}
                       onChange={(e) => setTransferDate(e.target.value)}
+                      tabIndex={-1}
                     />
                   </div>
                   
@@ -1115,26 +1161,14 @@ export default function TransfersPage() {
             {/* Action Buttons */}
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => {
+                // Check for unsaved changes before closing
+                if (hasUnsavedChanges()) {
+                  setPendingNavigation(null) // No navigation, just closing dialog
+                  setShowCloseWarning(true)
+                  return // Don't close the dialog yet
+                }
+                resetForm()
                 setIsCreateModalOpen(false)
-                // Reset form state
-                setTransferItems([])
-                setSelectedProduct(null)
-                setFromWarehouse(null)
-                setToWarehouse(null)
-                setTransferQuantity('')
-                setTransferReason('')
-                setTransferDate(new Date().toISOString().split('T')[0])
-                setAvailableProducts([])
-                setCurrentStock(null)
-                setQuantityError('')
-                setWarehousesLocked(false)
-                setShowWarehouseChangeWarning(false)
-                setPendingWarehouseChange(null)
-                setShowReviewDialog(false)
-                setShowSuccessDialog(false)
-                setShowErrorDialog(false)
-                setPreviewReferenceNumber('')
-          setGeneratedReferenceNumber('')
               }}>
                 Cancel
               </Button>
@@ -1414,6 +1448,41 @@ export default function TransfersPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close Warning Dialog */}
+      <Dialog open={showCloseWarning} onOpenChange={() => setShowCloseWarning(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <DialogTitle className="text-xl font-semibold text-gray-900">Unsaved Changes</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              You have unsaved changes that will be lost if you close this dialog. Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex justify-center gap-3 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleCloseWarning(false)}
+              className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg"
+            >
+              Keep Editing
+            </Button>
+            <Button
+              type="button"
+              onClick={() => handleCloseWarning(true)}
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
+            >
+              Close Anyway
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </AppLayout>
