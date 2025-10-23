@@ -6,15 +6,15 @@ import { useEffect, useState, useRef } from 'react'
 import { AppLayout } from '@/components/app-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Search, RefreshCw, ArrowLeft, Package, Package2, Eye, Calendar, User, DollarSign, FileText, Hash, ArrowRightLeft, CheckCircle, AlertCircle } from 'lucide-react'
+import { Plus, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react'
 import api from '@/lib/api'
-import { UnifiedDocumentUpload } from '@/components/documents/unified-document-upload'
+import { 
+  TransferTable, 
+  TransferDetailsDialog, 
+  NewTransferDialog, 
+  TransferReviewDialog 
+} from '@/components/transfers'
 
 interface Product {
   id: string
@@ -64,10 +64,6 @@ interface Transfer {
 export default function TransfersPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
-  const transferItemsRef = useRef<HTMLDivElement>(null)
-  const addProductsRef = useRef<HTMLDivElement>(null)
-  const productSelectRef = useRef<HTMLButtonElement>(null)
-  const fromWarehouseRef = useRef<HTMLButtonElement>(null)
   
   // State management
   const [transfers, setTransfers] = useState<Transfer[]>([])
@@ -104,17 +100,11 @@ export default function TransfersPage() {
   const [errorMessage, setErrorMessage] = useState<string>('')
   const [previewReferenceNumber, setPreviewReferenceNumber] = useState<string>('')
   const [generatedReferenceNumber, setGeneratedReferenceNumber] = useState<string>('')
-  const [showCancelDialog, setShowCancelDialog] = useState(false)
-  const [isCancelling, setIsCancelling] = useState(false)
   const [successFromWarehouse, setSuccessFromWarehouse] = useState<string>('')
   const [successToWarehouse, setSuccessToWarehouse] = useState<string>('')
   
   // Document upload state
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  
-  // Close warning state
-  const [showCloseWarning, setShowCloseWarning] = useState(false)
-  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -151,21 +141,6 @@ export default function TransfersPage() {
     setCurrentPage(1) // Reset to first page when filtering
   }, [searchTerm, transfers])
 
-  // Focus From Warehouse dropdown when modal opens
-  useEffect(() => {
-    if (isCreateModalOpen) {
-      // Use requestAnimationFrame to ensure focus happens after all rendering
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          if (fromWarehouseRef.current) {
-            fromWarehouseRef.current.focus()
-            // Also try clicking to ensure it's properly activated
-            fromWarehouseRef.current.click()
-          }
-        }, 100)
-      })
-    }
-  }, [isCreateModalOpen])
 
   // Pagination logic
   const totalPages = Math.ceil(filteredTransfers.length / itemsPerPage)
@@ -254,15 +229,6 @@ export default function TransfersPage() {
     })
   }
 
-  // Check if there are unsaved changes
-  const hasUnsavedChanges = () => {
-    const hasFormData = fromWarehouse || toWarehouse || transferReason || transferNotes || transferDate !== new Date().toISOString().split('T')[0]
-    const hasTransferItems = transferItems.length > 0
-    const hasSelectedProduct = selectedProduct || transferQuantity
-    const hasUploadedDocs = uploadedFiles.length > 0
-    
-    return hasFormData || hasTransferItems || hasSelectedProduct || hasUploadedDocs
-  }
 
   const handleTransferClick = (transfer: Transfer) => {
     setSelectedTransfer(transfer)
@@ -281,54 +247,8 @@ export default function TransfersPage() {
 
   const closeErrorDialog = () => {
     setShowErrorDialog(false)
-    // Focus back to product selection when error dialog closes
-    setTimeout(() => {
-      console.log('Attempting to focus product select after error dialog closes')
-      
-      // Try multiple methods to ensure focus works
-      const productSelect = document.getElementById('product-select') as HTMLElement
-      if (productSelect) {
-        console.log('Found product select by ID, attempting focus')
-        productSelect.focus()
-        // Also try clicking to ensure it's properly activated
-        productSelect.click()
-      } else {
-        console.log('Product select not found by ID, trying ref')
-        if (productSelectRef.current) {
-          productSelectRef.current.focus()
-          productSelectRef.current.click()
-        } else {
-          console.log('Product select not found by ref, trying tabIndex')
-          // Final fallback: find by tabIndex
-          const productSelectByTab = document.querySelector('[tabindex="5"]') as HTMLElement
-          if (productSelectByTab) {
-            productSelectByTab.focus()
-            productSelectByTab.click()
-          }
-        }
-      }
-    }, 500) // Increased timeout further
   }
 
-  const handleCancelTransfer = () => {
-    setShowCancelDialog(true)
-  }
-
-  // Handle close warning dialog
-  const handleCloseWarning = (confirmed: boolean) => {
-    setShowCloseWarning(false)
-    if (confirmed) {
-      if (pendingNavigation) {
-        // Navigation was requested
-        router.push(pendingNavigation)
-      } else {
-        // Dialog closing was requested
-        setIsCreateModalOpen(false)
-        resetForm()
-      }
-    }
-    setPendingNavigation(null)
-  }
 
   // Reset form function
   const resetForm = () => {
@@ -354,32 +274,6 @@ export default function TransfersPage() {
     setUploadedFiles([])
   }
 
-  const confirmCancelTransfer = async () => {
-    if (!selectedTransfer) return
-
-    try {
-      setIsCancelling(true)
-      await api.put(`/transfers/${selectedTransfer.id}/status`, {
-        status: 'cancelled'
-      })
-      
-      // Reload transfers to get updated data
-      await loadTransfers()
-      
-      // Update the selected transfer to show cancelled status
-      setSelectedTransfer({
-        ...selectedTransfer,
-        status: 'cancelled'
-      })
-      
-      setShowCancelDialog(false)
-    } catch (error) {
-      console.error('Error cancelling transfer:', error)
-      showError('Failed to cancel transfer. Please try again.')
-    } finally {
-      setIsCancelling(false)
-    }
-  }
 
   const handleAddItem = () => {
     const quantity = parseInt(transferQuantity) || 0
@@ -425,18 +319,6 @@ export default function TransfersPage() {
     setCurrentStock(null)
     setQuantityError('')
     
-    // Focus back to product selection for quick adding
-    setTimeout(() => {
-      if (productSelectRef.current) {
-        productSelectRef.current.focus()
-      } else {
-        // Fallback: find the product select by ID
-        const productSelect = document.getElementById('product-select') as HTMLElement
-        if (productSelect) {
-          productSelect.focus()
-        }
-      }
-    }, 100)
   }
 
   const handleRemoveItem = (index: number) => {
@@ -665,603 +547,77 @@ export default function TransfersPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Search Bar */}
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search by reference number, processed by, or product..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
-                {/* Transfers Table */}
-                {isLoadingData ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                    <p className="mt-2 text-gray-600">Loading transfers...</p>
-                  </div>
-                ) : currentTransfers.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">
-                      {searchTerm 
-                        ? 'No transfers found matching your search' 
-                        : 'No transfers available'
-                      }
-                    </p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      {searchTerm
-                        ? 'Try adjusting your search terms' 
-                        : 'Transfers will appear here once created'
-                      }
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Reference Number</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Total Quantity</TableHead>
-                          <TableHead>Processed By</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Items</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {currentTransfers.map((transfer) => (
-                          <TableRow 
-                            key={transfer.reference_id}
-                            className="cursor-pointer hover:bg-gray-50 transition-colors"
-                            onClick={() => handleTransferClick(transfer)}
-                          >
-                            <TableCell className="font-mono font-medium text-blue-600 hover:text-blue-800">
-                              {transfer.reference_id}
-                            </TableCell>
-                            <TableCell>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                transfer.status === 'cancelled' 
-                                  ? 'bg-red-100 text-red-800' 
-                                  : 'bg-purple-100 text-purple-800'
-                              }`}>
-                                {transfer.status === 'cancelled' ? 'Cancelled' : 'Transfer'}
-                              </span>
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {transfer.total_quantity}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600">
-                              {transfer.processed_by}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-500">
-                              {formatDate(transfer.processed_date)}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-500">
-                              {transfer.items.length} item{transfer.items.length !== 1 ? 's' : ''}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
+                <TransferTable
+                  transfers={filteredTransfers}
+                  isLoading={isLoadingData}
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  onTransferClick={handleTransferClick}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={filteredTransfers.length}
+                />
               </CardContent>
             </Card>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-6">
-                <div className="text-sm text-gray-700">
-                  Showing {startIndex + 1} to {Math.min(endIndex, filteredTransfers.length)} of {filteredTransfers.length} results
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <div className="flex items-center space-x-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(page)}
-                        className={currentPage === page ? "bg-[#52a852] hover:bg-[#4a964a] text-white" : ""}
-                      >
-                        {page}
-                      </Button>
-                    ))}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
       {/* Transfer Detail Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ArrowRightLeft className="h-5 w-5" />
-              Transfer Details
-            </DialogTitle>
-            <DialogDescription>
-              Complete information about this warehouse transfer
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedTransfer && (
-            <div className="space-y-6">
-              {/* Cancellation Banner */}
-              {selectedTransfer.status === 'cancelled' && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                    <div>
-                      <h3 className="text-sm font-semibold text-red-800">This transfer has been cancelled</h3>
-                      <p className="text-sm text-red-600 mt-1">No further actions can be taken on this transfer.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Transfer Overview */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Transfer Overview</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="flex items-center gap-2">
-                      <Hash className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm font-medium text-gray-700">Reference: </span>
-                        <span className="text-sm text-gray-900">{selectedTransfer.reference_id}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm font-medium text-gray-700">Date: </span>
-                        <span className="text-sm text-gray-900">{formatDate(selectedTransfer.processed_date)}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm font-medium text-gray-700">Processed By: </span>
-                        <span className="text-sm text-gray-900">{selectedTransfer.processed_by}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm font-medium text-gray-700">Reason: </span>
-                        <span className="text-sm text-gray-900">{selectedTransfer.reason || 'No reason provided'}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 md:col-span-2">
-                      <Package className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm font-medium text-gray-700">From: </span>
-                        <span className="text-sm text-gray-900">{selectedTransfer.from_warehouse_name}</span>
-                        <span className="mx-2 text-gray-400">→</span>
-                        <span className="text-sm font-medium text-gray-700">To: </span>
-                        <span className="text-sm text-gray-900">{selectedTransfer.to_warehouse_name}</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Transfer Items */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Transfer Items</CardTitle>
-                  <CardDescription>
-                    Complete list of items in this transfer
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Quantity</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedTransfer.items.map((item, index) => (
-                          <TableRow key={`${item.product_id}-${index}`}>
-                            <TableCell className="font-medium">
-                              {item.product_name}
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {item.product_sku}
-                            </TableCell>
-                            <TableCell className="font-medium text-blue-600">
-                              {item.quantity}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Action Buttons */}
-              <div className="flex justify-between gap-3">
-                {selectedTransfer.status !== 'cancelled' && (
-                  <Button 
-                    variant="destructive" 
-                    onClick={handleCancelTransfer}
-                    className="flex items-center gap-2"
-                  >
-                    <AlertCircle className="h-4 w-4" />
-                    Cancel Transfer
-                  </Button>
-                )}
-                <div className="flex gap-3 ml-auto">
-                  <Button variant="outline" onClick={closeModal}>
-                    Close
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <TransferDetailsDialog
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        transfer={selectedTransfer}
+        onTransferUpdate={loadTransfers}
+      />
 
       {/* Create Transfer Modal */}
-      <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
-        if (!open) {
-          // Check for unsaved changes before closing
-          if (hasUnsavedChanges()) {
-            setPendingNavigation(null) // No navigation, just closing dialog
-            setShowCloseWarning(true)
-            return // Don't close the dialog yet
+      <NewTransferDialog
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        warehouses={warehouses}
+        availableProducts={availableProducts}
+        currentStock={currentStock}
+        quantityError={quantityError}
+        warehousesLocked={warehousesLocked}
+        transferDate={transferDate}
+        transferReason={transferReason}
+        transferNotes={transferNotes}
+        transferQuantity={transferQuantity}
+        selectedProduct={selectedProduct}
+        fromWarehouse={fromWarehouse}
+        toWarehouse={toWarehouse}
+        transferItems={transferItems}
+        uploadedFiles={uploadedFiles}
+        user={user}
+        onTransferDateChange={setTransferDate}
+        onTransferReasonChange={setTransferReason}
+        onTransferNotesChange={setTransferNotes}
+        onTransferQuantityChange={setTransferQuantity}
+        onProductSelect={(product: Product | null) => {
+          setSelectedProduct(product)
+          if (product && fromWarehouse) {
+            loadStockLevel(product.id, fromWarehouse.id)
           }
-          resetForm() // Clear form when modal is closed
-        }
-        setIsCreateModalOpen(open)
-      }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Create New Transfer
-            </DialogTitle>
-            <DialogDescription>
-              Transfer inventory between warehouses
-            </DialogDescription>
-          </DialogHeader>
+        }}
+        onFromWarehouseChange={handleWarehouseChange}
+        onToWarehouseChange={handleWarehouseChange}
+        onAddItem={handleAddItem}
+        onRemoveItem={handleRemoveItem}
+        onFilesChange={setUploadedFiles}
+        onShowWarehouseChangeWarning={() => setShowWarehouseChangeWarning(true)}
+        onShowReviewDialog={() => setShowReviewDialog(true)}
+        hasUnsavedChanges={() => {
+          const hasFormData = !!(fromWarehouse || toWarehouse || transferReason || transferNotes || transferDate !== new Date().toISOString().split('T')[0])
+          const hasTransferItems = transferItems.length > 0
+          const hasSelectedProduct = !!(selectedProduct || transferQuantity)
+          const hasUploadedDocs = uploadedFiles.length > 0
           
-          <div className="space-y-6">
-            {/* Transfer Information */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Transfer Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="transfer-date" className="text-sm font-medium">Transfer Date *</Label>
-                    <Input
-                      id="transfer-date"
-                      type="date"
-                      value={transferDate}
-                      onChange={(e) => setTransferDate(e.target.value)}
-                      tabIndex={-1}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">From Warehouse *</Label>
-                    <Select 
-                      value={fromWarehouse?.id || ''} 
-                      onValueChange={(value) => handleWarehouseChange('from', value)}
-                      disabled={warehousesLocked}
-                    >
-                      <SelectTrigger 
-                        ref={fromWarehouseRef}
-                        tabIndex={1}
-                      >
-                        <SelectValue placeholder="Select source warehouse" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map((warehouse) => (
-                          <SelectItem key={warehouse.id} value={warehouse.id}>
-                            {warehouse.name} - {warehouse.location}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {warehousesLocked && (
-                      <p className="text-xs text-gray-500">Remove all items to change warehouse</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">To Warehouse *</Label>
-                    <Select 
-                      value={toWarehouse?.id || ''} 
-                      onValueChange={(value) => handleWarehouseChange('to', value)}
-                      disabled={warehousesLocked}
-                    >
-                      <SelectTrigger tabIndex={2}>
-                        <SelectValue placeholder="Select destination warehouse" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses
-                          .filter(warehouse => warehouse.id !== fromWarehouse?.id) // Exclude selected From warehouse
-                          .map((warehouse) => (
-                            <SelectItem key={warehouse.id} value={warehouse.id}>
-                              {warehouse.name} - {warehouse.location}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    {warehousesLocked && (
-                      <p className="text-xs text-gray-500">Remove all items to change warehouse</p>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="reason" className="text-sm font-medium">Reason for Transfer *</Label>
-                  <Input
-                    id="reason"
-                    value={transferReason}
-                    onChange={(e) => setTransferReason(e.target.value)}
-                    placeholder="e.g., Stock rebalancing, Customer request, etc."
-                    tabIndex={3}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Add Item Form */}
-            <Card ref={addProductsRef}>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Add Products to Transfer</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Product *</Label>
-                    <Select 
-                      value={selectedProduct?.id || ''} 
-                      onValueChange={(value) => {
-                        const stockLevel = availableProducts.find(p => p.product_id === value)
-                        if (stockLevel) {
-                          const product: Product = {
-                            id: stockLevel.product_id,
-                            name: stockLevel.product_name || '',
-                            sku: stockLevel.product_sku || '',
-                            unit_price: 0
-                          }
-                          setSelectedProduct(product)
-                          if (fromWarehouse) {
-                            loadStockLevel(stockLevel.product_id, fromWarehouse.id)
-                          }
-                        } else {
-                          setSelectedProduct(null)
-                          setCurrentStock(null)
-                        }
-                        setQuantityError('')
-                      }}
-                      disabled={!fromWarehouse}
-                    >
-                      <SelectTrigger 
-                        ref={productSelectRef} 
-                        tabIndex={6}
-                        id="product-select"
-                        onFocus={() => {
-                          // Auto-scroll to the Add Products to Transfer section when product dropdown is focused
-                          if (addProductsRef.current) {
-                            addProductsRef.current.scrollIntoView({ 
-                              behavior: 'smooth', 
-                              block: 'start',
-                              inline: 'nearest'
-                            })
-                          }
-                        }}
-                      >
-                        <SelectValue placeholder={fromWarehouse ? "Select a product" : "Select warehouse first"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableProducts.map((stockLevel) => (
-                          <SelectItem key={stockLevel.product_id} value={stockLevel.product_id}>
-                            {stockLevel.product_name} ({stockLevel.product_sku}) - Stock: {stockLevel.available_quantity}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {currentStock !== null && (
-                      <p className="text-sm text-gray-600">
-                        Available stock: <span className="font-semibold text-blue-600">{currentStock}</span>
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="quantity" className="text-sm font-medium">Quantity *</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      min="1"
-                      value={transferQuantity}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        setTransferQuantity(value)
-                        
-                        // Parse the value for validation
-                        const numericValue = parseInt(value) || 0
-                        
-                        // Validate quantity against current stock
-                        if (value && currentStock !== null && numericValue > currentStock) {
-                          setQuantityError(`Quantity cannot exceed available stock (${currentStock})`)
-                        } else {
-                          setQuantityError('')
-                        }
-                      }}
-                      placeholder="Enter quantity"
-                      className={quantityError ? 'border-red-500' : ''}
-                      tabIndex={7}
-                    />
-                    {quantityError && (
-                      <p className="text-sm text-red-600">{quantityError}</p>
-                    )}
-                  </div>
-                </div>
-                
-                <Button 
-                  type="button"
-                  onClick={handleAddItem} 
-                  className="w-full bg-[#52a852] hover:bg-[#4a964a] text-white"
-                  tabIndex={8}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Product to Transfer
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Items List */}
-            {transferItems.length > 0 && (
-              <Card ref={transferItemsRef}>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold">Products in Transfer ({transferItems.length})</CardTitle>
-                  <CardDescription className="text-sm">
-                    From: <span className="font-semibold">{fromWarehouse?.name}</span> → To: <span className="font-semibold">{toWarehouse?.name}</span>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="h-8">
-                          <TableHead className="py-2 text-xs font-medium">Product</TableHead>
-                          <TableHead className="py-2 text-xs font-medium">SKU</TableHead>
-                          <TableHead className="py-2 text-xs font-medium">Quantity</TableHead>
-                          <TableHead className="py-2 text-xs font-medium">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {transferItems.map((item, index) => (
-                          <TableRow key={`${item.product_id}-${index}`} className="h-8">
-                            <TableCell className="py-1 font-medium text-sm">
-                              {item.product_name}
-                            </TableCell>
-                            <TableCell className="py-1 font-mono text-xs text-gray-600">
-                              {item.product_sku}
-                            </TableCell>
-                            <TableCell className="py-1 font-medium text-sm text-blue-600">
-                              {item.quantity}
-                            </TableCell>
-                            <TableCell className="py-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveItem(index)}
-                                className="text-red-600 hover:text-red-800 h-6 px-2 text-xs"
-                              >
-                                Remove
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Notes Section */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Notes (Optional)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="transfer-notes" className="text-sm font-medium">Additional Notes</Label>
-                  <Textarea
-                    id="transfer-notes"
-                    value={transferNotes}
-                    onChange={(e) => setTransferNotes(e.target.value)}
-                    placeholder="Add any additional notes or comments for this transfer..."
-                    className="resize-none"
-                    rows={3}
-                    tabIndex={8}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Document Upload Section */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Supporting Documents (Optional)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <UnifiedDocumentUpload
-                  referenceType="transfer"
-                  referenceId=""
-                  title=""
-                  onFilesChange={setUploadedFiles}
-                  tabIndex={9}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => {
-                // Check for unsaved changes before closing
-                if (hasUnsavedChanges()) {
-                  setPendingNavigation(null) // No navigation, just closing dialog
-                  setShowCloseWarning(true)
-                  return // Don't close the dialog yet
-                }
-                resetForm()
-                setIsCreateModalOpen(false)
-              }}>
-                Cancel
-              </Button>
-              <Button 
-                type="button"
-                onClick={handleCreateTransfer}
-                disabled={transferItems.length === 0}
-                className="bg-[#52a852] hover:bg-[#4a964a] text-white"
-                tabIndex={10}
-              >
-                Review and Confirm
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          return hasFormData || hasTransferItems || hasSelectedProduct || hasUploadedDocs
+        }}
+        onResetForm={resetForm}
+      />
 
       {/* Warehouse Change Warning Dialog */}
       <Dialog open={showWarehouseChangeWarning} onOpenChange={setShowWarehouseChangeWarning}>
@@ -1293,173 +649,19 @@ export default function TransfersPage() {
       </Dialog>
 
       {/* Review Transfer Dialog */}
-      <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
-        <DialogContent className="w-[95vw] max-w-5xl max-h-[85vh] overflow-hidden flex flex-col [&>button]:hidden">
-          <DialogHeader className="sticky top-0 bg-white z-50 border-b border-gray-300 pb-4 mb-4 shadow-sm flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="flex items-center gap-3 text-xl font-semibold text-gray-900">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText className="h-5 w-5 text-blue-600" />
-                  </div>
-                  Review Transfer
-                </DialogTitle>
-                <DialogDescription className="text-gray-600 mt-2">
-                  Confirm the details below before creating the transfer.
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto overflow-x-hidden relative z-10">
-            <div className="space-y-8 p-1">
-              {/* Transfer Overview */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 border-b border-gray-200 pb-1">
-                  <Package className="h-5 w-5" />
-                  Transfer Overview
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">From Warehouse</span>
-                      <span className="text-gray-900 ml-2">: {fromWarehouse?.name || 'Not specified'}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">To Warehouse</span>
-                      <span className="text-gray-900 ml-2">: {toWarehouse?.name || 'Not specified'}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Processed By</span>
-                      <span className="text-gray-900 ml-2">: {user ? `${user.first_name} ${user.last_name}` : 'Current User'}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Transfer Date</span>
-                      <span className="text-gray-900 ml-2">: {new Date(transferDate).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Total Items</span>
-                      <span className="text-gray-900 ml-2">: {transferItems.length}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-gray-600 font-bold w-32">Total Quantity</span>
-                      <span className="text-gray-900 ml-2">: {transferItems.reduce((sum, item) => sum + item.quantity, 0)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Products Table */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
-                  <Package2 className="h-5 w-5" />
-                  Products ({transferItems.length})
-                </div>
-                <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm overflow-x-auto">
-                  <Table className="min-w-full">
-                    <TableHeader className="bg-gray-100">
-                      <TableRow className="border-b border-gray-300">
-                        <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">Product Name</TableHead>
-                        <TableHead className="font-semibold text-gray-900 text-left py-3 px-4 text-sm">SKU</TableHead>
-                        <TableHead className="font-semibold text-gray-900 text-center py-3 px-4 text-sm">Qty</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {transferItems.map((item, index) => (
-                        <TableRow 
-                          key={`${item.product_id}-${index}`} 
-                          className={`border-b border-gray-200 ${
-                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                          }`}
-                        >
-                          <TableCell className="py-3 px-4 text-sm">
-                            <span className="font-medium text-gray-900">
-                              {item.product_name}
-                            </span>
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-sm">
-                            <span className="font-mono text-gray-600">
-                              {item.product_sku}
-                            </span>
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-center text-sm">
-                            <span className="font-medium text-blue-600">
-                              {item.quantity}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-
-              {/* Reason Section */}
-              <div className="flex items-center gap-2 text-sm mt-1">
-                <span className="text-red-600 font-semibold">REASON:</span>
-                <span className="text-gray-700">{transferReason}</span>
-              </div>
-
-              {/* Notes Section */}
-              {transferNotes && (
-                <div className="flex items-center gap-2 text-sm mt-1">
-                  <span className="text-red-600 font-semibold">NOTE:</span>
-                  <span className="text-gray-700">{transferNotes}</span>
-                </div>
-              )}
-
-              {/* Documents Section */}
-              {uploadedFiles.length > 0 && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-base font-semibold text-gray-900 border-b border-gray-200 pb-1">
-                    <FileText className="h-4 w-4" />
-                    Documents ({uploadedFiles.length})
-                  </div>
-                  <div className="border border-gray-200 rounded p-3">
-                    <div className="space-y-2">
-                      {uploadedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-4 w-4 text-green-500" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                              <p className="text-xs text-gray-500">
-                                {(file.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex justify-center items-center pt-6 border-t border-gray-300 bg-gray-50 -mx-6 px-6 py-4">
-                <div className="flex gap-3">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowReviewDialog(false)}
-                    className="px-6 py-2"
-                  >
-                    Back
-                  </Button>
-                  <Button 
-                    className="bg-[#52a852] hover:bg-[#4a964a] text-white px-6 py-2" 
-                    onClick={confirmCreateTransfer}
-                  >
-                    Confirm & Create
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TransferReviewDialog
+        isOpen={showReviewDialog}
+        onClose={() => setShowReviewDialog(false)}
+        onConfirm={confirmCreateTransfer}
+        transferItems={transferItems}
+        fromWarehouse={fromWarehouse}
+        toWarehouse={toWarehouse}
+        transferDate={transferDate}
+        transferReason={transferReason}
+        transferNotes={transferNotes}
+        uploadedFiles={uploadedFiles}
+        user={user}
+      />
 
       {/* Success Dialog */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
@@ -1500,38 +702,7 @@ export default function TransfersPage() {
       </Dialog>
 
       {/* Error Dialog */}
-      <Dialog open={showErrorDialog} onOpenChange={(open) => {
-        setShowErrorDialog(open)
-        if (!open) {
-          // Focus back to product selection when error dialog closes
-          setTimeout(() => {
-            console.log('Attempting to focus product select after error dialog closes')
-            
-            // Try multiple methods to ensure focus works
-            const productSelect = document.getElementById('product-select') as HTMLElement
-            if (productSelect) {
-              console.log('Found product select by ID, attempting focus')
-              productSelect.focus()
-              // Also try clicking to ensure it's properly activated
-              productSelect.click()
-            } else {
-              console.log('Product select not found by ID, trying ref')
-              if (productSelectRef.current) {
-                productSelectRef.current.focus()
-                productSelectRef.current.click()
-              } else {
-                console.log('Product select not found by ref, trying tabIndex')
-                // Final fallback: find by tabIndex
-                const productSelectByTab = document.querySelector('[tabindex="5"]') as HTMLElement
-                if (productSelectByTab) {
-                  productSelectByTab.focus()
-                  productSelectByTab.click()
-                }
-              }
-            }
-          }, 500) // Increased timeout further
-        }
-      }}>
+      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
@@ -1555,95 +726,6 @@ export default function TransfersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Transfer Confirmation Dialog */}
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="h-5 w-5" />
-              Cancel Transfer
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to cancel this transfer? This action will:
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="p-4 bg-red-50 rounded-lg">
-              <ul className="text-sm text-red-800 space-y-2">
-                <li>• Reverse all stock movements</li>
-                <li>• Return items to source warehouse</li>
-                <li>• Remove items from destination warehouse</li>
-                <li>• Mark transfer as cancelled</li>
-              </ul>
-            </div>
-            
-            <div className="text-sm text-gray-600">
-              <p><strong>Transfer:</strong> {selectedTransfer?.reference_id}</p>
-              <p><strong>Items:</strong> {selectedTransfer?.items.length} product{selectedTransfer?.items.length !== 1 ? 's' : ''}</p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelDialog(false)} disabled={isCancelling}>
-              Keep Transfer
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={confirmCancelTransfer}
-              disabled={isCancelling}
-              className="flex items-center gap-2"
-            >
-              {isCancelling ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Cancelling...
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-4 w-4" />
-                  Cancel Transfer
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Close Warning Dialog */}
-      <Dialog open={showCloseWarning} onOpenChange={() => setShowCloseWarning(false)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <DialogTitle className="text-xl font-semibold text-gray-900">Unsaved Changes</DialogTitle>
-            <DialogDescription className="text-gray-600">
-              You have unsaved changes that will be lost if you close this dialog. Are you sure you want to continue?
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex justify-center gap-3 mt-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleCloseWarning(false)}
-              className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg"
-            >
-              Keep Editing
-            </Button>
-            <Button
-              type="button"
-              onClick={() => handleCloseWarning(true)}
-              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
-            >
-              Close Anyway
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </AppLayout>
   )
 }
