@@ -7,6 +7,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Search, User, FileText, X } from 'lucide-react'
+import { Plus, Search, User, FileText, X, CheckCircle } from 'lucide-react'
 import { UnifiedDocumentUpload } from '@/components/documents/unified-document-upload'
 import { AdjustmentReviewDialog } from './adjustment-review-dialog'
 import { useConfirm } from '@/hooks/use-confirm'
@@ -103,6 +104,11 @@ export function AdjustmentCreateDialog({
   // Close warning state
   const [showCloseWarning, setShowCloseWarning] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  
+  // Success dialog state
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [createdAdjustmentRef, setCreatedAdjustmentRef] = useState<string>('')
+  const [successWarehouse, setSuccessWarehouse] = useState<string>('')
   
   // Refs for form inputs
   const productSearchInputRef = useRef<HTMLInputElement>(null)
@@ -413,6 +419,9 @@ export function AdjustmentCreateDialog({
         }
       }
 
+      // Store warehouse name for success dialog before resetting
+      setSuccessWarehouse(selectedWarehouse?.name || '')
+      
       // Reset form and close modal
       resetForm()
       onClose()
@@ -420,14 +429,9 @@ export function AdjustmentCreateDialog({
       // Notify parent of success
       onSuccess()
       
-      await notice({
-        title: 'Adjustment created',
-        description: uploadedFiles.length > 0 
-          ? `Reference Number: ${generatedRef}\n\nDocuments uploaded: ${uploadedFiles.length}`
-          : `Reference Number: ${generatedRef}`,
-        variant: 'success',
-        okText: 'OK',
-      })
+      // Show success dialog
+      setCreatedAdjustmentRef(generatedRef)
+      setShowSuccessDialog(true)
     } catch (error: any) {
       console.error('Error creating adjustment:', error)
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error occurred'
@@ -1109,6 +1113,43 @@ export function AdjustmentCreateDialog({
               Close Without Saving
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              Adjustment Created Successfully!
+            </DialogTitle>
+            <DialogDescription>
+              Your adjustment has been processed and stock movements have been recorded.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="p-4 bg-green-50 rounded-lg">
+              <p className="text-sm font-medium text-green-800">Reference Number:</p>
+              <p className="text-lg font-bold text-green-900">{createdAdjustmentRef}</p>
+            </div>
+            
+            <div className="text-sm text-gray-600">
+              <p>• Stock has been adjusted in {successWarehouse || 'warehouse'}</p>
+              <p>• Adjustment details have been saved to the system</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => {
+              setShowSuccessDialog(false)
+              setCreatedAdjustmentRef('')
+              setSuccessWarehouse('')
+            }} className="w-full">
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
