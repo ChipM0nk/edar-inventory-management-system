@@ -1224,6 +1224,7 @@ export default function TransfersPage() {
                   referenceId=""
                   title=""
                   onFilesChange={setUploadedFiles}
+                  tabIndex={9}
                 />
               </CardContent>
             </Card>
@@ -1247,9 +1248,9 @@ export default function TransfersPage() {
                 onClick={handleCreateTransfer}
                 disabled={transferItems.length === 0}
                 className="bg-[#52a852] hover:bg-[#4a964a] text-white"
-                tabIndex={9}
+                tabIndex={10}
               >
-                Create Transfer
+                Review and Confirm
               </Button>
             </div>
           </div>
@@ -1287,98 +1288,111 @@ export default function TransfersPage() {
 
       {/* Review Transfer Dialog */}
       <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              Review Transfer
-            </DialogTitle>
+            <DialogTitle>Review Transfer</DialogTitle>
             <DialogDescription>
-              Please review the transfer details before creating
+              Confirm the details below before creating the transfer.
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Transfer Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Transfer Date</p>
-                    <p className="text-sm">{new Date(transferDate).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Reference Number</p>
-                    <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-                      {previewReferenceNumber}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">From Warehouse</p>
-                  <p className="text-sm font-semibold">{fromWarehouse?.name} - {fromWarehouse?.location}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">To Warehouse</p>
-                  <p className="text-sm font-semibold">{toWarehouse?.name} - {toWarehouse?.location}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Reason</p>
-                  <p className="text-sm">{transferReason}</p>
-                </div>
-                {transferNotes && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Notes</p>
-                    <p className="text-sm">{transferNotes}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Products to Transfer ({transferItems.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
+          <div className="space-y-6">
+            {/* Summary Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+              <div>
+                <div className="text-gray-500">Processed By</div>
+                <div className="font-medium">{user?.name || 'Current User'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Transfer Date</div>
+                <div className="font-medium">{new Date(transferDate).toLocaleDateString()}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">From Warehouse</div>
+                <div className="font-medium">{fromWarehouse?.name || '—'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">To Warehouse</div>
+                <div className="font-medium">{toWarehouse?.name || '—'}</div>
+              </div>
+            </div>
+
+            {/* Items Table */}
+            <div className="border rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transferItems.map((item, idx) => (
+                    <TableRow key={`${item.product_id}-${idx}`}>
+                      <TableCell>{item.product_name}</TableCell>
+                      <TableCell className="font-mono text-sm">{item.product_sku}</TableCell>
+                      <TableCell className="text-right text-blue-600 font-semibold">
+                        {item.quantity}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Reason Section */}
+            <div className="flex items-center gap-2 text-sm py-2">
+              <span className="text-red-600 font-semibold">REASON:</span>
+              <span className="text-gray-700">{transferReason}</span>
+            </div>
+
+            {/* Notes Section */}
+            {transferNotes && (
+              <div className="flex items-center gap-2 text-sm py-2">
+                <span className="text-red-600 font-semibold">NOTE:</span>
+                <span className="text-gray-700">{transferNotes}</span>
+              </div>
+            )}
+
+            {/* Documents Section */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <FileText className="h-4 w-4" />
+                  Documents ({uploadedFiles.length})
+                </div>
                 <div className="space-y-2">
-                  {transferItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-gray-600">SKU: {item.product_sku}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-blue-600">Qty: {item.quantity}</p>
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-green-500" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 pt-3 border-t">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Total Items:</span>
-                    <span className="font-semibold">{transferItems.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Total Quantity:</span>
-                    <span className="font-semibold text-blue-600">
-                      {transferItems.reduce((sum, item) => sum + item.quantity, 0)}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReviewDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmCreateTransfer} className="bg-[#52a852] hover:bg-[#4a964a] text-white">
-              Create Transfer
-            </Button>
-          </DialogFooter>
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setShowReviewDialog(false)}>
+                Back
+              </Button>
+              <Button 
+                className="bg-[#52a852] hover:bg-[#4a964a] text-white" 
+                onClick={confirmCreateTransfer}
+              >
+                Confirm & Create
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

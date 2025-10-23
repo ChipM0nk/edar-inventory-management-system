@@ -13,6 +13,7 @@ interface UnifiedDocumentUploadProps {
   showDelete?: boolean
   className?: string
   onFilesChange?: (files: File[]) => void
+  tabIndex?: number
 }
 
 interface Document {
@@ -30,7 +31,8 @@ export function UnifiedDocumentUpload({
   showDownload = true,
   showDelete = true,
   className = "",
-  onFilesChange
+  onFilesChange,
+  tabIndex
 }: UnifiedDocumentUploadProps) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
@@ -217,18 +219,19 @@ export function UnifiedDocumentUpload({
         )}
         
         {/* Compact Upload Area */}
-        <div className="border-2 border-dashed border-blue-400 bg-blue-50 rounded-md p-3 hover:border-blue-500 hover:bg-blue-100 transition-all duration-200">
+        <div className="border-2 border-dashed border-blue-400 bg-blue-50 rounded-md p-3 hover:border-blue-500 hover:bg-blue-100 transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus-within:border-blue-600 focus-within:bg-blue-100">
           <input
             type="file"
             multiple
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
             onChange={handleDocumentUpload}
-            className="hidden"
+            className="sr-only focus:outline-none"
             id="document-upload"
+            tabIndex={tabIndex}
           />
           <label
             htmlFor="document-upload"
-            className="cursor-pointer flex items-center gap-3"
+            className="cursor-pointer flex items-center gap-3 focus:outline-none"
           >
             <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
               <Upload className="w-4 h-4 text-blue-700" />

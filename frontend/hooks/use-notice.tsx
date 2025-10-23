@@ -71,7 +71,27 @@ export function useNotice(): [JSX.Element, NoticeFn] {
             {options.title}
           </DialogTitle>
           {options.description && (
-            <DialogDescription>{options.description}</DialogDescription>
+            <DialogDescription className="space-y-3">
+              {options.description.split('\n').map((line, index) => {
+                // Make reference number more prominent
+                if (line.includes('Reference Number:')) {
+                  const parts = line.split(': ')
+                  return (
+                    <div key={index} className="space-y-2">
+                      <div className="text-sm font-medium text-gray-700">{parts[0]}:</div>
+                      <div className="text-xl font-bold text-gray-900 font-mono bg-gray-50 px-3 py-2 rounded border">
+                        {parts[1]}
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <div key={index} className="text-sm text-gray-600 mt-2">
+                    {line}
+                  </div>
+                )
+              })}
+            </DialogDescription>
           )}
         </DialogHeader>
         <div className="flex justify-end">
